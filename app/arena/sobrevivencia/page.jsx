@@ -70,36 +70,39 @@ export default function ArenaSobrevivenciaPage() {
   };
 
   const calcularMultiplicadorOnda = (onda) => {
-    // Dificuldade aumenta exponencialmente mas de forma balanceada
-    if (onda <= 5) return 1.0 + (onda * 0.05); // 1.0 a 1.25
-    if (onda <= 10) return 1.25 + ((onda - 5) * 0.08); // 1.25 a 1.65
-    if (onda <= 15) return 1.65 + ((onda - 10) * 0.10); // 1.65 a 2.15
-    if (onda <= 20) return 2.15 + ((onda - 15) * 0.12); // 2.15 a 2.75
-    return 2.75 + ((onda - 20) * 0.15); // 2.75+
+    // ANTI-FARM: Dificuldade aumenta EXPONENCIALMENTE
+    // Onda 8+ = quase impossível sobreviver
+    if (onda <= 5) return 1.0 + (onda * 0.15); // 1.0 a 1.75 (mais agressivo)
+    if (onda <= 8) return 1.75 + ((onda - 5) * 0.4); // 1.75 a 2.95 (MUITO mais agressivo)
+    if (onda <= 12) return 2.95 + ((onda - 8) * 0.6); // 2.95 a 5.35 (brutal)
+    return 5.35 + ((onda - 12) * 0.8); // 5.35+ (quase impossível)
   };
 
-  const calcularRecompensasOnda = (onda) => {
+  const calcularRecompensasOnda = (onda, isAutoPlay = false) => {
     const base_xp = 30;
     const base_moedas = 20;
-    const multiplicador = Math.floor(onda / 5) + 1;
 
     const isBossWave = onda % 5 === 0;
     const bossBonus = isBossWave ? 2 : 1;
 
+    // ANTI-FARM: Auto-play recebe 40% das recompensas (-60%)
+    const penaltyAutoPlay = isAutoPlay ? 0.4 : 1.0;
+
     return {
-      xp: Math.floor(base_xp * onda * 0.8 * bossBonus),
-      moedas: Math.floor(base_moedas * onda * 0.6 * bossBonus),
+      xp: Math.floor(base_xp * onda * 0.8 * bossBonus * penaltyAutoPlay),
+      moedas: Math.floor(base_moedas * onda * 0.6 * bossBonus * penaltyAutoPlay),
       chance_fragmento: isBossWave ? 0.3 + (Math.floor(onda / 10) * 0.1) : 0.05 + (Math.floor(onda / 10) * 0.02),
       fragmentos_garantidos: onda >= 20 && isBossWave ? 1 : 0
     };
   };
 
   const calcularExaustaoOnda = (onda) => {
-    // Exaustão aumenta gradualmente - começa baixo mas acelera
-    if (onda <= 5) return 3 + onda;
-    if (onda <= 10) return 8 + (onda - 5) * 2;
-    if (onda <= 15) return 18 + (onda - 10) * 3;
-    return 33 + (onda - 15) * 4;
+    // ANTI-FARM: Exaustão aumenta MUITO mais rápido
+    // Após 10 ondas, avatar estará quase colapsado
+    if (onda <= 5) return 5 + (onda * 2); // 7 a 15
+    if (onda <= 10) return 15 + ((onda - 5) * 4); // 19 a 35
+    if (onda <= 15) return 35 + ((onda - 10) * 6); // 41 a 65
+    return 65 + ((onda - 15) * 8); // 73+ (colapso garantido)
   };
 
   const getNomeDificuldadeOnda = (onda) => {
@@ -127,6 +130,32 @@ export default function ArenaSobrevivenciaPage() {
       });
       return;
     }
+
+    // ANTI-FARM: Custo de entrada de 100 moedas
+    const CUSTO_ENTRADA = 100;
+    if (user.moedas < CUSTO_ENTRADA) {
+      setModalAlerta({
+        titulo: '💰 Moedas Insuficientes',
+        mensagem: `Modo Sobrevivência custa ${CUSTO_ENTRADA} moedas para entrar. Você tem apenas ${user.moedas} moedas.`
+      });
+      return;
+    }
+
+    // Descontar moedas imediatamente
+    fetch('/api/atualizar-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        moedas: -CUSTO_ENTRADA // Subtrai 100 moedas
+      })
+    });
+
+    // Atualizar moedas localmente
+    setUser(prev => ({
+      ...prev,
+      moedas: prev.moedas - CUSTO_ENTRADA
+    }));
 
     // Inicializar stats do avatar
     const statsIniciais = {
@@ -222,8 +251,8 @@ export default function ArenaSobrevivenciaPage() {
       localStorage.setItem(`survival_record_${user.id}`, onda.toString());
     }
 
-    // Calcular recompensas da onda
-    const recompensas = calcularRecompensasOnda(onda);
+    // Calcular recompensas da onda (passar flag de auto-play)
+    const recompensas = calcularRecompensasOnda(onda, autoPlayRef.current);
 
     // Acumular recompensas
     setRecompensasAcumuladas(prev => ({
@@ -335,6 +364,15 @@ export default function ArenaSobrevivenciaPage() {
       });
 
       // Atualizar avatar (XP, exaustão, nível)
+      // IMPORTANTE: NÃO enviar 'vinculo' - modo sobrevivência não altera vínculo
+      console.log('🏋️ Salvando sobrevivência:', {
+        avatarId: avatarSelecionado.id,
+        xp: recompensasTotais.xp,
+        exaustaoAcumulada: exaustaoAcumulada,
+        exaustaoEnviada: Math.floor(exaustaoAcumulada),
+        nivel: statsAvatarAtual?.nivel || avatarSelecionado.nivel
+      });
+
       await fetch('/api/atualizar-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -342,6 +380,7 @@ export default function ArenaSobrevivenciaPage() {
           avatarId: avatarSelecionado.id,
           experiencia: recompensasTotais.xp,
           exaustao: Math.floor(exaustaoAcumulada),
+          // NÃO enviar 'vinculo' - modo sobrevivência não altera vínculo!
           nivel: statsAvatarAtual?.nivel || avatarSelecionado.nivel,
           // Atualizar stats se subiram de nível
           forca: statsAvatarAtual?.forca || avatarSelecionado.forca,
@@ -375,7 +414,8 @@ export default function ArenaSobrevivenciaPage() {
     let totalFragmentos = 0;
 
     for (let i = 1; i <= ondaFinal; i++) {
-      const recompensas = calcularRecompensasOnda(i);
+      // Passar flag de auto-play para cálculo correto
+      const recompensas = calcularRecompensasOnda(i, autoPlayRef.current);
       totalXP += recompensas.xp;
       totalMoedas += recompensas.moedas;
       totalFragmentos += recompensas.fragmentos_garantidos;
@@ -750,7 +790,11 @@ export default function ArenaSobrevivenciaPage() {
                   <ul className="space-y-2 text-sm text-slate-300">
                     <li className="flex items-start gap-2">
                       <span className="text-purple-400 mt-1">▸</span>
-                      <span><strong>Ondas infinitas:</strong> Enfrente inimigos cada vez mais fortes</span>
+                      <span><strong>Custo de entrada:</strong> 100 moedas para entrar</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-purple-400 mt-1">▸</span>
+                      <span><strong>Ondas infinitas:</strong> Inimigos ficam exponencialmente mais fortes</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-purple-400 mt-1">▸</span>
@@ -758,11 +802,11 @@ export default function ArenaSobrevivenciaPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-purple-400 mt-1">▸</span>
-                      <span><strong>Exaustão crescente:</strong> Cada onda aumenta sua exaustão permanentemente</span>
+                      <span><strong>Exaustão devastadora:</strong> Avatar fica quase inutilizável após 10+ ondas</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-purple-400 mt-1">▸</span>
-                      <span><strong>Boss Waves:</strong> A cada 5 ondas, enfrente um chefe poderoso com recompensas dobradas</span>
+                      <span><strong>Boss Waves:</strong> A cada 5 ondas, chefe com recompensas dobradas</span>
                     </li>
                   </ul>
                 </div>
@@ -783,6 +827,10 @@ export default function ArenaSobrevivenciaPage() {
                       <span><strong>Fragmentos:</strong> Chance alta em boss waves, garantido na onda 20+</span>
                     </li>
                     <li className="flex items-start gap-2">
+                      <span className="text-yellow-400 mt-1">⚠</span>
+                      <span><strong className="text-yellow-400">Auto-play:</strong> Recompensas reduzidas em 60%</span>
+                    </li>
+                    <li className="flex items-start gap-2">
                       <span className="text-green-400 mt-1">▸</span>
                       <span><strong>Pode desistir:</strong> Colete suas recompensas a qualquer momento</span>
                     </li>
@@ -795,12 +843,12 @@ export default function ArenaSobrevivenciaPage() {
                 <h3 className="text-sm font-bold text-cyan-400 mb-3 uppercase tracking-wider">📊 Progressão de Dificuldade</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                   {[
-                    { ondas: '1-5', nome: 'Iniciante', mult: '1.0-1.25x', cor: 'border-green-500' },
-                    { ondas: '6-10', nome: 'Intermediário', mult: '1.25-1.65x', cor: 'border-cyan-500' },
-                    { ondas: '11-15', nome: 'Avançado', mult: '1.65-2.15x', cor: 'border-blue-500' },
-                    { ondas: '16-20', nome: 'Elite', mult: '2.15-2.75x', cor: 'border-purple-500' },
-                    { ondas: '21-30', nome: 'Lendário', mult: '2.75-4.25x', cor: 'border-red-500' },
-                    { ondas: '31+', nome: 'IMPOSSÍVEL', mult: '4.25x+', cor: 'border-red-700' }
+                    { ondas: '1-5', nome: 'Iniciante', mult: '1.0-1.75x', cor: 'border-green-500' },
+                    { ondas: '6-8', nome: 'Perigoso', mult: '1.75-2.95x', cor: 'border-yellow-500' },
+                    { ondas: '9-12', nome: 'Brutal', mult: '2.95-5.35x', cor: 'border-orange-500' },
+                    { ondas: '13-15', nome: 'Extremo', mult: '5.35-7.75x', cor: 'border-red-500' },
+                    { ondas: '16-20', nome: 'Mortal', mult: '7.75-10.95x', cor: 'border-red-600' },
+                    { ondas: '21+', nome: 'IMPOSSÍVEL', mult: '10.95x+', cor: 'border-red-900' }
                   ].map((tier, idx) => (
                     <div key={idx} className={`bg-slate-900/50 border-2 ${tier.cor} rounded p-2 text-center`}>
                       <div className="font-bold text-white mb-1">{tier.ondas}</div>
