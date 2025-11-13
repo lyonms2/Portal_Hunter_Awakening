@@ -1,0 +1,1143 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { aplicarPenalidadesExaustao, getNivelExaustao } from "../../avatares/sistemas/exhaustionSystem";
+import AvatarSVG from "../../components/AvatarSVG";
+
+export default function ArenaSobrevivenciaPage() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [avatares, setAvatares] = useState([]);
+  const [avatarSelecionado, setAvatarSelecionado] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [estadoJogo, setEstadoJogo] = useState('selecao'); // selecao, preparando, sobrevivendo, game_over
+  const [ondaAtual, setOndaAtual] = useState(0);
+  const [recordePessoal, setRecordePessoal] = useState(0);
+  const [autoPlay, setAutoPlay] = useState(false); // Modo auto-play
+  const autoPlayRef = useRef(false); // Ref para acesso imediato ao valor de autoPlay
+
+  // Estados de combate
+  const [statsAvatarAtual, setStatsAvatarAtual] = useState(null); // HP, energia, stats atuais
+  const [recompensasAcumuladas, setRecompensasAcumuladas] = useState({ xp: 0, moedas: 0, fragmentos: 0 });
+  const [modalLevelUp, setModalLevelUp] = useState(null); // { nivelAnterior, nivelNovo }
+  const [exaustaoAcumulada, setExaustaoAcumulada] = useState(0); // Exaustão total acumulada
+
+  // Estados para modais
+  const [modalOndaCompleta, setModalOndaCompleta] = useState(null); // { onda, recompensas, exaustao }
+  const [modalGameOver, setModalGameOver] = useState(null); // { ondaFinal, recompensasTotais, novoRecorde }
+  const [modalAlerta, setModalAlerta] = useState(null); // { titulo, mensagem }
+
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      router.push("/login");
+      return;
+    }
+
+    const parsedUser = JSON.parse(userData);
+    setUser(parsedUser);
+    carregarAvatares(parsedUser.id);
+
+    // Carregar recorde pessoal (simular - depois implementar com API)
+    const recordeSalvo = localStorage.getItem(`survival_record_${parsedUser.id}`);
+    if (recordeSalvo) {
+      setRecordePessoal(parseInt(recordeSalvo));
+    }
+  }, [router]);
+
+  const carregarAvatares = async (userId) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/meus-avatares?userId=${userId}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        // Filtro mais rigoroso: apenas avatares vivos com menos de 60% exaustão
+        const avataresAptos = data.avatares.filter(av => av.vivo && av.exaustao < 60);
+        setAvatares(avataresAptos);
+
+        const ativo = avataresAptos.find(av => av.ativo);
+        if (ativo) {
+          setAvatarSelecionado(ativo);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao carregar avatares:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calcularMultiplicadorOnda = (onda) => {
+    // Dificuldade aumenta exponencialmente mas de forma balanceada
+    if (onda <= 5) return 1.0 + (onda * 0.05); // 1.0 a 1.25
+    if (onda <= 10) return 1.25 + ((onda - 5) * 0.08); // 1.25 a 1.65
+    if (onda <= 15) return 1.65 + ((onda - 10) * 0.10); // 1.65 a 2.15
+    if (onda <= 20) return 2.15 + ((onda - 15) * 0.12); // 2.15 a 2.75
+    return 2.75 + ((onda - 20) * 0.15); // 2.75+
+  };
+
+  const calcularRecompensasOnda = (onda) => {
+    const base_xp = 30;
+    const base_moedas = 20;
+    const multiplicador = Math.floor(onda / 5) + 1;
+
+    const isBossWave = onda % 5 === 0;
+    const bossBonus = isBossWave ? 2 : 1;
+
+    return {
+      xp: Math.floor(base_xp * onda * 0.8 * bossBonus),
+      moedas: Math.floor(base_moedas * onda * 0.6 * bossBonus),
+      chance_fragmento: isBossWave ? 0.3 + (Math.floor(onda / 10) * 0.1) : 0.05 + (Math.floor(onda / 10) * 0.02),
+      fragmentos_garantidos: onda >= 20 && isBossWave ? 1 : 0
+    };
+  };
+
+  const calcularExaustaoOnda = (onda) => {
+    // Exaustão aumenta gradualmente - começa baixo mas acelera
+    if (onda <= 5) return 3 + onda;
+    if (onda <= 10) return 8 + (onda - 5) * 2;
+    if (onda <= 15) return 18 + (onda - 10) * 3;
+    return 33 + (onda - 15) * 4;
+  };
+
+  const getNomeDificuldadeOnda = (onda) => {
+    if (onda <= 5) return { nome: 'Iniciante', cor: 'text-green-400' };
+    if (onda <= 10) return { nome: 'Intermediário', cor: 'text-cyan-400' };
+    if (onda <= 15) return { nome: 'Avançado', cor: 'text-blue-400' };
+    if (onda <= 20) return { nome: 'Elite', cor: 'text-purple-400' };
+    if (onda <= 30) return { nome: 'Lendário', cor: 'text-red-400' };
+    return { nome: 'IMPOSSÍVEL', cor: 'text-red-600' };
+  };
+
+  const iniciarSobrevivencia = (comAutoPlay = false) => {
+    if (!avatarSelecionado) {
+      setModalAlerta({
+        titulo: '⚠️ Avatar não selecionado',
+        mensagem: 'Selecione um avatar antes de começar o modo Sobrevivência!'
+      });
+      return;
+    }
+
+    if (avatarSelecionado.exaustao >= 60) {
+      setModalAlerta({
+        titulo: '💀 Avatar Exausto',
+        mensagem: 'Seu avatar está muito exausto! Modo Sobrevivência exige avatares em boa forma (menos de 60% de exaustão).'
+      });
+      return;
+    }
+
+    // Inicializar stats do avatar
+    const statsIniciais = {
+      hp_atual: avatarSelecionado.resistencia * 10,
+      hp_maximo: avatarSelecionado.resistencia * 10,
+      energia_atual: 100,
+      energia_maxima: 100,
+      forca: avatarSelecionado.forca,
+      agilidade: avatarSelecionado.agilidade,
+      resistencia: avatarSelecionado.resistencia,
+      foco: avatarSelecionado.foco,
+      nivel: avatarSelecionado.nivel,
+      xp_atual: avatarSelecionado.experiencia || 0
+    };
+
+    setStatsAvatarAtual(statsIniciais);
+    setRecompensasAcumuladas({ xp: 0, moedas: 0, fragmentos: 0 });
+    setExaustaoAcumulada(0);
+    setAutoPlay(comAutoPlay);
+    autoPlayRef.current = comAutoPlay; // Sincronizar ref imediatamente
+    setEstadoJogo('preparando');
+    setOndaAtual(1);
+
+    // Simular preparação (1.5 segundos de animação)
+    setTimeout(() => {
+      setEstadoJogo('sobrevivendo');
+      iniciarOndaAtual(1);
+    }, 1500);
+  };
+
+  const iniciarOndaAtual = (onda) => {
+    // Simular batalha com dificuldade crescente
+    const multiplicador = calcularMultiplicadorOnda(onda);
+    const danoBase = 15 * multiplicador;
+    const gastoEnergiaBase = 20 + (onda * 2);
+
+    const tempoCombate = autoPlayRef.current ? 800 : 2500;
+
+    setTimeout(() => {
+      // Calcular dano recebido na onda (progressivo e balanceado)
+      const danoAleatorio = danoBase + Math.random() * (danoBase * 0.5);
+      const dano = Math.floor(danoAleatorio);
+
+      // Calcular gasto de energia
+      const energiaGasta = Math.min(gastoEnergiaBase + Math.random() * 10, 80);
+
+      // Atualizar exaustão acumulada
+      const exaustaoOnda = calcularExaustaoOnda(onda);
+      setExaustaoAcumulada(prev => prev + exaustaoOnda);
+
+      // Calcular novos valores antes de atualizar estado
+      let novoHP = 0;
+      let morreu = false;
+
+      // Atualizar stats do avatar
+      setStatsAvatarAtual(prev => {
+        if (!prev) return prev;
+
+        novoHP = Math.max(0, prev.hp_atual - dano);
+        const novaEnergia = Math.max(0, prev.energia_atual - energiaGasta);
+        morreu = novoHP <= 0;
+
+        return {
+          ...prev,
+          hp_atual: novoHP,
+          energia_atual: novaEnergia
+        };
+      });
+
+      // Verificar resultado FORA do setState
+      setTimeout(() => {
+        if (morreu) {
+          setAutoPlay(false);
+          autoPlayRef.current = false;
+          finalizarSobrevivencia(onda, true);
+        } else {
+          ondaCompleta(onda);
+        }
+      }, 400);
+    }, tempoCombate);
+  };
+
+  const ondaCompleta = (onda) => {
+    // Atualizar recorde se necessário
+    if (onda > recordePessoal) {
+      setRecordePessoal(onda);
+      localStorage.setItem(`survival_record_${user.id}`, onda.toString());
+    }
+
+    // Calcular recompensas da onda
+    const recompensas = calcularRecompensasOnda(onda);
+
+    // Acumular recompensas
+    setRecompensasAcumuladas(prev => ({
+      xp: prev.xp + recompensas.xp,
+      moedas: prev.moedas + recompensas.moedas,
+      fragmentos: prev.fragmentos + recompensas.fragmentos_garantidos + (Math.random() < recompensas.chance_fragmento ? 1 : 0)
+    }));
+
+    // Verificar level up e atualizar XP
+    let houveLevelUp = false;
+    setStatsAvatarAtual(prev => {
+      if (!prev) return prev;
+
+      const novoXP = prev.xp_atual + recompensas.xp;
+      const xpParaProximoNivel = prev.nivel * 100; // Fórmula simples
+
+      if (novoXP >= xpParaProximoNivel) {
+        // Level up!
+        const nivelAnterior = prev.nivel;
+        const nivelNovo = nivelAnterior + 1;
+        houveLevelUp = true;
+
+        // Mostrar animação de level up (mas só no modo normal)
+        if (!autoPlayRef.current) {
+          setTimeout(() => {
+            setModalLevelUp({ nivelAnterior, nivelNovo });
+          }, 1500);
+        }
+
+        // Aumentar stats ao subir de nível
+        return {
+          ...prev,
+          nivel: nivelNovo,
+          xp_atual: novoXP - xpParaProximoNivel,
+          hp_maximo: prev.hp_maximo + 10,
+          hp_atual: Math.min(prev.hp_atual + 20, prev.hp_maximo + 10), // Recupera 20 HP
+          energia_atual: Math.min(prev.energia_atual + 30, 100), // Recupera 30 energia
+          forca: prev.forca + 1,
+          agilidade: prev.agilidade + 1,
+          resistencia: prev.resistencia + 1,
+          foco: prev.foco + 1
+        };
+      }
+
+      return { ...prev, xp_atual: novoXP };
+    });
+
+    // Decidir próxima ação - verificar imediatamente se é autoPlay
+    if (autoPlayRef.current) {
+      // Continuar para próxima onda
+      const proximaOnda = onda + 1;
+      setOndaAtual(proximaOnda);
+      setTimeout(() => {
+        iniciarOndaAtual(proximaOnda);
+      }, 300); // Delay curto entre ondas no auto-play
+    } else {
+      // Modo normal - mostrar modal de onda completa
+      const exaustao = calcularExaustaoOnda(onda);
+      setModalOndaCompleta({ onda, recompensas, exaustao });
+    }
+  };
+
+  const continuarParaProximaOnda = () => {
+    const proximaOnda = modalOndaCompleta.onda + 1;
+    setModalOndaCompleta(null);
+    setOndaAtual(proximaOnda);
+    setEstadoJogo('preparando');
+
+    setTimeout(() => {
+      setEstadoJogo('sobrevivendo');
+      iniciarOndaAtual(proximaOnda);
+    }, 1500);
+  };
+
+  const desistirSobrevivencia = () => {
+    const ondaFinal = modalOndaCompleta.onda;
+    setModalOndaCompleta(null);
+    finalizarSobrevivencia(ondaFinal, false);
+  };
+
+  const finalizarSobrevivencia = async (ondaFinal, derrota = true) => {
+    const novoRecorde = ondaFinal > recordePessoal;
+
+    // Usar recompensas acumuladas
+    const recompensasTotais = recompensasAcumuladas;
+
+    // Salvar recompensas no banco de dados
+    try {
+      // Atualizar stats do jogador (moedas e fragmentos)
+      await fetch('/api/atualizar-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          moedas: recompensasTotais.moedas,
+          fragmentos: recompensasTotais.fragmentos
+        })
+      });
+
+      // Atualizar avatar (XP, exaustão, nível)
+      await fetch('/api/atualizar-avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          avatarId: avatarSelecionado.id,
+          experiencia: recompensasTotais.xp,
+          exaustao: Math.floor(exaustaoAcumulada),
+          nivel: statsAvatarAtual?.nivel || avatarSelecionado.nivel,
+          // Atualizar stats se subiram de nível
+          forca: statsAvatarAtual?.forca || avatarSelecionado.forca,
+          agilidade: statsAvatarAtual?.agilidade || avatarSelecionado.agilidade,
+          resistencia: statsAvatarAtual?.resistencia || avatarSelecionado.resistencia,
+          foco: statsAvatarAtual?.foco || avatarSelecionado.foco
+        })
+      });
+    } catch (error) {
+      console.error('Erro ao salvar recompensas:', error);
+    }
+
+    setModalGameOver({
+      ondaFinal,
+      recompensasTotais,
+      novoRecorde,
+      derrota,
+      statsFinais: statsAvatarAtual
+    });
+  };
+
+  const voltarAoLobby = () => {
+    setModalGameOver(null);
+    setEstadoJogo('selecao');
+    setOndaAtual(0);
+  };
+
+  const calcularRecompensasTotais = (ondaFinal) => {
+    let totalXP = 0;
+    let totalMoedas = 0;
+    let totalFragmentos = 0;
+
+    for (let i = 1; i <= ondaFinal; i++) {
+      const recompensas = calcularRecompensasOnda(i);
+      totalXP += recompensas.xp;
+      totalMoedas += recompensas.moedas;
+      totalFragmentos += recompensas.fragmentos_garantidos;
+
+      // Simular chance de fragmento
+      if (Math.random() < recompensas.chance_fragmento) {
+        totalFragmentos++;
+      }
+    }
+
+    return { xp: totalXP, moedas: totalMoedas, fragmentos: totalFragmentos };
+  };
+
+  const getAvisoExaustao = (exaustao) => {
+    if (exaustao >= 60) return { texto: '🔴 MUITO EXAUSTO - NÃO RECOMENDADO!', cor: 'text-red-500' };
+    if (exaustao >= 40) return { texto: '🟡 CANSADO - Cuidado com penalidades', cor: 'text-yellow-500' };
+    if (exaustao >= 20) return { texto: '🟢 BOM - Pequenas penalidades', cor: 'text-green-500' };
+    return { texto: '💚 PERFEITO - Sem penalidades!', cor: 'text-green-400' };
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950 flex items-center justify-center">
+        <div className="text-purple-400 font-mono animate-pulse">Carregando Modo Sobrevivência...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950 text-gray-100">
+      {/* Modal de Alerta */}
+      {modalAlerta && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-gradient-to-br from-slate-900 to-slate-950 rounded-xl border-2 border-orange-500 p-8">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">{modalAlerta.titulo.split(' ')[0]}</div>
+              <h2 className="text-2xl font-black text-white mb-2">
+                {modalAlerta.titulo.substring(2)}
+              </h2>
+              <p className="text-slate-300">{modalAlerta.mensagem}</p>
+            </div>
+            <button
+              onClick={() => setModalAlerta(null)}
+              className="w-full px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-lg transition-colors"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Onda Completa */}
+      {modalOndaCompleta && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full bg-gradient-to-br from-purple-900/50 to-slate-950 rounded-2xl border-2 border-purple-500 p-8">
+            <div className="text-center mb-8">
+              <div className="text-7xl mb-4 animate-bounce">🎉</div>
+              <h2 className="text-5xl font-black text-purple-400 mb-2">
+                ONDA {modalOndaCompleta.onda}
+              </h2>
+              <p className="text-2xl text-green-400 font-bold">COMPLETADA!</p>
+              {modalOndaCompleta.onda > recordePessoal - 1 && modalOndaCompleta.onda > recordePessoal && (
+                <div className="mt-2 text-yellow-400 font-black text-lg animate-pulse">
+                  🎊 NOVO RECORDE! 🎊
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-blue-500/30">
+                <div className="text-xs text-blue-300 mb-2 uppercase font-bold">XP Ganho</div>
+                <div className="text-3xl font-black text-blue-400">+{modalOndaCompleta.recompensas.xp}</div>
+              </div>
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-yellow-500/30">
+                <div className="text-xs text-yellow-300 mb-2 uppercase font-bold">Moedas</div>
+                <div className="text-3xl font-black text-yellow-400">+{modalOndaCompleta.recompensas.moedas}</div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-4 border border-purple-500/30 mb-6">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-400">💎 Chance de Fragmento:</span>
+                <span className="text-lg font-bold text-purple-400">
+                  {(modalOndaCompleta.recompensas.chance_fragmento * 100).toFixed(0)}%
+                </span>
+              </div>
+              {modalOndaCompleta.recompensas.fragmentos_garantidos > 0 && (
+                <div className="mt-2 text-center text-purple-300 font-bold">
+                  +{modalOndaCompleta.recompensas.fragmentos_garantidos} Fragmento(s) Garantido(s)!
+                </div>
+              )}
+            </div>
+
+            <div className="bg-orange-950/30 border border-orange-500/50 rounded-lg p-4 mb-6">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-orange-300">😰 Exaustão Acumulada:</span>
+                <span className="text-2xl font-bold text-orange-400">+{modalOndaCompleta.exaustao}</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-2 text-center">
+                Sua exaustão continua aumentando sem recuperação!
+              </div>
+            </div>
+
+            {/* Card de Stats Atuais do Avatar */}
+            {statsAvatarAtual && (
+              <div className="bg-slate-900/70 border-2 border-cyan-500/50 rounded-lg p-6 mb-8">
+                <h3 className="text-cyan-400 font-bold mb-4 text-center">📊 STATUS DO AVATAR</h3>
+
+                <div className="flex items-center gap-4 mb-4 justify-center">
+                  <AvatarSVG avatar={avatarSelecionado} tamanho={60} />
+                  <div>
+                    <div className="font-bold text-white">{avatarSelecionado.nome}</div>
+                    <div className="text-slate-400 text-sm">Nv.{statsAvatarAtual.nivel} • {avatarSelecionado.elemento}</div>
+                  </div>
+                </div>
+
+                {/* Barras de HP, Energia e Exaustão */}
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-red-400 font-bold">❤️ HP</span>
+                      <span className="text-slate-300 font-mono">{Math.floor(statsAvatarAtual.hp_atual)} / {statsAvatarAtual.hp_maximo}</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-4 overflow-hidden border border-slate-700">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          (statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) > 0.5 ? 'bg-gradient-to-r from-green-600 to-green-400' :
+                          (statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) > 0.25 ? 'bg-gradient-to-r from-yellow-600 to-yellow-400' :
+                          'bg-gradient-to-r from-red-600 to-red-400'
+                        }`}
+                        style={{ width: `${(statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-blue-400 font-bold">⚡ Energia</span>
+                      <span className="text-slate-300 font-mono">{Math.floor(statsAvatarAtual.energia_atual)} / {statsAvatarAtual.energia_maxima}</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-4 overflow-hidden border border-slate-700">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-500"
+                        style={{ width: `${(statsAvatarAtual.energia_atual / statsAvatarAtual.energia_maxima) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-orange-400 font-bold">😰 Exaustão</span>
+                      <span className="text-slate-300 font-mono">{Math.floor(exaustaoAcumulada)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-4 overflow-hidden border border-slate-700">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          exaustaoAcumulada < 40 ? 'bg-gradient-to-r from-green-600 to-green-400' :
+                          exaustaoAcumulada < 60 ? 'bg-gradient-to-r from-yellow-600 to-orange-400' :
+                          'bg-gradient-to-r from-orange-600 to-red-600'
+                        }`}
+                        style={{ width: `${Math.min(exaustaoAcumulada, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Aviso de perigo */}
+                {statsAvatarAtual.hp_atual < statsAvatarAtual.hp_maximo * 0.3 && (
+                  <div className="mt-4 bg-red-950/50 border border-red-600 rounded p-3 text-center">
+                    <p className="text-red-400 text-sm font-bold">⚠️ HP CRÍTICO! Considere coletar e sair!</p>
+                  </div>
+                )}
+
+                {statsAvatarAtual.energia_atual < 20 && (
+                  <div className="mt-4 bg-yellow-950/50 border border-yellow-600 rounded p-3 text-center">
+                    <p className="text-yellow-400 text-sm font-bold">⚠️ ENERGIA BAIXA! Próxima onda será difícil!</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={desistirSobrevivencia}
+                className="px-6 py-4 bg-red-900/50 hover:bg-red-900/70 border-2 border-red-600 text-red-300 font-bold rounded-lg transition-all"
+              >
+                💰 Coletar e Sair
+              </button>
+              <button
+                onClick={continuarParaProximaOnda}
+                className="px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black rounded-lg transition-all shadow-lg shadow-purple-500/30"
+              >
+                ⚔️ Próxima Onda ({modalOndaCompleta.onda + 1})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Level Up */}
+      {modalLevelUp && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-gradient-to-br from-yellow-900 via-orange-900 to-yellow-900 rounded-2xl border-4 border-yellow-400 p-8 shadow-2xl shadow-yellow-500/50 animate-pulse">
+            <div className="text-center">
+              <div className="text-8xl mb-4 animate-bounce">⭐</div>
+              <h2 className="text-6xl font-black text-yellow-300 mb-2 drop-shadow-lg">
+                LEVEL UP!
+              </h2>
+              <div className="text-4xl font-bold text-white mb-6">
+                {modalLevelUp.nivelAnterior} → {modalLevelUp.nivelNovo}
+              </div>
+
+              <div className="bg-black/40 rounded-lg p-6 mb-6">
+                <h3 className="text-yellow-400 font-bold mb-4 text-lg">✨ MELHORIAS</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-green-900/50 border border-green-500 rounded p-2">
+                    <div className="text-green-400 font-bold">+20 HP</div>
+                    <div className="text-xs text-slate-300">Recuperado</div>
+                  </div>
+                  <div className="bg-blue-900/50 border border-blue-500 rounded p-2">
+                    <div className="text-blue-400 font-bold">+30 Energia</div>
+                    <div className="text-xs text-slate-300">Recuperada</div>
+                  </div>
+                  <div className="bg-red-900/50 border border-red-500 rounded p-2">
+                    <div className="text-red-400 font-bold">+1 Força</div>
+                  </div>
+                  <div className="bg-green-900/50 border border-green-500 rounded p-2">
+                    <div className="text-green-400 font-bold">+1 Agilidade</div>
+                  </div>
+                  <div className="bg-blue-900/50 border border-blue-500 rounded p-2">
+                    <div className="text-blue-400 font-bold">+1 Resistência</div>
+                  </div>
+                  <div className="bg-purple-900/50 border border-purple-500 rounded p-2">
+                    <div className="text-purple-400 font-bold">+1 Foco</div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setModalLevelUp(null)}
+                className="w-full px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black rounded-lg transition-all text-lg shadow-lg"
+              >
+                🎉 CONTINUAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Game Over */}
+      {modalGameOver && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border-2 border-purple-500 p-8">
+            <div className="text-center mb-8">
+              <div className="text-8xl mb-4">
+                {modalGameOver.derrota ? '💀' : '🏆'}
+              </div>
+              <h2 className="text-5xl font-black text-white mb-4">
+                {modalGameOver.derrota ? 'GAME OVER' : 'SOBREVIVÊNCIA FINALIZADA'}
+              </h2>
+              <div className="text-3xl font-bold text-purple-400 mb-2">
+                {modalGameOver.ondaFinal} Ondas Sobrevividas
+              </div>
+              {modalGameOver.novoRecorde && (
+                <div className="text-2xl text-yellow-400 font-black animate-pulse">
+                  🎊 NOVO RECORDE PESSOAL! 🎊
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-6 border border-purple-500/30 mb-8">
+              <h3 className="text-cyan-400 font-bold mb-4 text-center text-xl">🎁 RECOMPENSAS TOTAIS</h3>
+
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="text-center p-4 bg-slate-800 rounded">
+                  <div className="text-3xl font-bold text-blue-400">{modalGameOver.recompensasTotais.xp}</div>
+                  <div className="text-xs text-slate-400 mt-1">XP Total</div>
+                </div>
+                <div className="text-center p-4 bg-slate-800 rounded">
+                  <div className="text-3xl font-bold text-yellow-400">{modalGameOver.recompensasTotais.moedas}</div>
+                  <div className="text-xs text-slate-400 mt-1">Moedas</div>
+                </div>
+                <div className="text-center p-4 bg-slate-800 rounded">
+                  <div className="text-3xl font-bold text-purple-400">{modalGameOver.recompensasTotais.fragmentos}</div>
+                  <div className="text-xs text-slate-400 mt-1">💎 Fragmentos</div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={voltarAoLobby}
+              className="w-full px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black rounded-lg transition-all text-lg shadow-lg shadow-purple-500/30"
+            >
+              ← Voltar ao Lobby
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent mb-2">
+              💀 MODO SOBREVIVÊNCIA
+            </h1>
+            <p className="text-slate-400 font-mono text-sm">
+              Quantas ondas você consegue sobreviver? Sem recuperação, sem piedade.
+            </p>
+          </div>
+
+          <button
+            onClick={() => router.push("/arena")}
+            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors"
+          >
+            ← Voltar ao Lobby
+          </button>
+        </div>
+
+        {/* Recorde Pessoal */}
+        {recordePessoal > 0 && (
+          <div className="mb-8 bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-2 border-purple-500/50 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-5xl">🏆</div>
+                <div>
+                  <div className="text-sm text-purple-400 font-bold uppercase tracking-wider">Seu Recorde</div>
+                  <div className="text-4xl font-black text-white">{recordePessoal} Ondas</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-slate-400">Dificuldade</div>
+                <div className={`text-xl font-bold ${getNomeDificuldadeOnda(recordePessoal).cor}`}>
+                  {getNomeDificuldadeOnda(recordePessoal).nome}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sem avatares aptos */}
+        {avatares.length === 0 && (
+          <div className="max-w-2xl mx-auto text-center py-20 bg-slate-900/50 rounded-lg border border-slate-800">
+            <div className="text-6xl mb-6">💀</div>
+            <h2 className="text-2xl font-bold text-slate-300 mb-4">
+              Nenhum Avatar Apto para Sobrevivência
+            </h2>
+            <p className="text-slate-400 mb-8">
+              Modo Sobrevivência exige avatares em boa forma. Apenas avatares vivos com menos de 60% de exaustão podem participar.
+            </p>
+            <button
+              onClick={() => router.push("/avatares")}
+              className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded font-bold transition-colors"
+            >
+              Ver Meus Avatares
+            </button>
+          </div>
+        )}
+
+        {/* Interface Principal */}
+        {avatares.length > 0 && estadoJogo === 'selecao' && (
+          <div className="space-y-8">
+            {/* Explicação do Modo */}
+            <div className="bg-gradient-to-br from-purple-900/30 to-slate-900/30 rounded-xl p-8 border-2 border-purple-500/30">
+              <h2 className="text-2xl font-black text-purple-400 mb-6 flex items-center gap-3">
+                <span className="text-3xl">⚔️</span> COMO FUNCIONA
+              </h2>
+
+              <div className="grid md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-3">🎯 Mecânicas</h3>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    <li className="flex items-start gap-2">
+                      <span className="text-purple-400 mt-1">▸</span>
+                      <span><strong>Ondas infinitas:</strong> Enfrente inimigos cada vez mais fortes</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-purple-400 mt-1">▸</span>
+                      <span><strong>Sem recuperação:</strong> HP e energia não regeneram entre ondas</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-purple-400 mt-1">▸</span>
+                      <span><strong>Exaustão crescente:</strong> Cada onda aumenta sua exaustão permanentemente</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-purple-400 mt-1">▸</span>
+                      <span><strong>Boss Waves:</strong> A cada 5 ondas, enfrente um chefe poderoso com recompensas dobradas</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-3">🎁 Recompensas</h3>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-400 mt-1">▸</span>
+                      <span><strong>Crescentes:</strong> Recompensas aumentam a cada onda</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-400 mt-1">▸</span>
+                      <span><strong>Boss Bonus:</strong> Ondas 5, 10, 15, 20+ dão o dobro de XP e moedas</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-400 mt-1">▸</span>
+                      <span><strong>Fragmentos:</strong> Chance alta em boss waves, garantido na onda 20+</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-400 mt-1">▸</span>
+                      <span><strong>Pode desistir:</strong> Colete suas recompensas a qualquer momento</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Tabela de Dificuldade */}
+              <div className="bg-slate-950/50 rounded-lg p-4">
+                <h3 className="text-sm font-bold text-cyan-400 mb-3 uppercase tracking-wider">📊 Progressão de Dificuldade</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                  {[
+                    { ondas: '1-5', nome: 'Iniciante', mult: '1.0-1.25x', cor: 'border-green-500' },
+                    { ondas: '6-10', nome: 'Intermediário', mult: '1.25-1.65x', cor: 'border-cyan-500' },
+                    { ondas: '11-15', nome: 'Avançado', mult: '1.65-2.15x', cor: 'border-blue-500' },
+                    { ondas: '16-20', nome: 'Elite', mult: '2.15-2.75x', cor: 'border-purple-500' },
+                    { ondas: '21-30', nome: 'Lendário', mult: '2.75-4.25x', cor: 'border-red-500' },
+                    { ondas: '31+', nome: 'IMPOSSÍVEL', mult: '4.25x+', cor: 'border-red-700' }
+                  ].map((tier, idx) => (
+                    <div key={idx} className={`bg-slate-900/50 border-2 ${tier.cor} rounded p-2 text-center`}>
+                      <div className="font-bold text-white mb-1">{tier.ondas}</div>
+                      <div className="text-slate-400 mb-1">{tier.nome}</div>
+                      <div className="text-[10px] text-slate-500">{tier.mult}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Seleção de Avatar */}
+            <div>
+              <h2 className="text-3xl font-black text-purple-400 mb-6 flex items-center gap-3">
+                <span className="text-4xl">👤</span> SELECIONAR AVATAR
+              </h2>
+
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {avatares.map((avatar) => {
+                  const selecionado = avatarSelecionado?.id === avatar.id;
+                  const aviso = getAvisoExaustao(avatar.exaustao);
+                  const podeJogar = avatar.exaustao < 60;
+
+                  const statsBase = {
+                    forca: avatar.forca || 0,
+                    agilidade: avatar.agilidade || 0,
+                    resistencia: avatar.resistencia || 0,
+                    foco: avatar.foco || 0
+                  };
+                  const statsAtuais = aplicarPenalidadesExaustao(statsBase, avatar.exaustao || 0);
+                  const nivelExaustao = getNivelExaustao(avatar.exaustao || 0);
+                  const temPenalidade = nivelExaustao.penalidades.stats !== undefined;
+
+                  return (
+                    <button
+                      key={avatar.id}
+                      onClick={() => podeJogar && setAvatarSelecionado(avatar)}
+                      disabled={!podeJogar}
+                      className={`group relative text-left overflow-hidden rounded-xl border-2 transition-all duration-300 ${
+                        selecionado
+                          ? 'border-purple-500 bg-purple-900/30 ring-4 ring-purple-500/50 scale-105 shadow-2xl shadow-purple-500/20'
+                          : podeJogar
+                            ? 'border-slate-700 bg-slate-900/50 hover:border-purple-700 hover:scale-102 hover:shadow-xl'
+                            : 'border-red-900 bg-red-950/30 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      {selecionado && (
+                        <div className="absolute top-3 right-3 z-10 bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider animate-pulse">
+                          ✓ Selecionado
+                        </div>
+                      )}
+
+                      <div className={`absolute top-3 left-3 z-10 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${
+                        avatar.raridade === 'Lendário' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' :
+                        avatar.raridade === 'Raro' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' :
+                        'bg-slate-700 text-slate-300'
+                      }`}>
+                        {avatar.raridade}
+                      </div>
+
+                      <div className="relative p-6 pb-3 flex justify-center items-center bg-gradient-to-b from-purple-950/50 to-transparent">
+                        <div className={`relative ${podeJogar ? 'group-hover:scale-110' : ''} transition-transform duration-300`}>
+                          <AvatarSVG avatar={avatar} tamanho={140} />
+                          {!podeJogar && (
+                            <div className="absolute inset-0 bg-red-950/70 rounded-full flex items-center justify-center">
+                              <span className="text-4xl">⚠️</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="px-4 pb-4">
+                        <div className="text-center mb-3">
+                          <div className="font-black text-lg text-white mb-1">{avatar.nome}</div>
+                          <div className="flex items-center justify-center gap-2 text-sm">
+                            <span className="text-purple-400 font-bold">Nv.{avatar.nivel}</span>
+                            <span className="text-slate-500">•</span>
+                            <span className="text-slate-400">{avatar.elemento}</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-950/50 rounded-lg p-3 mb-3">
+                          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                            <div>
+                              {temPenalidade ? (
+                                <div>
+                                  <div className="text-[9px] text-slate-700 line-through">{statsBase.forca}</div>
+                                  <div className="text-red-400 font-bold text-base">{statsAtuais.forca}</div>
+                                </div>
+                              ) : (
+                                <div className="text-red-400 font-bold text-base">{statsBase.forca}</div>
+                              )}
+                              <div className="text-slate-600 font-semibold mt-1">FOR</div>
+                            </div>
+                            <div>
+                              {temPenalidade ? (
+                                <div>
+                                  <div className="text-[9px] text-slate-700 line-through">{statsBase.agilidade}</div>
+                                  <div className="text-green-400 font-bold text-base">{statsAtuais.agilidade}</div>
+                                </div>
+                              ) : (
+                                <div className="text-green-400 font-bold text-base">{statsBase.agilidade}</div>
+                              )}
+                              <div className="text-slate-600 font-semibold mt-1">AGI</div>
+                            </div>
+                            <div>
+                              {temPenalidade ? (
+                                <div>
+                                  <div className="text-[9px] text-slate-700 line-through">{statsBase.resistencia}</div>
+                                  <div className="text-blue-400 font-bold text-base">{statsAtuais.resistencia}</div>
+                                </div>
+                              ) : (
+                                <div className="text-blue-400 font-bold text-base">{statsBase.resistencia}</div>
+                              )}
+                              <div className="text-slate-600 font-semibold mt-1">RES</div>
+                            </div>
+                            <div>
+                              {temPenalidade ? (
+                                <div>
+                                  <div className="text-[9px] text-slate-700 line-through">{statsBase.foco}</div>
+                                  <div className="text-purple-400 font-bold text-base">{statsAtuais.foco}</div>
+                                </div>
+                              ) : (
+                                <div className="text-purple-400 font-bold text-base">{statsBase.foco}</div>
+                              )}
+                              <div className="text-slate-600 font-semibold mt-1">FOC</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className={`text-xs ${aviso.cor} font-mono text-center font-bold py-2 px-3 rounded ${
+                          podeJogar ? 'bg-slate-900/50' : 'bg-red-950/50'
+                        }`}>
+                          {aviso.texto}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Botões Iniciar */}
+              <div className="max-w-3xl mx-auto space-y-4">
+                {avatarSelecionado && avatarSelecionado.exaustao >= 40 && (
+                  <div className="p-4 bg-orange-950/50 border-2 border-orange-500/50 rounded-lg">
+                    <p className="text-sm text-orange-400 font-bold text-center">
+                      ⚠️ Seu avatar está cansado! Sobrevivência é mais difícil com penalidades.
+                    </p>
+                  </div>
+                )}
+
+                {/* Botão Principal */}
+                <button
+                  onClick={() => iniciarSobrevivencia(false)}
+                  disabled={!avatarSelecionado}
+                  className="w-full group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 rounded-xl blur opacity-50 group-hover:opacity-75 transition-all"></div>
+
+                  <div className="relative px-12 py-6 bg-slate-950 rounded-xl border-2 border-purple-500 group-hover:border-purple-400 transition-all">
+                    <span className="text-2xl font-black tracking-wider uppercase bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+                      💀 INICIAR SOBREVIVÊNCIA
+                    </span>
+                  </div>
+                </button>
+
+                {/* Botão Auto-Play */}
+                <button
+                  onClick={() => iniciarSobrevivencia(true)}
+                  disabled={!avatarSelecionado}
+                  className="w-full group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-red-500 to-red-700 rounded-xl blur opacity-40 group-hover:opacity-60 transition-all"></div>
+
+                  <div className="relative px-8 py-4 bg-slate-950 rounded-xl border-2 border-red-500/70 group-hover:border-red-400 transition-all">
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="text-xl font-black tracking-wider uppercase bg-gradient-to-r from-red-300 to-orange-300 bg-clip-text text-transparent">
+                        ⚡ AUTO-PLAY (ATÉ MORRER)
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2 text-center">
+                      Passa automaticamente pelas ondas até a derrota
+                    </p>
+                  </div>
+                </button>
+
+                {!avatarSelecionado && (
+                  <p className="text-center text-sm text-slate-500 font-mono">
+                    Selecione um avatar para começar o desafio
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Estado: Preparando */}
+        {estadoJogo === 'preparando' && (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-gradient-to-br from-purple-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-purple-500/30">
+              <div className="text-center space-y-6">
+                <div className="relative">
+                  <div className="w-32 h-32 mx-auto">
+                    <div className="absolute inset-0 border-4 border-purple-500/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl">
+                      💀
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-4xl font-black text-white mb-2">
+                    PREPARANDO DESAFIO
+                  </h2>
+                  <p className="text-purple-400 font-mono text-lg">
+                    Onda 1 • Iniciante
+                  </p>
+                </div>
+
+                <div className="bg-slate-950/50 rounded-lg p-6 border border-slate-700">
+                  <p className="text-sm text-slate-400 mb-4">Seu Avatar</p>
+                  <div className="flex items-center gap-4 justify-center">
+                    <AvatarSVG avatar={avatarSelecionado} tamanho={100} />
+                    <div className="text-left">
+                      <div className="font-bold text-white text-xl">{avatarSelecionado.nome}</div>
+                      <div className="text-slate-400">Nv.{avatarSelecionado.nivel} • {avatarSelecionado.elemento}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-slate-500 text-sm font-mono">
+                  {autoPlay ? 'Modo AUTO-PLAY ativado...' : 'Boa sorte, caçador...'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Estado: Sobrevivendo (Auto-Play) */}
+        {estadoJogo === 'sobrevivendo' && autoPlay && (
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-gradient-to-br from-red-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-red-500/30">
+              <div className="text-center space-y-6">
+                <div className="relative">
+                  <div className="w-40 h-40 mx-auto relative">
+                    <div className="absolute inset-0 border-4 border-red-500/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="absolute inset-4 border-4 border-orange-500/20 rounded-full"></div>
+                    <div className="absolute inset-4 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
+                    <div className="absolute inset-0 flex items-center justify-center text-6xl animate-pulse">
+                      ⚡
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-4xl font-black text-red-400 mb-2 animate-pulse">
+                    AUTO-PLAY ATIVO
+                  </h2>
+                  <p className="text-white font-mono text-2xl mb-1">
+                    Onda {ondaAtual}
+                  </p>
+                  <p className={`font-bold ${getNomeDificuldadeOnda(ondaAtual).cor}`}>
+                    {getNomeDificuldadeOnda(ondaAtual).nome}
+                  </p>
+                </div>
+
+                {/* Card de Stats do Avatar */}
+                {statsAvatarAtual && (
+                  <div className="bg-slate-950/50 rounded-lg p-6 border border-red-700/50 space-y-4">
+                    <div className="flex items-center gap-4 justify-center">
+                      <AvatarSVG avatar={avatarSelecionado} tamanho={80} />
+                      <div className="text-left">
+                        <div className="font-bold text-white text-lg">{avatarSelecionado.nome}</div>
+                        <div className="text-slate-400 text-sm">Nv.{statsAvatarAtual.nivel} • {avatarSelecionado.elemento}</div>
+                      </div>
+                    </div>
+
+                    {/* Barras de HP, Energia e Exaustão */}
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-red-400 font-bold">❤️ HP</span>
+                          <span className="text-slate-300 font-mono">{Math.floor(statsAvatarAtual.hp_atual)} / {statsAvatarAtual.hp_maximo}</span>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              (statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) > 0.5 ? 'bg-gradient-to-r from-green-600 to-green-400' :
+                              (statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) > 0.25 ? 'bg-gradient-to-r from-yellow-600 to-yellow-400' :
+                              'bg-gradient-to-r from-red-600 to-red-400'
+                            }`}
+                            style={{ width: `${(statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-blue-400 font-bold">⚡ Energia</span>
+                          <span className="text-slate-300 font-mono">{Math.floor(statsAvatarAtual.energia_atual)} / {statsAvatarAtual.energia_maxima}</span>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-500"
+                            style={{ width: `${(statsAvatarAtual.energia_atual / statsAvatarAtual.energia_maxima) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-orange-400 font-bold">😰 Exaustão</span>
+                          <span className="text-slate-300 font-mono">{Math.floor(exaustaoAcumulada)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              exaustaoAcumulada < 40 ? 'bg-gradient-to-r from-green-600 to-green-400' :
+                              exaustaoAcumulada < 60 ? 'bg-gradient-to-r from-yellow-600 to-orange-400' :
+                              'bg-gradient-to-r from-orange-600 to-red-600'
+                            }`}
+                            style={{ width: `${Math.min(exaustaoAcumulada, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-red-400 text-sm font-bold text-center">
+                      ⚔️ Batalhando automaticamente...
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setAutoPlay(false);
+                    autoPlayRef.current = false;
+                    finalizarSobrevivencia(ondaAtual, false);
+                  }}
+                  className="px-8 py-3 bg-red-900/50 hover:bg-red-900/70 text-red-300 rounded-lg border border-red-700 transition-colors font-bold"
+                >
+                  ✕ Parar Auto-Play
+                </button>
+
+                <p className="text-xs text-slate-500 font-mono">
+                  O auto-play continuará até seu avatar ser derrotado
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
