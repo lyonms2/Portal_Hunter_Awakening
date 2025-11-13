@@ -894,16 +894,6 @@ function BatalhaContent() {
                           )}
                         </div>
                       </div>
-                      <div className="text-xs text-slate-400 mb-2 line-clamp-2">{hab.descricao}</div>
-                      <div className={`text-xs flex items-center justify-between ${
-                        energiaInsuficiente ? 'text-red-400' : 'text-blue-400'
-                      }`}>
-                        <span>⚡ {custoEnergia} energia</span>
-                        {energiaInsuficiente && (
-                          <span className="text-[10px] text-red-400">❌ Sem energia</span>
-                        )}
-                      </div>
-                    </div>
                   </button>
                 );
               }) : (
