@@ -353,7 +353,7 @@ export default function ArenaSobrevivenciaPage() {
     // Salvar recompensas no banco de dados
     try {
       // Atualizar stats do jogador (moedas e fragmentos)
-      await fetch('/api/atualizar-stats', {
+      const responseStats = await fetch('/api/atualizar-stats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -362,6 +362,24 @@ export default function ArenaSobrevivenciaPage() {
           fragmentos: recompensasTotais.fragmentos
         })
       });
+
+      // Atualizar estado local do usuário
+      if (responseStats.ok) {
+        const dataStats = await responseStats.json();
+        console.log('✅ Stats do jogador atualizados:', dataStats);
+
+        setUser(prev => ({
+          ...prev,
+          moedas: dataStats.jogador?.moedas || prev.moedas,
+          fragmentos: dataStats.jogador?.fragmentos || prev.fragmentos
+        }));
+
+        // Atualizar localStorage
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        userData.moedas = dataStats.jogador?.moedas || userData.moedas;
+        userData.fragmentos = dataStats.jogador?.fragmentos || userData.fragmentos;
+        localStorage.setItem('user', JSON.stringify(userData));
+      }
 
       // Atualizar avatar (XP, exaustão, nível)
       // IMPORTANTE: NÃO enviar 'vinculo' - modo sobrevivência não altera vínculo
@@ -373,7 +391,7 @@ export default function ArenaSobrevivenciaPage() {
         nivel: statsAvatarAtual?.nivel || avatarSelecionado.nivel
       });
 
-      await fetch('/api/atualizar-avatar', {
+      const responseAvatar = await fetch('/api/atualizar-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -389,6 +407,29 @@ export default function ArenaSobrevivenciaPage() {
           foco: statsAvatarAtual?.foco || avatarSelecionado.foco
         })
       });
+
+      // CRÍTICO: Atualizar estado local do avatar com dados salvos
+      if (responseAvatar.ok) {
+        const dataAvatar = await responseAvatar.json();
+        console.log('✅ Avatar atualizado na API:', dataAvatar.avatar);
+
+        // Atualizar avatar selecionado com novos valores
+        setAvatarSelecionado(prev => ({
+          ...prev,
+          nivel: dataAvatar.avatar.nivel,
+          experiencia: dataAvatar.avatar.experiencia,
+          exaustao: dataAvatar.avatar.exaustao,
+          forca: dataAvatar.avatar.forca,
+          agilidade: dataAvatar.avatar.agilidade,
+          resistencia: dataAvatar.avatar.resistencia,
+          foco: dataAvatar.avatar.foco
+        }));
+
+        // Recarregar lista de avatares para refletir mudanças
+        if (user?.id) {
+          carregarAvatares(user.id);
+        }
+      }
     } catch (error) {
       console.error('Erro ao salvar recompensas:', error);
     }
