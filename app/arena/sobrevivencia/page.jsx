@@ -199,9 +199,15 @@ export default function ArenaSobrevivenciaPage() {
       // Verificar resultado FORA do setState
       setTimeout(() => {
         if (morreu) {
-          setAutoPlay(false);
-          autoPlayRef.current = false;
-          finalizarSobrevivencia(onda, true);
+          // Mesmo ao morrer, processar recompensas da onda completada
+          processarRecompensasOnda(onda);
+
+          // Aguardar um frame para garantir que o estado foi atualizado
+          setTimeout(() => {
+            setAutoPlay(false);
+            autoPlayRef.current = false;
+            finalizarSobrevivencia(onda, true);
+          }, 100);
         } else {
           ondaCompleta(onda);
         }
@@ -209,7 +215,7 @@ export default function ArenaSobrevivenciaPage() {
     }, tempoCombate);
   };
 
-  const ondaCompleta = (onda) => {
+  const processarRecompensasOnda = (onda) => {
     // Atualizar recorde se necessário
     if (onda > recordePessoal) {
       setRecordePessoal(onda);
@@ -225,6 +231,12 @@ export default function ArenaSobrevivenciaPage() {
       moedas: prev.moedas + recompensas.moedas,
       fragmentos: prev.fragmentos + recompensas.fragmentos_garantidos + (Math.random() < recompensas.chance_fragmento ? 1 : 0)
     }));
+
+    return recompensas;
+  };
+
+  const ondaCompleta = (onda) => {
+    const recompensas = processarRecompensasOnda(onda);
 
     // Verificar level up e atualizar XP
     let houveLevelUp = false;
@@ -301,8 +313,13 @@ export default function ArenaSobrevivenciaPage() {
   const finalizarSobrevivencia = async (ondaFinal, derrota = true) => {
     const novoRecorde = ondaFinal > recordePessoal;
 
-    // Usar recompensas acumuladas
-    const recompensasTotais = recompensasAcumuladas;
+    // IMPORTANTE: Recalcular recompensas totais baseado na onda final
+    // Isso garante que as recompensas sejam calculadas corretamente mesmo na primeira onda
+    // quando o estado recompensasAcumuladas pode não ter sido atualizado ainda
+    const recompensasTotais = calcularRecompensasTotais(ondaFinal);
+
+    // Atualizar estado de recompensas para refletir o valor correto
+    setRecompensasAcumuladas(recompensasTotais);
 
     // Salvar recompensas no banco de dados
     try {
