@@ -32,7 +32,7 @@ CREATE INDEX idx_temporadas_data_fim ON pvp_temporadas(data_fim DESC);
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pvp_rankings (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL, -- Referência para player_stats.user_id ou auth.users.id
   temporada_id VARCHAR(7) NOT NULL REFERENCES pvp_temporadas(temporada_id) ON DELETE CASCADE,
 
   -- Stats atuais
@@ -66,7 +66,7 @@ CREATE INDEX idx_rankings_temporada_fama ON pvp_rankings(temporada_id, fama DESC
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pvp_historico_temporadas (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL, -- Referência para player_stats.user_id ou auth.users.id
   temporada_id VARCHAR(7) NOT NULL REFERENCES pvp_temporadas(temporada_id) ON DELETE CASCADE,
 
   -- Stats finais da temporada
@@ -106,8 +106,8 @@ CREATE TABLE IF NOT EXISTS pvp_batalhas_log (
   temporada_id VARCHAR(7) NOT NULL REFERENCES pvp_temporadas(temporada_id) ON DELETE CASCADE,
 
   -- Jogadores
-  jogador1_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-  jogador2_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  jogador1_id UUID NOT NULL, -- Referência para player_stats.user_id ou auth.users.id
+  jogador2_id UUID NOT NULL, -- Referência para player_stats.user_id ou auth.users.id
 
   -- Stats antes da batalha
   jogador1_fama_antes INTEGER NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS pvp_batalhas_log (
   jogador2_streak_antes INTEGER NOT NULL DEFAULT 0,
 
   -- Resultado
-  vencedor_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  vencedor_id UUID, -- Referência para player_stats.user_id ou auth.users.id
   duracao_rodadas INTEGER NOT NULL,
 
   -- Mudanças pós-batalha
@@ -151,7 +151,7 @@ CREATE INDEX idx_batalhas_vencedor ON pvp_batalhas_log(vencedor_id);
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pvp_titulos (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL, -- Referência para player_stats.user_id ou auth.users.id
 
   -- Informações do título
   titulo_id VARCHAR(50) NOT NULL, -- "campeao_2025_01", "vice_campeao_2025_02", etc.
@@ -181,7 +181,7 @@ CREATE INDEX idx_titulos_ativo ON pvp_titulos(user_id, ativo) WHERE ativo = true
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pvp_recompensas_pendentes (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL, -- Referência para player_stats.user_id ou auth.users.id
   temporada_id VARCHAR(7) NOT NULL REFERENCES pvp_temporadas(temporada_id) ON DELETE CASCADE,
 
   -- Recompensas
@@ -215,8 +215,8 @@ CREATE INDEX idx_recompensas_pendentes ON pvp_recompensas_pendentes(user_id, col
 CREATE OR REPLACE VIEW leaderboard_atual AS
 SELECT
   ROW_NUMBER() OVER (ORDER BY r.fama DESC, r.vitorias DESC, r.derrotas ASC) AS posicao,
-  u.id AS user_id,
-  u.nome AS nome_usuario,
+  r.user_id,
+  ps.nome_operacao AS nome_usuario,
   r.fama,
   r.vitorias,
   r.derrotas,
@@ -231,7 +231,7 @@ SELECT
   t.nome AS temporada_nome,
   r.ultima_batalha
 FROM pvp_rankings r
-JOIN usuarios u ON r.user_id = u.id
+LEFT JOIN player_stats ps ON r.user_id = ps.user_id
 JOIN pvp_temporadas t ON r.temporada_id = t.temporada_id
 WHERE t.ativa = true
 ORDER BY r.fama DESC, r.vitorias DESC, r.derrotas ASC;
@@ -250,8 +250,8 @@ LIMIT 100;
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW estatisticas_jogador AS
 SELECT
-  u.id AS user_id,
-  u.nome,
+  ps.user_id,
+  ps.nome_operacao AS nome,
 
   -- Stats da temporada atual
   COALESCE(r.fama, 1000) AS fama_atual,
@@ -274,11 +274,11 @@ SELECT
   -- Títulos
   COUNT(DISTINCT t.id) AS total_titulos
 
-FROM usuarios u
-LEFT JOIN pvp_rankings r ON u.id = r.user_id AND r.temporada_id = (SELECT temporada_id FROM pvp_temporadas WHERE ativa = true LIMIT 1)
-LEFT JOIN pvp_historico_temporadas h ON u.id = h.user_id
-LEFT JOIN pvp_titulos t ON u.id = t.user_id
-GROUP BY u.id, u.nome, r.fama, r.vitorias, r.derrotas, r.streak, r.streak_maximo;
+FROM player_stats ps
+LEFT JOIN pvp_rankings r ON ps.user_id = r.user_id AND r.temporada_id = (SELECT temporada_id FROM pvp_temporadas WHERE ativa = true LIMIT 1)
+LEFT JOIN pvp_historico_temporadas h ON ps.user_id = h.user_id
+LEFT JOIN pvp_titulos t ON ps.user_id = t.user_id
+GROUP BY ps.user_id, ps.nome_operacao, r.fama, r.vitorias, r.derrotas, r.streak, r.streak_maximo;
 
 -- ============================================================================
 -- FUNÇÕES ÚTEIS
@@ -393,7 +393,7 @@ $$ LANGUAGE plpgsql;
 -- Gera recompensas de fim de temporada baseado na posição
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gerar_recompensas_temporada(
-  p_user_id INTEGER,
+  p_user_id UUID,
   p_temporada_id VARCHAR(7),
   p_posicao INTEGER
 )
@@ -480,9 +480,9 @@ $$ LANGUAGE plpgsql;
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION atualizar_ranking_apos_batalha(
   p_temporada_id VARCHAR(7),
-  p_jogador1_id INTEGER,
-  p_jogador2_id INTEGER,
-  p_vencedor_id INTEGER,
+  p_jogador1_id UUID,
+  p_jogador2_id UUID,
+  p_vencedor_id UUID,
   p_jogador1_fama_ganho INTEGER,
   p_jogador2_fama_ganho INTEGER
 )
