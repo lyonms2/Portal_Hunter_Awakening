@@ -289,23 +289,30 @@ function BatalhaContent() {
     }
 
     let recompensas;
-    let pontosGanhos = 0;
 
     if (modoPvP && dadosPvP) {
-      // Calcular recompensas PvP
+      // Calcular recompensas PvP com o novo sistema de Fama
       const venceu = vencedor === 'jogador';
-      recompensas = calcularRecompensasPvP(venceu, dadosPvP.tierJogador, estadoFinal.rodada);
+      recompensas = calcularRecompensasPvP(
+        venceu,
+        dadosPvP.famaJogador,
+        dadosPvP.famaOponente,
+        dadosPvP.tierJogador,
+        dadosPvP.streakJogador || 0,
+        estadoFinal.rodada
+      );
 
-      // Calcular pontos de ranking
+      // Log de ganho/perda de fama
       if (venceu) {
-        pontosGanhos = calcularPontosVitoria(dadosPvP.pontosRankingJogador, dadosPvP.pontosRankingOponente);
-        adicionarLog(`🏆 +${pontosGanhos} pontos de ranking!`);
+        adicionarLog(`🏆 +${recompensas.fama} Fama!`);
       } else {
-        pontosGanhos = -calcularPerda(dadosPvP.pontosRankingOponente, dadosPvP.pontosRankingJogador);
-        adicionarLog(`📉 ${pontosGanhos} pontos de ranking`);
+        adicionarLog(`📉 ${recompensas.fama} Fama`); // Já vem negativo
       }
 
-      recompensas.pontos_ranking = pontosGanhos;
+      // Exibir mensagens especiais (upset, streak, etc.)
+      if (recompensas.mensagens && recompensas.mensagens.length > 0) {
+        recompensas.mensagens.forEach(msg => adicionarLog(msg));
+      }
     } else {
       // Calcular recompensas de treino
       recompensas = calcularRecompensasTreino(estadoFinal, vencedor);
@@ -325,24 +332,70 @@ function BatalhaContent() {
     if (resultado) {
       try {
         if (modoPvP) {
-          // Modo PvP - atualizar ranking
+          // Modo PvP - salvar resultado no banco via API
+          const venceuBatalha = resultado.vencedor === 'jogador';
+          const jogador1Id = userData.id;
+          const jogador2Id = 'oponente_simulado'; // TODO: usar ID real do oponente quando tiver matchmaking real
+
+          // Obter fama atual do jogador
           const rankingKey = `pvp_ranking_${userData.id}`;
-          const rankingData = JSON.parse(localStorage.getItem(rankingKey) || '{"pontos": 1000, "vitorias": 0, "derrotas": 0}');
+          const rankingData = JSON.parse(localStorage.getItem(rankingKey) || '{"fama": 1000, "vitorias": 0, "derrotas": 0, "streak": 0}');
+          const famaAntes = rankingData.fama || 1000;
 
-          // Atualizar pontos e estatísticas
-          const novosPontos = Math.max(0, rankingData.pontos + (resultado.recompensas.pontos_ranking || 0));
+          try {
+            // Salvar resultado da batalha no banco (atualiza rankings automaticamente)
+            const responseBatalha = await fetch('/api/pvp/batalha', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jogador1Id: jogador1Id,
+                jogador2Id: jogador2Id,
+                vencedorId: venceuBatalha ? jogador1Id : jogador2Id,
+                jogador1FamaAntes: famaAntes,
+                jogador2FamaAntes: dadosPvP.famaOponente || 1000,
+                jogador1FamaGanho: venceuBatalha ? resultado.recompensas.fama : resultado.recompensas.fama, // Já vem negativo na derrota
+                jogador2FamaGanho: venceuBatalha ? -resultado.recompensas.fama : Math.abs(resultado.recompensas.fama),
+                duracaoRodadas: resultado.estado.rodada,
+                jogador1Recompensas: {
+                  xp: resultado.recompensas.xp,
+                  moedas: resultado.recompensas.moedas,
+                  fragmentos: resultado.recompensas.fragmentos || 0,
+                  vinculo: resultado.recompensas.vinculo || 0,
+                  exaustao: resultado.recompensas.exaustao
+                },
+                jogador2Recompensas: {},
+                salvarLog: true
+              })
+            });
 
-          if (resultado.vencedor === 'jogador') {
-            rankingData.vitorias = (rankingData.vitorias || 0) + 1;
-          } else if (resultado.vencedor === 'inimigo') {
-            rankingData.derrotas = (rankingData.derrotas || 0) + 1;
+            if (responseBatalha.ok) {
+              const dataBatalha = await responseBatalha.json();
+              // Atualizar localStorage com dados do banco
+              if (dataBatalha.success && dataBatalha.jogador1) {
+                localStorage.setItem(rankingKey, JSON.stringify(dataBatalha.jogador1));
+              }
+            } else {
+              console.warn('Erro ao salvar resultado no banco, salvando localmente');
+              // Fallback para localStorage se API falhar
+              const novaFama = Math.max(0, famaAntes + resultado.recompensas.fama);
+              rankingData.fama = novaFama;
+              rankingData.vitorias = venceuBatalha ? (rankingData.vitorias || 0) + 1 : rankingData.vitorias;
+              rankingData.derrotas = !venceuBatalha ? (rankingData.derrotas || 0) + 1 : rankingData.derrotas;
+              rankingData.streak = venceuBatalha ? (rankingData.streak || 0) + 1 : 0;
+              localStorage.setItem(rankingKey, JSON.stringify(rankingData));
+            }
+          } catch (error) {
+            console.error('Erro ao salvar batalha PvP:', error);
+            // Fallback para localStorage
+            const novaFama = Math.max(0, famaAntes + resultado.recompensas.fama);
+            rankingData.fama = novaFama;
+            rankingData.vitorias = venceuBatalha ? (rankingData.vitorias || 0) + 1 : rankingData.vitorias;
+            rankingData.derrotas = !venceuBatalha ? (rankingData.derrotas || 0) + 1 : rankingData.derrotas;
+            rankingData.streak = venceuBatalha ? (rankingData.streak || 0) + 1 : 0;
+            localStorage.setItem(rankingKey, JSON.stringify(rankingData));
           }
 
-          rankingData.pontos = novosPontos;
-
-          localStorage.setItem(rankingKey, JSON.stringify(rankingData));
-
-          // Aplicar recompensas (XP, moedas, etc.)
+          // Aplicar recompensas de moedas e fragmentos
           await fetch('/api/atualizar-stats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -353,13 +406,14 @@ function BatalhaContent() {
             })
           });
 
+          // Aplicar recompensas de avatar (XP, exaustão, vínculo)
           await fetch('/api/atualizar-avatar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               avatarId: estado.jogador.id,
               experiencia: resultado.recompensas.xp,
-              exaustao: 15, // Exaustão fixa para PvP
+              exaustao: resultado.recompensas.exaustao,
               vinculo: resultado.recompensas.vinculo || 0
             })
           });
@@ -472,22 +526,22 @@ function BatalhaContent() {
                 </div>
               )}
 
-              {/* Pontos de Ranking (PvP) */}
-              {resultado.pvp && resultado.recompensas.pontos_ranking !== undefined && (
+              {/* Fama (PvP) */}
+              {resultado.pvp && resultado.recompensas.fama !== undefined && (
                 <div className={`text-center p-4 rounded border mb-4 ${
-                  resultado.recompensas.pontos_ranking > 0
+                  resultado.recompensas.fama > 0
                     ? 'bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-yellow-500/50'
                     : 'bg-gradient-to-r from-red-900/30 to-orange-900/30 border-red-500/50'
                 }`}>
                   <div className="text-4xl mb-2">
-                    {resultado.recompensas.pontos_ranking > 0 ? '🏆' : '📉'}
+                    {resultado.recompensas.fama > 0 ? '🏆' : '📉'}
                   </div>
                   <div className={`text-3xl font-black ${
-                    resultado.recompensas.pontos_ranking > 0 ? 'text-yellow-400' : 'text-red-400'
+                    resultado.recompensas.fama > 0 ? 'text-yellow-400' : 'text-red-400'
                   }`}>
-                    {resultado.recompensas.pontos_ranking > 0 ? '+' : ''}{resultado.recompensas.pontos_ranking}
+                    {resultado.recompensas.fama > 0 ? '+' : ''}{resultado.recompensas.fama}
                   </div>
-                  <div className="text-sm text-slate-400">Pontos de Ranking</div>
+                  <div className="text-sm text-slate-400">Fama</div>
                 </div>
               )}
 
@@ -499,10 +553,10 @@ function BatalhaContent() {
                     </span>
                   </div>
                 )}
-                {resultado.pvp && (
+                {resultado.pvp && resultado.recompensas.exaustao && (
                   <div className="text-center p-3 bg-orange-900/30 rounded border border-orange-500/50">
                     <span className="text-orange-400 text-sm">
-                      😰 +15 Exaustão
+                      😰 +{resultado.recompensas.exaustao} Exaustão
                     </span>
                   </div>
                 )}
