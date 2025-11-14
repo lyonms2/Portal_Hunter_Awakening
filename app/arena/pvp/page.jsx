@@ -7,6 +7,8 @@ import { getNivelVinculo } from "../../avatares/sistemas/bondSystem";
 import { calcularHPMaximoCompleto } from "../../../lib/combat/statsCalculator";
 import AvatarSVG from "../../components/AvatarSVG";
 import { getTierPorFama, getProgressoNoTier, getProximoTier } from "../../../lib/pvp/rankingSystem";
+import { verificarResetTemporada, getInfoTemporada } from "../../../lib/pvp/seasonSystem";
+import { getPosicaoJogador } from "../../../lib/pvp/leaderboardSystem";
 
 export default function ArenaPvPPage() {
   const router = useRouter();
@@ -23,9 +25,14 @@ export default function ArenaPvPPage() {
   const [derrotas, setDerrotas] = useState(0);
   const [streak, setStreak] = useState(0); // Streak de vitórias consecutivas
 
+  // Sistema de Temporadas
+  const [infoTemporada, setInfoTemporada] = useState(null);
+  const [posicaoLeaderboard, setPosicaoLeaderboard] = useState(null);
+
   // Modais
   const [modalAlerta, setModalAlerta] = useState(null);
   const [modalConfirmacao, setModalConfirmacao] = useState(null);
+  const [modalNovaTemporada, setModalNovaTemporada] = useState(null);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -38,15 +45,42 @@ export default function ArenaPvPPage() {
     setUser(parsedUser);
     carregarAvatarAtivo(parsedUser.id);
 
-    // Carregar dados de ranking do localStorage
-    const rankingData = localStorage.getItem(`pvp_ranking_${parsedUser.id}`);
-    if (rankingData) {
-      const { fama: f, pontos, vitorias: v, derrotas: d, streak: s } = JSON.parse(rankingData);
-      setFama(f || pontos || 1000); // Backward compatibility com "pontos"
-      setVitorias(v || 0);
-      setDerrotas(d || 0);
-      setStreak(s || 0);
+    // Verificar reset de temporada
+    const resetInfo = verificarResetTemporada(parsedUser.id);
+    if (resetInfo.precisaReset) {
+      // Mostrar modal de nova temporada
+      setModalNovaTemporada({
+        temporadaAnterior: resetInfo.temporadaAnterior,
+        temporadaAtual: resetInfo.temporadaAtual,
+        dadosAntigos: resetInfo.dadosAntigos,
+        novosDados: resetInfo.novosDados
+      });
+
+      // Aplicar reset
+      localStorage.setItem(`pvp_ranking_${parsedUser.id}`, JSON.stringify(resetInfo.novosDados));
+
+      // Carregar novos dados
+      setFama(1000);
+      setVitorias(0);
+      setDerrotas(0);
+      setStreak(0);
+    } else {
+      // Carregar dados de ranking do localStorage
+      const rankingData = JSON.parse(localStorage.getItem(`pvp_ranking_${parsedUser.id}`) || '{}');
+      setFama(rankingData.fama || rankingData.pontos || 1000); // Backward compatibility
+      setVitorias(rankingData.vitorias || 0);
+      setDerrotas(rankingData.derrotas || 0);
+      setStreak(rankingData.streak || 0);
     }
+
+    // Carregar info da temporada
+    const tempInfo = getInfoTemporada();
+    setInfoTemporada(tempInfo);
+
+    // Carregar posição no leaderboard
+    const famaAtual = resetInfo.precisaReset ? 1000 : (JSON.parse(localStorage.getItem(`pvp_ranking_${parsedUser.id}`) || '{}').fama || 1000);
+    const posicao = getPosicaoJogador(parsedUser.id, famaAtual);
+    setPosicaoLeaderboard(posicao);
   }, [router]);
 
   // Timer de espera no matchmaking
@@ -246,14 +280,41 @@ export default function ArenaPvPPage() {
             <p className="text-slate-400 font-mono text-sm">
               Enfrente outros jogadores em batalhas competitivas 1v1
             </p>
+            {infoTemporada && (
+              <div className="mt-2 flex items-center gap-3 text-xs">
+                <span className="text-purple-400">
+                  📅 {infoTemporada.nome}
+                </span>
+                <span className="text-slate-600">•</span>
+                <span className="text-orange-400">
+                  ⏰ Termina em {infoTemporada.diasRestantes} dias
+                </span>
+                {posicaoLeaderboard && posicaoLeaderboard.posicao && (
+                  <>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-yellow-400">
+                      🏆 #{posicaoLeaderboard.posicao}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
-          <button
-            onClick={() => router.push("/arena")}
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors"
-          >
-            ← Voltar ao Lobby
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push("/arena/leaderboard")}
+              className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold rounded border border-yellow-500/50 transition-colors"
+            >
+              🏆 Leaderboard
+            </button>
+            <button
+              onClick={() => router.push("/arena")}
+              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors"
+            >
+              ← Voltar ao Lobby
+            </button>
+          </div>
         </div>
 
         {/* Sem Avatar Ativo */}
@@ -803,6 +864,61 @@ export default function ArenaPvPPage() {
                 Continuar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Nova Temporada */}
+      {modalNovaTemporada && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-gradient-to-b from-purple-900/50 to-slate-900 rounded-lg border-2 border-purple-500 p-8">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">🎊</div>
+              <h3 className="text-3xl font-black text-purple-400 mb-2">NOVA TEMPORADA!</h3>
+              <p className="text-slate-300 text-lg">
+                {infoTemporada?.nome}
+              </p>
+            </div>
+
+            <div className="bg-slate-950/50 rounded-lg p-6 mb-6 space-y-4">
+              <div className="text-center">
+                <p className="text-slate-400 text-sm mb-4">
+                  A temporada anterior terminou! Seus dados foram salvos no histórico.
+                </p>
+              </div>
+
+              {/* Stats da temporada anterior */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-yellow-400">
+                    {modalNovaTemporada.dadosAntigos?.fama || 1000}
+                  </div>
+                  <div className="text-xs text-slate-500">Fama Final</div>
+                </div>
+                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-cyan-400">
+                    {modalNovaTemporada.dadosAntigos?.vitorias || 0}
+                  </div>
+                  <div className="text-xs text-slate-500">Vitórias</div>
+                </div>
+              </div>
+
+              <div className="text-center p-4 bg-purple-950/30 rounded border border-purple-500/30">
+                <p className="text-purple-300 text-sm">
+                  ⚔️ Você foi resetado para <strong className="text-yellow-400">1000 Fama</strong>
+                </p>
+                <p className="text-purple-400 text-xs mt-2">
+                  Uma nova jornada começa! Boa sorte!
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setModalNovaTemporada(null)}
+              className="w-full px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-colors"
+            >
+              ⚔️ Começar Nova Temporada!
+            </button>
           </div>
         </div>
       )}
