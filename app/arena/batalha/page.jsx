@@ -367,17 +367,7 @@ function BatalhaContent() {
           sessionStorage.removeItem('batalha_pvp_dados');
           router.push('/arena/pvp');
         } else if (resultado.vencedor === 'jogador') {
-          // Modo Treino - aplicar recompensas normalmente
-          await fetch('/api/atualizar-stats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: userData.id,
-              moedas: resultado.recompensas.moedas,
-              fragmentos: resultado.recompensas.fragmentos || 0
-            })
-          });
-
+          // Modo Treino - aplicar XP e Vínculo (SEM moedas!)
           await fetch('/api/atualizar-avatar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -906,14 +896,6 @@ function BatalhaContent() {
             {/* Ações Especiais */}
             <div className="space-y-2">
               <button
-                onClick={() => !turnoIA && !processando && executarAcao('ataque_basico')}
-                disabled={turnoIA || processando}
-                className="w-full px-4 py-3 bg-gradient-to-br from-red-900/60 to-red-800/40 hover:from-red-800/70 hover:to-red-700/50 rounded border border-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-semibold hover:scale-105"
-              >
-                ⚔️ Ataque Básico <span className="text-xs text-red-300">(0 energia)</span>
-              </button>
-
-              <button
                 onClick={() => !turnoIA && !processando && executarAcao('defender')}
                 disabled={turnoIA || processando}
                 className="w-full px-4 py-3 bg-gradient-to-br from-blue-900/60 to-blue-800/40 hover:from-blue-800/70 hover:to-blue-700/50 rounded border border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-semibold hover:scale-105"
@@ -933,15 +915,87 @@ function BatalhaContent() {
         </div>
 
         {/* Log de Combate - Embaixo */}
-        <div className="mt-2 bg-slate-900/80 rounded-lg p-3 border border-slate-700">
-          <h3 className="text-cyan-400 font-bold mb-2 text-sm">📜 LOG DE COMBATE</h3>
+        <div className="mt-2 bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 rounded-lg border-2 border-slate-700/50 overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 px-4 py-2 border-b border-cyan-500/30">
+            <h3 className="text-cyan-400 font-bold text-sm flex items-center gap-2">
+              <span className="text-base">📜</span>
+              LOG DE COMBATE
+              <span className="text-xs text-slate-500 ml-auto">Última ação no topo</span>
+            </h3>
+          </div>
 
-          <div className="max-h-32 overflow-y-auto space-y-1 text-xs font-mono">
-            {log.map((entry, i) => (
-              <div key={i} className="text-slate-300 leading-relaxed">
-                {entry.texto}
+          <div className="max-h-48 overflow-y-auto p-4 space-y-2">
+            {log.slice().reverse().map((entry, i) => {
+              const texto = entry.texto;
+
+              // Determinar cor baseada no conteúdo
+              let bgColor = 'bg-slate-800/40';
+              let textColor = 'text-slate-300';
+              let borderColor = 'border-slate-700/50';
+              let icon = '•';
+
+              if (texto.includes('VITÓRIA') || texto.includes('🎉')) {
+                bgColor = 'bg-green-900/30';
+                textColor = 'text-green-300';
+                borderColor = 'border-green-500/30';
+                icon = '🎉';
+              } else if (texto.includes('DERROTA') || texto.includes('☠️')) {
+                bgColor = 'bg-red-900/30';
+                textColor = 'text-red-300';
+                borderColor = 'border-red-500/30';
+                icon = '☠️';
+              } else if (texto.includes('💥') || texto.includes('dano')) {
+                bgColor = 'bg-orange-900/20';
+                textColor = 'text-orange-200';
+                borderColor = 'border-orange-500/20';
+                icon = '💥';
+              } else if (texto.includes('🛡️') || texto.includes('Defesa')) {
+                bgColor = 'bg-blue-900/20';
+                textColor = 'text-blue-200';
+                borderColor = 'border-blue-500/20';
+                icon = '🛡️';
+              } else if (texto.includes('⚡') || texto.includes('energia')) {
+                bgColor = 'bg-yellow-900/20';
+                textColor = 'text-yellow-200';
+                borderColor = 'border-yellow-500/20';
+                icon = '⚡';
+              } else if (texto.includes('🎯')) {
+                bgColor = 'bg-purple-900/20';
+                textColor = 'text-purple-200';
+                borderColor = 'border-purple-500/20';
+                icon = '🎯';
+              } else if (texto.includes('━━━')) {
+                bgColor = 'bg-slate-700/30';
+                borderColor = 'border-slate-600/30';
+                icon = '';
+              } else if (texto.includes('🤖') || texto.includes('oponente')) {
+                bgColor = 'bg-red-900/20';
+                textColor = 'text-red-200';
+                borderColor = 'border-red-500/20';
+                icon = '🤖';
+              } else if (texto.includes('⏰') || texto.includes('Rodada')) {
+                bgColor = 'bg-cyan-900/20';
+                textColor = 'text-cyan-200';
+                borderColor = 'border-cyan-500/20';
+                icon = '⏰';
+              }
+
+              return (
+                <div
+                  key={i}
+                  className={`${bgColor} ${textColor} px-3 py-2 rounded border ${borderColor} text-xs font-mono leading-relaxed transition-all hover:scale-[1.02] hover:shadow-md`}
+                >
+                  {icon && <span className="mr-2">{icon}</span>}
+                  {texto.replace(icon, '').trim()}
+                </div>
+              );
+            })}
+
+            {log.length === 0 && (
+              <div className="text-center text-slate-500 py-8 text-sm">
+                ⚔️ A batalha está prestes a começar...
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
