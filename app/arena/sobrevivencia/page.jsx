@@ -278,6 +278,9 @@ export default function ArenaSobrevivenciaPage() {
 
     // Verificar level up e atualizar XP
     let houveLevelUp = false;
+    let nivelAnterior = 0;
+    let nivelNovo = 0;
+
     setStatsAvatarAtual(prev => {
       if (!prev) return prev;
 
@@ -286,14 +289,9 @@ export default function ArenaSobrevivenciaPage() {
 
       if (novoXP >= xpParaProximoNivel) {
         // Level up!
-        const nivelAnterior = prev.nivel;
-        const nivelNovo = nivelAnterior + 1;
+        nivelAnterior = prev.nivel;
+        nivelNovo = nivelAnterior + 1;
         houveLevelUp = true;
-
-        // Mostrar animação de level up
-        setTimeout(() => {
-          setModalLevelUp({ nivelAnterior, nivelNovo });
-        }, 1500);
 
         // Aumentar stats ao subir de nível
         return {
@@ -313,9 +311,22 @@ export default function ArenaSobrevivenciaPage() {
       return { ...prev, xp_atual: novoXP };
     });
 
-    // Mostrar modal de onda completa
     const exaustao = calcularExaustaoOnda(onda);
-    setModalOndaCompleta({ onda, recompensas, exaustao });
+
+    // Se houve level up, mostrar modal de level up PRIMEIRO
+    if (houveLevelUp) {
+      setTimeout(() => {
+        setModalLevelUp({
+          nivelAnterior,
+          nivelNovo,
+          // Guardar dados da onda para mostrar depois
+          proximoModal: { onda, recompensas, exaustao }
+        });
+      }, 800);
+    } else {
+      // Sem level up, mostrar modal de onda completa direto
+      setModalOndaCompleta({ onda, recompensas, exaustao });
+    }
   };
 
   const continuarParaProximaOnda = () => {
@@ -683,8 +694,14 @@ export default function ArenaSobrevivenciaPage() {
       {/* Modal de Level Up */}
       {modalLevelUp && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto p-4"
-          onClick={() => setModalLevelUp(null)}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] overflow-y-auto p-4"
+          onClick={() => {
+            // Se tem próximo modal (onda completa), mostrar ele
+            if (modalLevelUp.proximoModal) {
+              setModalOndaCompleta(modalLevelUp.proximoModal);
+            }
+            setModalLevelUp(null);
+          }}
         >
           <div className="min-h-full flex items-center justify-center py-8">
             <div
@@ -730,7 +747,13 @@ export default function ArenaSobrevivenciaPage() {
               </div>
 
               <button
-                onClick={() => setModalLevelUp(null)}
+                onClick={() => {
+                  // Se tem próximo modal (onda completa), mostrar ele
+                  if (modalLevelUp.proximoModal) {
+                    setModalOndaCompleta(modalLevelUp.proximoModal);
+                  }
+                  setModalLevelUp(null);
+                }}
                 className="w-full px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black rounded-lg transition-all text-lg shadow-lg"
               >
                 🎉 CONTINUAR
