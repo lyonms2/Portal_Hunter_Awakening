@@ -10,8 +10,9 @@ export default function InventarioPage() {
   const [stats, setStats] = useState(null);
   const [avatarAtivo, setAvatarAtivo] = useState(null);
   const [inventario, setInventario] = useState([]);
-  const [catalogoItens, setCatalogoItens] = useState([]);
+  const [itensLoja, setItensLoja] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingLoja, setLoadingLoja] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState('inventario'); // 'inventario' ou 'loja'
 
   // Estados para usar item
@@ -59,6 +60,9 @@ export default function InventarioPage() {
         // Buscar inventário
         await carregarInventario(parsedUser.id);
 
+        // Buscar itens da loja
+        await carregarItensLoja();
+
       } catch (error) {
         console.error("Erro ao inicializar página:", error);
       } finally {
@@ -81,6 +85,26 @@ export default function InventarioPage() {
       }
     } catch (error) {
       console.error("Erro ao carregar inventário:", error);
+    }
+  };
+
+  const carregarItensLoja = async () => {
+    setLoadingLoja(true);
+    try {
+      const response = await fetch('/api/inventario/loja');
+      const data = await response.json();
+
+      if (response.ok) {
+        setItensLoja(data.itens || []);
+      } else {
+        console.error("Erro ao carregar itens da loja:", data.message);
+        mostrarFeedback("Erro ao carregar loja. Tente novamente.", 'erro');
+      }
+    } catch (error) {
+      console.error("Erro ao carregar loja:", error);
+      mostrarFeedback("Erro ao conectar com a loja.", 'erro');
+    } finally {
+      setLoadingLoja(false);
     }
   };
 
@@ -194,25 +218,6 @@ export default function InventarioPage() {
       </div>
     );
   }
-
-  // Catálogo da loja (fixo por enquanto)
-  const itensDaLoja = [
-    {
-      id: 'pocao-vida',
-      nome: 'Poção de Vida',
-      descricao: 'Uma poção mágica que restaura 50 HP do avatar ativo. Essencial para caçadores em missões perigosas.',
-      tipo: 'consumivel',
-      efeito: 'cura_hp',
-      valor_efeito: 50,
-      preco_compra: 100,
-      preco_venda: 30,
-      raridade: 'Comum',
-      icone: '🧪',
-      empilhavel: true,
-      max_pilha: 99,
-      requer_avatar_ativo: true
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-gray-100 relative overflow-hidden">
@@ -385,8 +390,19 @@ export default function InventarioPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {itensDaLoja.map((item) => {
+            {loadingLoja ? (
+              <div className="text-center py-20">
+                <div className="text-cyan-400 font-mono animate-pulse">Carregando loja...</div>
+              </div>
+            ) : itensLoja.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-6xl mb-4">🏪</div>
+                <div className="text-xl text-slate-400 font-bold mb-2">Loja Vazia</div>
+                <p className="text-slate-500">Nenhum item disponível no momento.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {itensLoja.map((item) => {
                 const itemNoInventario = inventario.find(inv => inv.items.nome === item.nome);
                 const quantidadeAtual = itemNoInventario?.quantidade || 0;
 
@@ -458,7 +474,8 @@ export default function InventarioPage() {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
