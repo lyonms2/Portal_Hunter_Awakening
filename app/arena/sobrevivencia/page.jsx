@@ -293,6 +293,8 @@ export default function ArenaSobrevivenciaPage() {
         nivelNovo = nivelAnterior + 1;
         houveLevelUp = true;
 
+        console.log('🎉 LEVEL UP DETECTADO!', { nivelAnterior, nivelNovo, novoXP, xpParaProximoNivel });
+
         // Aumentar stats ao subir de nível
         return {
           ...prev,
@@ -314,19 +316,22 @@ export default function ArenaSobrevivenciaPage() {
     const exaustao = calcularExaustaoOnda(onda);
 
     // Se houve level up, mostrar modal de level up PRIMEIRO
-    if (houveLevelUp) {
-      setTimeout(() => {
+    // IMPORTANTE: Usar setTimeout para garantir que o setState acima complete primeiro
+    setTimeout(() => {
+      if (houveLevelUp) {
+        console.log('⭐ Mostrando modal de LEVEL UP:', { nivelAnterior, nivelNovo });
         setModalLevelUp({
           nivelAnterior,
           nivelNovo,
           // Guardar dados da onda para mostrar depois
           proximoModal: { onda, recompensas, exaustao }
         });
-      }, 800);
-    } else {
-      // Sem level up, mostrar modal de onda completa direto
-      setModalOndaCompleta({ onda, recompensas, exaustao });
-    }
+      } else {
+        // Sem level up, mostrar modal de onda completa direto
+        console.log('📊 Sem level up, mostrando modal de onda completa');
+        setModalOndaCompleta({ onda, recompensas, exaustao });
+      }
+    }, 800);
   };
 
   const continuarParaProximaOnda = () => {

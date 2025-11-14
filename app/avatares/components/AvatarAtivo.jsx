@@ -203,6 +203,47 @@ export default function AvatarAtivo({
 
               {/* Progresso e Status */}
               <div className="space-y-3">
+                {/* HP */}
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-slate-500 uppercase">HP</span>
+                    <span className="text-xl font-bold text-green-400">
+                      {(() => {
+                        const hpMaximo = avatar.resistencia * 10 + avatar.nivel * 5;
+                        const hpAtual = avatar.hp_atual !== null && avatar.hp_atual !== undefined
+                          ? avatar.hp_atual
+                          : hpMaximo;
+                        return `${hpAtual} / ${hpMaximo}`;
+                      })()}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-700 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${(() => {
+                        const hpMaximo = avatar.resistencia * 10 + avatar.nivel * 5;
+                        const hpAtual = avatar.hp_atual !== null && avatar.hp_atual !== undefined
+                          ? avatar.hp_atual
+                          : hpMaximo;
+                        const hpPercent = (hpAtual / hpMaximo) * 100;
+
+                        if (hpPercent > 70) return 'bg-green-500';
+                        if (hpPercent > 40) return 'bg-yellow-500';
+                        if (hpPercent > 20) return 'bg-orange-500';
+                        return 'bg-red-500';
+                      })()}`}
+                      style={{
+                        width: `${(() => {
+                          const hpMaximo = avatar.resistencia * 10 + avatar.nivel * 5;
+                          const hpAtual = avatar.hp_atual !== null && avatar.hp_atual !== undefined
+                            ? avatar.hp_atual
+                            : hpMaximo;
+                          return Math.min((hpAtual / hpMaximo) * 100, 100);
+                        })()}%`
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
                 {/* Nível e XP */}
                 <div className="bg-slate-900/50 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -210,8 +251,8 @@ export default function AvatarAtivo({
                     <span className="text-xl font-bold text-cyan-400">{avatar.nivel}</span>
                   </div>
                   <div className="w-full bg-slate-700 rounded-full h-2 mb-1">
-                    <div 
-                      className="bg-cyan-400 h-2 rounded-full transition-all" 
+                    <div
+                      className="bg-cyan-400 h-2 rounded-full transition-all"
                       style={{width: `${((avatar.experiencia || 0) / calcularXPNecessario(avatar.nivel)) * 100}%`}}
                     ></div>
                   </div>

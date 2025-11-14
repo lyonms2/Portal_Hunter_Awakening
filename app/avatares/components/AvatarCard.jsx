@@ -147,15 +147,90 @@ export default function AvatarCard({
             </div>
           </div>
 
-          {/* Info adicional */}
-          <div className="flex justify-between text-[10px] text-slate-500 mb-3">
-            <span>Nv. {avatar.nivel}</span>
-            <span>Vínculo: {avatar.vinculo}%</span>
-          </div>
+          {/* Barras de Progressão */}
+          <div className="space-y-2 mb-3">
+            {/* Barra de HP */}
+            <div>
+              <div className="flex justify-between text-[10px] mb-1">
+                <span className="text-green-400 font-bold">❤️ HP</span>
+                <span className="text-slate-400">
+                  {(() => {
+                    const hpMaximo = avatar.resistencia * 10 + avatar.nivel * 5;
+                    const hpAtual = avatar.hp_atual !== null && avatar.hp_atual !== undefined
+                      ? avatar.hp_atual
+                      : hpMaximo;
+                    return `${hpAtual} / ${hpMaximo}`;
+                  })()}
+                </span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                <div
+                  className={`h-full transition-all duration-500 ${(() => {
+                    const hpMaximo = avatar.resistencia * 10 + avatar.nivel * 5;
+                    const hpAtual = avatar.hp_atual !== null && avatar.hp_atual !== undefined
+                      ? avatar.hp_atual
+                      : hpMaximo;
+                    const hpPercent = (hpAtual / hpMaximo) * 100;
 
-          {/* Badge de Exaustão */}
-          <div className="mb-3 flex justify-center">
-            <BadgeExaustao exaustao={avatar.exaustao} />
+                    if (hpPercent > 70) return 'bg-gradient-to-r from-green-600 to-green-400';
+                    if (hpPercent > 40) return 'bg-gradient-to-r from-yellow-600 to-yellow-400';
+                    if (hpPercent > 20) return 'bg-gradient-to-r from-orange-600 to-orange-400';
+                    return 'bg-gradient-to-r from-red-600 to-red-400';
+                  })()}`}
+                  style={{
+                    width: `${(() => {
+                      const hpMaximo = avatar.resistencia * 10 + avatar.nivel * 5;
+                      const hpAtual = avatar.hp_atual !== null && avatar.hp_atual !== undefined
+                        ? avatar.hp_atual
+                        : hpMaximo;
+                      return Math.min((hpAtual / hpMaximo) * 100, 100);
+                    })()}%`
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Barra de Level / XP */}
+            <div>
+              <div className="flex justify-between text-[10px] mb-1">
+                <span className="text-cyan-400 font-bold">📊 Nv {avatar.nivel}</span>
+                <span className="text-slate-400">
+                  {avatar.experiencia || 0} / {avatar.nivel * 100} XP
+                </span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-600 to-blue-400 transition-all duration-500"
+                  style={{
+                    width: `${Math.min(((avatar.experiencia || 0) / (avatar.nivel * 100)) * 100, 100)}%`
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Barra de Exaustão */}
+            <div>
+              <div className="flex justify-between text-[10px] mb-1">
+                <span className="text-orange-400 font-bold">😰 Exaustão</span>
+                <span className="text-slate-400">{Math.floor(avatar.exaustao || 0)}%</span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    (avatar.exaustao || 0) < 20 ? 'bg-gradient-to-r from-green-600 to-green-400' :
+                    (avatar.exaustao || 0) < 40 ? 'bg-gradient-to-r from-green-600 to-yellow-400' :
+                    (avatar.exaustao || 0) < 60 ? 'bg-gradient-to-r from-yellow-600 to-orange-400' :
+                    'bg-gradient-to-r from-orange-600 to-red-600'
+                  }`}
+                  style={{ width: `${Math.min(avatar.exaustao || 0, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Info adicional: Vínculo */}
+            <div className="flex justify-between text-[10px] text-slate-500">
+              <span>🔗 Vínculo: {avatar.vinculo}%</span>
+            </div>
           </div>
 
           {/* Total de Stats */}
