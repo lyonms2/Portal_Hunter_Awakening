@@ -327,6 +327,27 @@ export default function ArenaTreinamentoPage() {
                       </div>
                     </div>
 
+                    {/* XP / Nível */}
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-cyan-400 font-bold">⭐ Nível {avatarAtivo.nivel}</span>
+                        <span className="text-slate-400">
+                          {avatarAtivo.experiencia || 0} / {avatarAtivo.nivel * 100} XP
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all"
+                          style={{
+                            width: `${Math.min(((avatarAtivo.experiencia || 0) / (avatarAtivo.nivel * 100)) * 100, 100)}%`
+                          }}
+                        ></div>
+                      </div>
+                      <div className="text-[10px] text-cyan-400 font-bold mt-1 text-center">
+                        {Math.floor(((avatarAtivo.experiencia || 0) / (avatarAtivo.nivel * 100)) * 100)}% para próximo nível
+                      </div>
+                    </div>
+
                     {/* Stats com Penalidade */}
                     <div className="bg-slate-900/50 rounded-lg p-3">
                       <div className="grid grid-cols-4 gap-2 text-center">
@@ -412,6 +433,21 @@ export default function ArenaTreinamentoPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Botão Trocar Avatar */}
+                  <div className="p-4 border-t border-slate-700/50">
+                    <button
+                      onClick={() => router.push('/avatares')}
+                      className="w-full group/trocar relative"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded blur opacity-0 group-hover/trocar:opacity-75 transition-all"></div>
+                      <div className="relative px-4 py-3 bg-slate-900/50 hover:bg-slate-800/50 rounded border border-cyan-500/30 group-hover/trocar:border-cyan-400/50 transition-all">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-cyan-400 font-bold text-sm">🔄 Trocar Avatar</span>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
 
