@@ -528,7 +528,34 @@ export default function DashboardPage() {
                 </div>
               </div>
             </button>
-          
+
+            {/* Botão Inventário/Itens */}
+            <button
+              onClick={() => router.push("/inventario")}
+              className="w-full group relative"
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
+
+              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-amber-900/30 rounded-lg p-5 group-hover:border-amber-500/50 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg flex items-center justify-center border border-amber-500/30 group-hover:border-amber-400/50 transition-all">
+                    <span className="text-2xl">🎒</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-amber-300 text-base mb-0.5 group-hover:text-amber-200 transition-colors">
+                      INVENTÁRIO
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      Itens, poções e equipamentos
+                    </div>
+                  </div>
+                  <div className="text-amber-400 group-hover:translate-x-1 group-hover:text-amber-300 transition-all text-xl">
+                    →
+                  </div>
+                </div>
+              </div>
+            </button>
+
             {/* Alerta se não tem avatar ativo */}
             {!loadingAvatares && avatares.length > 0 && !avatarAtivo && (
               <div className="relative group">
@@ -546,7 +573,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
-          
+
             {/* Divisor */}
             <div className="h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent my-2"></div>
           
