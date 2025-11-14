@@ -3,21 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { aplicarPenalidadesExaustao, getNivelExaustao } from "../../avatares/sistemas/exhaustionSystem";
+import { getNivelVinculo } from "../../avatares/sistemas/bondSystem";
+import { calcularHPMaximoCompleto } from "../../../lib/combat/statsCalculator";
 import AvatarSVG from "../../components/AvatarSVG";
-import { getTierPorPontos, getProgressoNoTier, getProximoTier, calcularRecompensasPvP } from "../../../lib/pvp/rankingSystem";
+import { getTierPorPontos, getProgressoNoTier, getProximoTier } from "../../../lib/pvp/rankingSystem";
 
 export default function ArenaPvPPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [avatares, setAvatares] = useState([]);
-  const [avatarSelecionado, setAvatarSelecionado] = useState(null);
+  const [avatarAtivo, setAvatarAtivo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [estadoMatchmaking, setEstadoMatchmaking] = useState('selecao'); // selecao, procurando, encontrado, em_batalha
+  const [estadoMatchmaking, setEstadoMatchmaking] = useState('lobby'); // lobby, procurando, encontrado
   const [tempoEspera, setTempoEspera] = useState(0);
   const [oponenteEncontrado, setOponenteEncontrado] = useState(null);
 
   // Sistema de Ranking
-  const [pontosRanking, setPontosRanking] = useState(1000); // Começa em Bronze (1000 pontos)
+  const [pontosRanking, setPontosRanking] = useState(1000); //Começa em Bronze (1000 pontos)
   const [vitorias, setVitorias] = useState(0);
   const [derrotas, setDerrotas] = useState(0);
 
@@ -34,7 +35,7 @@ export default function ArenaPvPPage() {
 
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
-    carregarAvatares(parsedUser.id);
+    carregarAvatarAtivo(parsedUser.id);
 
     // Carregar dados de ranking do localStorage
     const rankingData = localStorage.getItem(`pvp_ranking_${parsedUser.id}`);
@@ -60,41 +61,52 @@ export default function ArenaPvPPage() {
     return () => clearInterval(interval);
   }, [estadoMatchmaking]);
 
-  const carregarAvatares = async (userId) => {
+  const carregarAvatarAtivo = async (userId) => {
     try {
       setLoading(true);
       const response = await fetch(`/api/meus-avatares?userId=${userId}`);
       const data = await response.json();
 
       if (response.ok) {
-        const avataresVivos = data.avatares.filter(av => av.vivo && av.exaustao < 80);
-        setAvatares(avataresVivos);
-
-        const ativo = avataresVivos.find(av => av.ativo);
-        if (ativo) {
-          setAvatarSelecionado(ativo);
-        }
+        const ativo = data.avatares.find(av => av.ativo);
+        setAvatarAtivo(ativo || null);
       }
     } catch (error) {
-      console.error("Erro ao carregar avatares:", error);
+      console.error("Erro ao carregar avatar ativo:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const iniciarMatchmaking = () => {
-    if (!avatarSelecionado) {
+    if (!avatarAtivo) {
       setModalAlerta({
-        titulo: '⚠️ Avatar não selecionado',
-        mensagem: 'Selecione um avatar antes de procurar uma partida!'
+        titulo: '⚠️ Sem Avatar Ativo',
+        mensagem: 'Você precisa ter um avatar ativo para entrar no PvP!'
       });
       return;
     }
 
-    if (avatarSelecionado.exaustao >= 60) {
+    if (!avatarAtivo.vivo) {
+      setModalAlerta({
+        titulo: '💀 Avatar Morto',
+        mensagem: 'Seu avatar está morto! Visite o Necromante para ressuscitá-lo.'
+      });
+      return;
+    }
+
+    if (avatarAtivo.exaustao >= 80) {
+      setModalAlerta({
+        titulo: '😰 Avatar Colapsado',
+        mensagem: 'Seu avatar está colapsado de exaustão! Deixe-o descansar antes de lutar.'
+      });
+      return;
+    }
+
+    if (avatarAtivo.exaustao >= 60) {
       setModalConfirmacao({
         titulo: '⚠️ Avatar Exausto',
-        mensagem: 'Seu avatar está exausto! Isso pode prejudicar significativamente seu desempenho em combate. Deseja continuar mesmo assim?',
+        mensagem: 'Seu avatar está exausto! Isso causará penalidades severas em combate. Deseja continuar mesmo assim?',
         onConfirm: () => {
           setModalConfirmacao(null);
           setEstadoMatchmaking('procurando');
@@ -112,8 +124,8 @@ export default function ArenaPvPPage() {
       const oponente = {
         id: 'oponente_' + Date.now(),
         nome: 'Jogador Adversário',
-        nivel: avatarSelecionado.nivel + Math.floor(Math.random() * 3) - 1, // ±1 nivel
-        avatar: gerarAvatarOponente(avatarSelecionado.nivel)
+        nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1, // ±1 nivel
+        avatar: gerarAvatarOponente(avatarAtivo.nivel)
       };
 
       setOponenteEncontrado(oponente);
@@ -127,7 +139,7 @@ export default function ArenaPvPPage() {
   };
 
   const cancelarMatchmaking = () => {
-    setEstadoMatchmaking('selecao');
+    setEstadoMatchmaking('lobby');
     setOponenteEncontrado(null);
     setTempoEspera(0);
   };
@@ -152,16 +164,16 @@ export default function ArenaPvPPage() {
   const iniciarBatalha = () => {
     // Aplicar penalidades de exaustão aos stats do avatar ANTES de entrar em batalha
     const statsBase = {
-      forca: avatarSelecionado.forca,
-      agilidade: avatarSelecionado.agilidade,
-      resistencia: avatarSelecionado.resistencia,
-      foco: avatarSelecionado.foco
+      forca: avatarAtivo.forca,
+      agilidade: avatarAtivo.agilidade,
+      resistencia: avatarAtivo.resistencia,
+      foco: avatarAtivo.foco
     };
-    const statsComPenalidades = aplicarPenalidadesExaustao(statsBase, avatarSelecionado.exaustao || 0);
+    const statsComPenalidades = aplicarPenalidadesExaustao(statsBase, avatarAtivo.exaustao || 0);
 
     // Avatar com stats penalizados
     const avatarComPenalidades = {
-      ...avatarSelecionado,
+      ...avatarAtivo,
       forca: statsComPenalidades.forca,
       agilidade: statsComPenalidades.agilidade,
       resistencia: statsComPenalidades.resistencia,
@@ -185,19 +197,31 @@ export default function ArenaPvPPage() {
     router.push('/arena/batalha?modo=pvp');
   };
 
-  const getAvisoExaustao = (exaustao) => {
-    if (exaustao >= 80) return { texto: '💀 EXAUSTO DEMAIS - NÃO PODE LUTAR!', cor: 'text-red-500' };
-    if (exaustao >= 60) return { texto: '🔴 EXAUSTO - Penalidades severas', cor: 'text-orange-500' };
-    if (exaustao >= 40) return { texto: '🟡 CANSADO - Penalidades leves', cor: 'text-yellow-500' };
-    if (exaustao >= 20) return { texto: '🟢 ALERTA - Bom para lutar', cor: 'text-green-500' };
-    return { texto: '💚 DESCANSADO - Em ótima forma!', cor: 'text-green-400' };
-  };
-
   const formatarTempo = (segundos) => {
     const mins = Math.floor(segundos / 60);
     const secs = segundos % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Calcular stats e informações do avatar
+  const statsBase = avatarAtivo ? {
+    forca: avatarAtivo.forca || 0,
+    agilidade: avatarAtivo.agilidade || 0,
+    resistencia: avatarAtivo.resistencia || 0,
+    foco: avatarAtivo.foco || 0
+  } : null;
+
+  const statsAtuais = avatarAtivo ? aplicarPenalidadesExaustao(statsBase, avatarAtivo.exaustao || 0) : null;
+  const nivelExaustao = avatarAtivo ? getNivelExaustao(avatarAtivo.exaustao || 0) : null;
+  const nivelVinculo = avatarAtivo ? getNivelVinculo(avatarAtivo.vinculo || 0) : null;
+  const hpMaximo = avatarAtivo ? calcularHPMaximoCompleto(avatarAtivo) : 0;
+  const hpAtual = avatarAtivo ? (avatarAtivo.hp_atual !== undefined ? avatarAtivo.hp_atual : hpMaximo) : 0;
+  const temPenalidade = nivelExaustao && nivelExaustao.penalidades.stats !== undefined;
+
+  // Tier info
+  const tierAtual = getTierPorPontos(pontosRanking);
+  const progressoTier = getProgressoNoTier(pontosRanking, tierAtual);
+  const proximoTier = getProximoTier(tierAtual);
 
   if (loading) {
     return (
@@ -229,35 +253,15 @@ export default function ArenaPvPPage() {
           </button>
         </div>
 
-        {/* Info PvP */}
-        <div className="mb-8 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border-2 border-cyan-500/50 rounded-xl p-6">
-          <div className="flex items-start gap-4">
-            <div className="text-4xl">⚔️</div>
-            <div className="flex-1">
-              <h3 className="text-xl font-black text-cyan-400 mb-2">ARENA PvP COMPETITIVA</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                Enfrente outros jogadores em batalhas táticas em tempo real. Suba de tier e ganhe recompensas multiplicadas!
-              </p>
-              <div className="text-xs text-slate-400 space-y-1">
-                <div>✅ Batalhas em tempo real (30s por turno)</div>
-                <div>✅ Sistema de ranking com 6 tiers</div>
-                <div>✅ Recompensas escalonadas (1.0x → 3.0x)</div>
-                <div>✅ Pontos ELO balanceados</div>
-                <div>✅ Upsets rendem bônus de pontos</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sem avatares */}
-        {avatares.length === 0 && (
+        {/* Sem Avatar Ativo */}
+        {!avatarAtivo && (
           <div className="max-w-2xl mx-auto text-center py-20 bg-slate-900/50 rounded-lg border border-slate-800">
             <div className="text-6xl mb-6">⚔️</div>
             <h2 className="text-2xl font-bold text-slate-300 mb-4">
-              Nenhum Avatar Disponível para PvP
+              Nenhum Avatar Ativo
             </h2>
             <p className="text-slate-400 mb-8">
-              Apenas avatares vivos e com menos de 80% de exaustão podem lutar no PvP.
+              Você precisa ter um avatar ativo para participar do PvP.
             </p>
             <button
               onClick={() => router.push("/avatares")}
@@ -269,582 +273,515 @@ export default function ArenaPvPPage() {
         )}
 
         {/* Interface Principal */}
-        {avatares.length > 0 && (
-          <div className="space-y-8">
-            {/* Estado: Seleção de Avatar */}
-            {estadoMatchmaking === 'selecao' && (
-              <>
-                {/* Seleção de Avatar */}
-                <div>
-                  <h2 className="text-3xl font-black text-cyan-400 mb-6 flex items-center gap-3">
-                    <span className="text-4xl">👤</span> SELECIONAR AVATAR
-                  </h2>
+        {avatarAtivo && estadoMatchmaking === 'lobby' && (
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Coluna Esquerda - Avatar Ativo */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* Card do Avatar */}
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-red-500/20 via-orange-500/20 to-yellow-500/20 rounded-xl blur opacity-50"></div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    {avatares.map((avatar) => {
-                      const selecionado = avatarSelecionado?.id === avatar.id;
-                      const aviso = getAvisoExaustao(avatar.exaustao);
-                      const podeLutar = avatar.exaustao < 80;
-
-                      const statsBase = {
-                        forca: avatar.forca || 0,
-                        agilidade: avatar.agilidade || 0,
-                        resistencia: avatar.resistencia || 0,
-                        foco: avatar.foco || 0
-                      };
-                      const statsAtuais = aplicarPenalidadesExaustao(statsBase, avatar.exaustao || 0);
-                      const nivelExaustao = getNivelExaustao(avatar.exaustao || 0);
-                      const temPenalidade = nivelExaustao.penalidades.stats !== undefined;
-
-                      return (
-                        <button
-                          key={avatar.id}
-                          onClick={() => podeLutar && setAvatarSelecionado(avatar)}
-                          disabled={!podeLutar}
-                          className={`group relative text-left overflow-hidden rounded-xl border-2 transition-all duration-300 ${
-                            selecionado
-                              ? 'border-cyan-500 bg-cyan-900/30 ring-4 ring-cyan-500/50 scale-105 shadow-2xl shadow-cyan-500/20'
-                              : podeLutar
-                                ? 'border-slate-700 bg-slate-900/50 hover:border-cyan-700 hover:scale-102 hover:shadow-xl'
-                                : 'border-red-900 bg-red-950/30 opacity-50 cursor-not-allowed'
-                          }`}
-                        >
-                          {selecionado && (
-                            <div className="absolute top-3 right-3 z-10 bg-cyan-500 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider animate-pulse">
-                              ✓ Selecionado
-                            </div>
-                          )}
-
-                          <div className={`absolute top-3 left-3 z-10 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                            avatar.raridade === 'Lendário' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' :
-                            avatar.raridade === 'Raro' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' :
-                            'bg-slate-700 text-slate-300'
-                          }`}>
-                            {avatar.raridade}
-                          </div>
-
-                          <div className="relative p-6 pb-3 flex justify-center items-center bg-gradient-to-b from-slate-950/50 to-transparent">
-                            <div className={`relative ${podeLutar ? 'group-hover:scale-110' : ''} transition-transform duration-300`}>
-                              <AvatarSVG avatar={avatar} tamanho={140} />
-                              {!podeLutar && (
-                                <div className="absolute inset-0 bg-red-950/70 rounded-full flex items-center justify-center">
-                                  <span className="text-4xl">💀</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="px-4 pb-4">
-                            <div className="text-center mb-3">
-                              <div className="font-black text-lg text-white mb-1">{avatar.nome}</div>
-                              <div className="flex items-center justify-center gap-2 text-sm">
-                                <span className="text-cyan-400 font-bold">Nv.{avatar.nivel}</span>
-                                <span className="text-slate-500">•</span>
-                                <span className="text-slate-400">{avatar.elemento}</span>
-                              </div>
-                            </div>
-
-                            <div className="bg-slate-950/50 rounded-lg p-3 mb-3">
-                              <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                                <div>
-                                  {temPenalidade ? (
-                                    <div>
-                                      <div className="text-[9px] text-slate-700 line-through">{statsBase.forca}</div>
-                                      <div className="text-red-400 font-bold text-base">{statsAtuais.forca}</div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-red-400 font-bold text-base">{statsBase.forca}</div>
-                                  )}
-                                  <div className="text-slate-600 font-semibold mt-1">FOR</div>
-                                </div>
-                                <div>
-                                  {temPenalidade ? (
-                                    <div>
-                                      <div className="text-[9px] text-slate-700 line-through">{statsBase.agilidade}</div>
-                                      <div className="text-green-400 font-bold text-base">{statsAtuais.agilidade}</div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-green-400 font-bold text-base">{statsBase.agilidade}</div>
-                                  )}
-                                  <div className="text-slate-600 font-semibold mt-1">AGI</div>
-                                </div>
-                                <div>
-                                  {temPenalidade ? (
-                                    <div>
-                                      <div className="text-[9px] text-slate-700 line-through">{statsBase.resistencia}</div>
-                                      <div className="text-blue-400 font-bold text-base">{statsAtuais.resistencia}</div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-blue-400 font-bold text-base">{statsBase.resistencia}</div>
-                                  )}
-                                  <div className="text-slate-600 font-semibold mt-1">RES</div>
-                                </div>
-                                <div>
-                                  {temPenalidade ? (
-                                    <div>
-                                      <div className="text-[9px] text-slate-700 line-through">{statsBase.foco}</div>
-                                      <div className="text-purple-400 font-bold text-base">{statsAtuais.foco}</div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-purple-400 font-bold text-base">{statsBase.foco}</div>
-                                  )}
-                                  <div className="text-slate-600 font-semibold mt-1">FOC</div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className={`text-xs ${aviso.cor} font-mono text-center font-bold py-2 px-3 rounded ${
-                              podeLutar ? 'bg-slate-900/50' : 'bg-red-950/50'
-                            }`}>
-                              {aviso.texto}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                <div className="relative bg-slate-950/90 backdrop-blur-xl border border-orange-900/50 rounded-xl overflow-hidden">
+                  {/* Header do Card */}
+                  <div className="bg-gradient-to-r from-red-900/30 to-orange-900/30 p-4 border-b border-orange-500/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-slate-400 uppercase font-mono tracking-wider">Seu Gladiador</div>
+                      <div className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider ${
+                        avatarAtivo.raridade === 'Lendário' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' :
+                        avatarAtivo.raridade === 'Raro' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' :
+                        'bg-slate-700 text-slate-300'
+                      }`}>
+                        {avatarAtivo.raridade}
+                      </div>
+                    </div>
+                    <h2 className="text-2xl font-bold text-orange-400">{avatarAtivo.nome}</h2>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-sm text-slate-300">Nv.{avatarAtivo.nivel}</span>
+                      <span className="text-slate-600">•</span>
+                      <span className="text-sm text-slate-400">{avatarAtivo.elemento}</span>
+                    </div>
                   </div>
 
-                  {/* Botão Procurar Partida */}
-                  <div className="max-w-2xl mx-auto space-y-4">
-                    {avatarSelecionado && avatarSelecionado.exaustao >= 60 && (
-                      <div className="p-4 bg-orange-950/50 border-2 border-orange-500/50 rounded-lg">
-                        <p className="text-sm text-orange-400 font-bold text-center">
-                          ⚠️ Seu avatar está exausto! Você terá penalidades em combate.
-                        </p>
+                  {/* Avatar Image */}
+                  <div className="p-6 flex justify-center bg-gradient-to-b from-slate-950/30 to-transparent">
+                    <AvatarSVG avatar={avatarAtivo} tamanho={180} />
+                  </div>
+
+                  {/* Stats */}
+                  <div className="p-4 space-y-3">
+                    {/* HP */}
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-green-400 font-bold">❤️ HP</span>
+                        <span className="text-slate-400">{hpAtual} / {hpMaximo}</span>
                       </div>
-                    )}
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            (hpAtual / hpMaximo) > 0.7 ? 'bg-green-500' :
+                            (hpAtual / hpMaximo) > 0.4 ? 'bg-yellow-500' :
+                            (hpAtual / hpMaximo) > 0.2 ? 'bg-orange-500' :
+                            'bg-red-500'
+                          }`}
+                          style={{ width: `${Math.min((hpAtual / hpMaximo) * 100, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
 
-                    <button
-                      onClick={iniciarMatchmaking}
-                      disabled={!avatarSelecionado}
-                      className="w-full group relative disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <div className="absolute -inset-1 bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 rounded-xl blur opacity-50 group-hover:opacity-75 transition-all"></div>
-
-                      <div className="relative px-12 py-6 bg-slate-950 rounded-xl border-2 border-orange-500 group-hover:border-orange-400 transition-all">
-                        <span className="text-2xl font-black tracking-wider uppercase bg-gradient-to-r from-red-300 to-yellow-300 bg-clip-text text-transparent">
-                          🔍 PROCURAR PARTIDA
+                    {/* XP / Nível */}
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-cyan-400 font-bold">⭐ Nível {avatarAtivo.nivel}</span>
+                        <span className="text-slate-400">
+                          {avatarAtivo.experiencia || 0} / {avatarAtivo.nivel * 100} XP
                         </span>
                       </div>
-                    </button>
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all"
+                          style={{
+                            width: `${Math.min(((avatarAtivo.experiencia || 0) / (avatarAtivo.nivel * 100)) * 100, 100)}%`
+                          }}
+                        ></div>
+                      </div>
+                      <div className="text-[10px] text-cyan-400 font-bold mt-1 text-center">
+                        {Math.floor(((avatarAtivo.experiencia || 0) / (avatarAtivo.nivel * 100)) * 100)}% para próximo nível
+                      </div>
+                    </div>
 
-                    {!avatarSelecionado && (
-                      <p className="text-center text-sm text-slate-500 font-mono">
-                        Selecione um avatar para procurar uma partida
-                      </p>
+                    {/* Stats com penalidade */}
+                    <div className="bg-slate-900/50 rounded-lg p-3">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <div className="text-[10px] text-slate-500 uppercase mb-1">Força</div>
+                          {temPenalidade ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-600 line-through">{statsBase.forca}</span>
+                              <span className="text-red-400 font-bold text-lg">→ {statsAtuais.forca}</span>
+                            </div>
+                          ) : (
+                            <div className="text-red-400 font-bold text-lg">{statsBase.forca}</div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-slate-500 uppercase mb-1">Agilidade</div>
+                          {temPenalidade ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-600 line-through">{statsBase.agilidade}</span>
+                              <span className="text-green-400 font-bold text-lg">→ {statsAtuais.agilidade}</span>
+                            </div>
+                          ) : (
+                            <div className="text-green-400 font-bold text-lg">{statsBase.agilidade}</div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-slate-500 uppercase mb-1">Resistência</div>
+                          {temPenalidade ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-600 line-through">{statsBase.resistencia}</span>
+                              <span className="text-blue-400 font-bold text-lg">→ {statsAtuais.resistencia}</span>
+                            </div>
+                          ) : (
+                            <div className="text-blue-400 font-bold text-lg">{statsBase.resistencia}</div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-slate-500 uppercase mb-1">Foco</div>
+                          {temPenalidade ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-600 line-through">{statsBase.foco}</span>
+                              <span className="text-purple-400 font-bold text-lg">→ {statsAtuais.foco}</span>
+                            </div>
+                          ) : (
+                            <div className="text-purple-400 font-bold text-lg">{statsBase.foco}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Exaustão */}
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-orange-400 font-bold">😰 Exaustão</span>
+                        <span className={nivelExaustao.cor}>{avatarAtivo.exaustao || 0}%</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${nivelExaustao.corBarra}`}
+                          style={{ width: `${Math.min(avatarAtivo.exaustao || 0, 100)}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-[10px] text-center mt-1">
+                        <span className={nivelExaustao.cor}>{nivelExaustao.nome}</span>
+                      </div>
+                    </div>
+
+                    {/* Vínculo */}
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-pink-400 font-bold">💚 Vínculo</span>
+                        <span className="text-slate-400">{avatarAtivo.vinculo || 0}/100</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all"
+                          style={{ width: `${Math.min(avatarAtivo.vinculo || 0, 100)}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-[10px] text-center mt-1">
+                        <span className="text-pink-400">{nivelVinculo.emoji} {nivelVinculo.nome}</span>
+                      </div>
+                    </div>
+
+                    {/* Avisos */}
+                    {!avatarAtivo.vivo && (
+                      <div className="p-3 bg-red-950/50 border border-red-500/50 rounded text-center">
+                        <p className="text-sm text-red-400 font-bold">☠️ Avatar Morto - Visite o Necromante</p>
+                      </div>
+                    )}
+
+                    {avatarAtivo.vivo && avatarAtivo.exaustao >= 80 && (
+                      <div className="p-3 bg-red-950/50 border border-red-500/50 rounded text-center">
+                        <p className="text-sm text-red-400 font-bold">😰 Colapsado - Não pode lutar!</p>
+                      </div>
+                    )}
+
+                    {avatarAtivo.vivo && avatarAtivo.exaustao >= 60 && avatarAtivo.exaustao < 80 && (
+                      <div className="p-3 bg-orange-950/50 border border-orange-500/50 rounded text-center">
+                        <p className="text-sm text-orange-400 font-bold">⚠️ Muito Exausto - Penalidades Severas</p>
+                      </div>
                     )}
                   </div>
-                </div>
 
-                {/* Info PvP */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
-                    <h3 className="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
-                      <span>⚔️</span> Como Funciona
-                    </h3>
-                    <ul className="space-y-2 text-sm text-slate-300">
-                      <li className="flex items-start gap-2">
-                        <span className="text-cyan-400 mt-1">▸</span>
-                        <span><strong>Matchmaking equilibrado:</strong> Sistema busca oponentes de nível similar.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-cyan-400 mt-1">▸</span>
-                        <span><strong>Turnos de 30 segundos:</strong> Decida rápido ou sua vez será pulada.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-cyan-400 mt-1">▸</span>
-                        <span><strong>Sem desistência:</strong> Abandonar a partida conta como derrota.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-cyan-400 mt-1">▸</span>
-                        <span><strong>Recompensas baseadas em ranking:</strong> Quanto maior seu rank, melhores as recompensas.</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
-                    <h3 className="text-xl font-bold text-purple-400 mb-4 flex items-center gap-2">
-                      <span>🏆</span> Ranking e Recompensas
-                    </h3>
-
-                    {(() => {
-                      const tierAtual = getTierPorPontos(pontosRanking);
-                      const progresso = getProgressoNoTier(pontosRanking, tierAtual);
-                      const proximoTier = getProximoTier(tierAtual);
-                      const totalPartidas = vitorias + derrotas;
-                      const winRate = totalPartidas > 0 ? Math.floor((vitorias / totalPartidas) * 100) : 0;
-
-                      return (
-                        <div className="space-y-4">
-                          {/* Tier Atual */}
-                          <div className={`${tierAtual.corBg} ${tierAtual.corBorda} border-2 rounded-lg p-4`}>
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <span className="text-4xl">{tierAtual.icone}</span>
-                                <div>
-                                  <div className={`text-2xl font-black ${tierAtual.corTexto}`}>
-                                    {tierAtual.nome}
-                                  </div>
-                                  <div className="text-sm text-slate-400 font-mono">
-                                    {pontosRanking} pontos
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xs text-slate-500">Multiplicador</div>
-                                <div className="text-xl font-black text-yellow-400">
-                                  {tierAtual.multiplicadorRecompensa}x
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Barra de Progresso */}
-                            {proximoTier && (
-                              <div>
-                                <div className="flex justify-between text-xs text-slate-400 mb-2">
-                                  <span>Progresso para {proximoTier.nome}</span>
-                                  <span>{progresso}%</span>
-                                </div>
-                                <div className="w-full bg-slate-950/50 rounded-full h-2 overflow-hidden">
-                                  <div
-                                    className={`h-full bg-gradient-to-r ${tierAtual.corTexto.replace('text-', 'from-')} to-purple-500 transition-all duration-500`}
-                                    style={{ width: `${progresso}%` }}
-                                  ></div>
-                                </div>
-                                <div className="text-xs text-slate-500 mt-1 text-center">
-                                  Faltam {proximoTier.minPontos - pontosRanking} pontos
-                                </div>
-                              </div>
-                            )}
-
-                            {!proximoTier && (
-                              <div className="text-center text-sm text-yellow-400 font-bold">
-                                ⭐ RANK MÁXIMO ALCANÇADO! ⭐
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Estatísticas */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-slate-950/50 rounded-lg">
-                              <div className="text-xs text-slate-500 mb-1">Vitórias</div>
-                              <div className="text-2xl font-bold text-green-400">{vitorias}</div>
-                            </div>
-                            <div className="p-3 bg-slate-950/50 rounded-lg">
-                              <div className="text-xs text-slate-500 mb-1">Derrotas</div>
-                              <div className="text-2xl font-bold text-red-400">{derrotas}</div>
-                            </div>
-                          </div>
-
-                          {/* Win Rate */}
-                          <div className="p-3 bg-slate-950/50 rounded-lg">
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-400 text-sm">Taxa de Vitória</span>
-                              <span className={`text-2xl font-bold ${
-                                winRate >= 60 ? 'text-green-400' :
-                                winRate >= 40 ? 'text-yellow-400' :
-                                'text-red-400'
-                              }`}>
-                                {winRate}%
-                              </span>
-                            </div>
-                            {totalPartidas === 0 && (
-                              <div className="text-xs text-slate-500 mt-2 text-center">
-                                Jogue sua primeira partida!
-                              </div>
-                            )}
-                          </div>
+                  {/* Botão trocar avatar */}
+                  <div className="p-4 border-t border-slate-700/50">
+                    <button
+                      onClick={() => router.push('/avatares')}
+                      className="w-full group/trocar relative"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded blur opacity-0 group-hover/trocar:opacity-75 transition-all"></div>
+                      <div className="relative px-4 py-3 bg-slate-900/50 hover:bg-slate-800/50 rounded border border-cyan-500/30 group-hover/trocar:border-cyan-400/50 transition-all">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-cyan-400 font-bold text-sm">🔄 Trocar Avatar</span>
                         </div>
-                      );
-                    })()}
+                      </div>
+                    </button>
                   </div>
                 </div>
+              </div>
 
-                {/* Tabela de Recompensas por Tier */}
-                <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
-                  <h3 className="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
-                    <span>💰</span> Recompensas Competitivas
+              {/* Card de Ranking */}
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-red-500/20 rounded-xl blur opacity-50"></div>
+
+                <div className="relative bg-slate-950/90 backdrop-blur-xl border border-yellow-900/50 rounded-xl overflow-hidden p-6">
+                  <h3 className="text-xl font-black text-yellow-400 mb-4 flex items-center gap-2">
+                    <span>{tierAtual.icone}</span> SEU RANKING
                   </h3>
 
-                  {(() => {
-                    const tierAtual = getTierPorPontos(pontosRanking);
-                    const recompensasVitoria = calcularRecompensasPvP(true, tierAtual, 0);
-                    const recompensasDerrota = calcularRecompensasPvP(false, tierAtual, 0);
-
-                    return (
-                      <div className="space-y-4">
-                        {/* Recompensas de Vitória */}
-                        <div className="bg-green-950/30 border border-green-700/50 rounded-lg p-4">
-                          <h4 className="text-lg font-black text-green-400 mb-3 flex items-center gap-2">
-                            <span>🏆</span> Por Vitória (Tier {tierAtual.nome})
-                          </h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">⭐</div>
-                              <div className="text-cyan-400 font-bold text-lg">{recompensasVitoria.xp}</div>
-                              <div className="text-slate-500 text-xs">XP</div>
-                            </div>
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">💰</div>
-                              <div className="text-yellow-400 font-bold text-lg">{recompensasVitoria.moedas}</div>
-                              <div className="text-slate-500 text-xs">Moedas</div>
-                            </div>
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">💎</div>
-                              <div className="text-purple-400 font-bold text-lg">{recompensasVitoria.vinculo}</div>
-                              <div className="text-slate-500 text-xs">Vínculo</div>
-                            </div>
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">✨</div>
-                              <div className="text-pink-400 font-bold text-lg">
-                                {Math.floor(recompensasVitoria.chance_fragmento * 100)}%
-                              </div>
-                              <div className="text-slate-500 text-xs">Fragmento</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Recompensas de Derrota */}
-                        <div className="bg-red-950/30 border border-red-700/50 rounded-lg p-4">
-                          <h4 className="text-lg font-black text-red-400 mb-3 flex items-center gap-2">
-                            <span>💔</span> Por Derrota (Consolação)
-                          </h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">⭐</div>
-                              <div className="text-cyan-400 font-bold text-lg">{recompensasDerrota.xp}</div>
-                              <div className="text-slate-500 text-xs">XP</div>
-                            </div>
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">💰</div>
-                              <div className="text-yellow-400 font-bold text-lg">{recompensasDerrota.moedas}</div>
-                              <div className="text-slate-500 text-xs">Moedas</div>
-                            </div>
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">💎</div>
-                              <div className="text-red-400 font-bold text-lg">{recompensasDerrota.vinculo}</div>
-                              <div className="text-slate-500 text-xs">Vínculo</div>
-                            </div>
-                            <div className="bg-slate-950/50 rounded p-3 text-center">
-                              <div className="text-2xl mb-1">✨</div>
-                              <div className="text-pink-400 font-bold text-lg">
-                                {Math.floor(recompensasDerrota.chance_fragmento * 100)}%
-                              </div>
-                              <div className="text-slate-500 text-xs">Fragmento</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Informação sobre Tiers */}
-                        <div className="bg-gradient-to-r from-purple-950/50 to-blue-950/50 border border-purple-700/50 rounded-lg p-4">
-                          <h4 className="text-sm font-bold text-purple-400 mb-2 flex items-center gap-2">
-                            <span>📈</span> Multiplicadores por Tier
-                          </h4>
-                          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs">
-                            <div className="text-center">
-                              <div className="text-lg">🥉</div>
-                              <div className="text-orange-400 font-bold">Bronze</div>
-                              <div className="text-slate-500">1.0x</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg">🥈</div>
-                              <div className="text-gray-400 font-bold">Prata</div>
-                              <div className="text-slate-500">1.2x</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg">🥇</div>
-                              <div className="text-yellow-400 font-bold">Ouro</div>
-                              <div className="text-slate-500">1.5x</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg">💎</div>
-                              <div className="text-cyan-400 font-bold">Platina</div>
-                              <div className="text-slate-500">2.0x</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg">💠</div>
-                              <div className="text-blue-400 font-bold">Diamante</div>
-                              <div className="text-slate-500">2.5x</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg">👑</div>
-                              <div className="text-purple-400 font-bold">Mestre</div>
-                              <div className="text-slate-500">3.0x</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-slate-500 text-center italic">
-                          * Quanto maior seu rank, melhores as recompensas. Suba de tier para multiplicar seus ganhos!
-                        </p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </>
-            )}
-
-            {/* Estado: Procurando Partida */}
-            {estadoMatchmaking === 'procurando' && (
-              <div className="max-w-2xl mx-auto">
-                <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-cyan-500/30">
-                  <div className="text-center space-y-6">
-                    {/* Animação de busca */}
-                    <div className="relative">
-                      <div className="w-32 h-32 mx-auto">
-                        <div className="absolute inset-0 border-4 border-cyan-500/20 rounded-full"></div>
-                        <div className="absolute inset-0 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-                        <div className="absolute inset-4 border-4 border-orange-500/20 rounded-full"></div>
-                        <div className="absolute inset-4 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                        <div className="absolute inset-0 flex items-center justify-center text-4xl">
-                          🔍
-                        </div>
+                  <div className="space-y-4">
+                    {/* Tier Atual */}
+                    <div className={`${tierAtual.corBg} border ${tierAtual.corBorda} rounded-lg p-4`}>
+                      <div className="text-center">
+                        <div className="text-4xl mb-2">{tierAtual.icone}</div>
+                        <div className={`text-2xl font-black ${tierAtual.corTexto}`}>{tierAtual.nome}</div>
+                        <div className="text-sm text-slate-400 mt-1">{pontosRanking} Pontos</div>
                       </div>
                     </div>
 
-                    <div>
-                      <h2 className="text-3xl font-black text-white mb-2">
-                        PROCURANDO OPONENTE...
-                      </h2>
-                      <p className="text-slate-400 font-mono text-sm">
-                        Buscando jogador de nível similar
-                      </p>
-                    </div>
-
-                    {/* Timer */}
-                    <div className="inline-block bg-slate-950/50 rounded-lg px-6 py-3 border border-slate-700">
-                      <div className="text-cyan-400 font-mono text-2xl font-bold">
-                        ⏱️ {formatarTempo(tempoEspera)}
-                      </div>
-                    </div>
-
-                    {/* Avatar Selecionado */}
-                    {avatarSelecionado && (
-                      <div className="bg-slate-950/50 rounded-lg p-6 border border-slate-700">
-                        <p className="text-xs text-slate-500 uppercase mb-3">Seu Avatar</p>
-                        <div className="flex items-center gap-4">
-                          <AvatarSVG avatar={avatarSelecionado} tamanho={80} />
-                          <div className="text-left">
-                            <div className="font-bold text-white text-lg">{avatarSelecionado.nome}</div>
-                            <div className="text-sm text-slate-400">Nv.{avatarSelecionado.nivel} • {avatarSelecionado.elemento}</div>
-                          </div>
+                    {/* Progresso */}
+                    {proximoTier && (
+                      <div>
+                        <div className="flex justify-between text-xs mb-2">
+                          <span className="text-slate-400">Progresso para {proximoTier.nome}</span>
+                          <span className="text-yellow-400 font-bold">{progressoTier}%</span>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 transition-all"
+                            style={{ width: `${progressoTier}%` }}
+                          ></div>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1 text-center">
+                          {proximoTier.minPontos - pontosRanking} pontos restantes
                         </div>
                       </div>
                     )}
 
-                    {/* Botão Cancelar */}
-                    <button
-                      onClick={cancelarMatchmaking}
-                      className="px-8 py-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg border border-red-700 transition-colors font-bold"
-                    >
-                      ✕ Cancelar Busca
-                    </button>
+                    {/* Estatísticas */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-green-400">{vitorias}</div>
+                        <div className="text-[10px] text-slate-500 uppercase">Vitórias</div>
+                      </div>
+                      <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-red-400">{derrotas}</div>
+                        <div className="text-[10px] text-slate-500 uppercase">Derrotas</div>
+                      </div>
+                    </div>
+
+                    {/* Win Rate */}
+                    {(vitorias + derrotas) > 0 && (
+                      <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                        <div className="text-lg font-bold text-cyan-400">
+                          {Math.round((vitorias / (vitorias + derrotas)) * 100)}%
+                        </div>
+                        <div className="text-[10px] text-slate-500 uppercase">Taxa de Vitória</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Estado: Oponente Encontrado */}
-            {estadoMatchmaking === 'encontrado' && oponenteEncontrado && (
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-gradient-to-br from-green-900/30 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-green-500/50">
-                  <div className="text-center space-y-8">
-                    <div>
-                      <div className="text-6xl mb-4 animate-bounce">⚔️</div>
-                      <h2 className="text-4xl font-black text-green-400 mb-2">
-                        OPONENTE ENCONTRADO!
-                      </h2>
-                      <p className="text-slate-400 font-mono">
-                        Preparando batalha...
-                      </p>
-                    </div>
-
-                    {/* VS Display */}
-                    <div className="grid grid-cols-3 gap-8 items-center">
-                      {/* Seu Avatar */}
-                      <div className="bg-slate-950/50 rounded-xl p-6 border-2 border-cyan-500">
-                        <p className="text-xs text-cyan-400 uppercase mb-4 font-bold">Você</p>
-                        <AvatarSVG avatar={avatarSelecionado} tamanho={120} />
-                        <div className="mt-4">
-                          <div className="font-bold text-white text-lg">{avatarSelecionado.nome}</div>
-                          <div className="text-sm text-slate-400">Nv.{avatarSelecionado.nivel}</div>
-                        </div>
-                      </div>
-
-                      {/* VS */}
-                      <div className="text-6xl font-black text-red-400 animate-pulse">
-                        VS
-                      </div>
-
-                      {/* Oponente */}
-                      <div className="bg-slate-950/50 rounded-xl p-6 border-2 border-red-500">
-                        <p className="text-xs text-red-400 uppercase mb-4 font-bold">Oponente</p>
-                        <AvatarSVG avatar={oponenteEncontrado.avatar} tamanho={120} />
-                        <div className="mt-4">
-                          <div className="font-bold text-white text-lg">{oponenteEncontrado.nome}</div>
-                          <div className="text-sm text-slate-400">Nv.{oponenteEncontrado.nivel}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-slate-400 text-sm font-mono">
-                      Iniciando em 3 segundos...
+            {/* Coluna Direita - Info e Botão */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Info PvP */}
+              <div className="bg-gradient-to-r from-red-900/30 to-orange-900/30 border-2 border-orange-500/50 rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">⚔️</div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-black text-orange-400 mb-2">ARENA PvP COMPETITIVA</h3>
+                    <p className="text-slate-300 text-sm leading-relaxed mb-3">
+                      Enfrente outros jogadores em batalhas táticas! Suba de tier, ganhe fama e conquiste recompensas incríveis!
+                    </p>
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <div>✅ Batalhas em tempo real (30s por turno)</div>
+                      <div>✅ Sistema de ranking com 6 tiers</div>
+                      <div>✅ Recompensas escalonadas (1.0x → 3.0x)</div>
+                      <div>✅ Ganha Fama, XP, Moedas, Vínculo e Fragmentos</div>
+                      <div>✅ Matchmaking balanceado por nível</div>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Modal de Alerta */}
-        {modalAlerta && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl border-2 border-orange-500/50 p-8 max-w-md w-full shadow-2xl">
-              <h3 className="text-2xl font-black text-orange-400 mb-4 flex items-center gap-3">
-                {modalAlerta.titulo}
-              </h3>
-              <p className="text-slate-300 mb-6 leading-relaxed">
-                {modalAlerta.mensagem}
-              </p>
-              <button
-                onClick={() => setModalAlerta(null)}
-                className="w-full px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white rounded-lg font-bold transition-all"
-              >
-                OK, Entendi
-              </button>
+              {/* Botão Procurar Partida */}
+              <div className="space-y-4">
+                <button
+                  onClick={iniciarMatchmaking}
+                  disabled={!avatarAtivo?.vivo || (avatarAtivo?.exaustao >= 80)}
+                  className="w-full group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="absolute -inset-1 bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 rounded-xl blur opacity-50 group-hover:opacity-75 transition-all"></div>
+
+                  <div className="relative px-12 py-8 bg-slate-950 rounded-xl border-2 border-orange-500 group-hover:border-orange-400 transition-all">
+                    <span className="text-3xl font-black tracking-wider uppercase bg-gradient-to-r from-red-300 to-yellow-300 bg-clip-text text-transparent">
+                      🔍 PROCURAR PARTIDA
+                    </span>
+                  </div>
+                </button>
+
+                {(!avatarAtivo?.vivo || avatarAtivo?.exaustao >= 80) && (
+                  <p className="text-center text-sm text-red-400 font-mono">
+                    ⚠️ Seu avatar não pode lutar neste estado
+                  </p>
+                )}
+              </div>
+
+              {/* Recompensas e Informações */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+                  <h3 className="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                    <span>🎁</span> Recompensas
+                  </h3>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Vitória:</strong> XP, Moedas, Fama, Vínculo e chance de Fragmentos</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Derrota:</strong> Perde Fama e Vínculo, ganha pouco XP</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Tiers mais altos:</strong> Multiplicador de recompensas (até 3x)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Exaustão:</strong> 15 pontos por batalha (win ou loss)</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+                  <h3 className="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                    <span>⚔️</span> Como Funciona
+                  </h3>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Matchmaking equilibrado:</strong> Busca oponentes de nível similar</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Batalha tática:</strong> Mesmas regras do modo treino</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Timer por turno:</strong> 30 segundos para decidir sua ação</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-cyan-400 mt-1">▸</span>
+                      <span><strong>Upsets:</strong> Vencer oponente mais forte dá bônus de Fama</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Modal de Confirmação */}
-        {modalConfirmacao && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl border-2 border-yellow-500/50 p-8 max-w-md w-full shadow-2xl">
-              <h3 className="text-2xl font-black text-yellow-400 mb-4 flex items-center gap-3">
-                {modalConfirmacao.titulo}
-              </h3>
-              <p className="text-slate-300 mb-6 leading-relaxed">
-                {modalConfirmacao.mensagem}
-              </p>
-              <div className="grid grid-cols-2 gap-4">
+        {/* Estado: Procurando Partida */}
+        {estadoMatchmaking === 'procurando' && (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-cyan-500/30">
+              <div className="text-center space-y-6">
+                {/* Animação de busca */}
+                <div className="relative">
+                  <div className="w-32 h-32 mx-auto">
+                    <div className="absolute inset-0 border-4 border-cyan-500/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="absolute inset-4 border-4 border-orange-500/20 rounded-full"></div>
+                    <div className="absolute inset-4 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                    <div className="absolute inset-0 flex items-center justify-center text-4xl">
+                      🔍
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-3xl font-black text-white mb-2">
+                    PROCURANDO OPONENTE...
+                  </h2>
+                  <p className="text-slate-400 font-mono text-sm">
+                    Buscando jogador de nível similar
+                  </p>
+                </div>
+
+                {/* Timer */}
+                <div className="inline-block bg-slate-950/50 rounded-lg px-6 py-3 border border-slate-700">
+                  <div className="text-cyan-400 font-mono text-2xl font-bold">
+                    ⏱️ {formatarTempo(tempoEspera)}
+                  </div>
+                </div>
+
+                {/* Avatar Ativo */}
+                <div className="bg-slate-950/50 rounded-lg p-6 border border-slate-700">
+                  <p className="text-xs text-slate-500 uppercase mb-3">Seu Avatar</p>
+                  <div className="flex items-center justify-center gap-4">
+                    <AvatarSVG avatar={avatarAtivo} tamanho={80} />
+                    <div className="text-left">
+                      <div className="font-bold text-white text-lg">{avatarAtivo.nome}</div>
+                      <div className="text-sm text-slate-400">Nv.{avatarAtivo.nivel} • {avatarAtivo.elemento}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botão Cancelar */}
                 <button
-                  onClick={modalConfirmacao.onCancel}
-                  className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-bold transition-all"
+                  onClick={cancelarMatchmaking}
+                  className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded transition-colors"
                 >
-                  ✕ Cancelar
+                  Cancelar Busca
                 </button>
-                <button
-                  onClick={modalConfirmacao.onConfirm}
-                  className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white rounded-lg font-bold transition-all"
-                >
-                  ✓ Continuar
-                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Estado: Oponente Encontrado */}
+        {estadoMatchmaking === 'encontrado' && oponenteEncontrado && (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-green-500/50">
+              <div className="text-center space-y-8">
+                <h2 className="text-4xl font-black text-green-400 mb-4">
+                  🎯 OPONENTE ENCONTRADO!
+                </h2>
+
+                {/* Versus */}
+                <div className="grid md:grid-cols-3 gap-6 items-center">
+                  {/* Seu Avatar */}
+                  <div className="bg-cyan-950/30 rounded-xl p-6 border-2 border-cyan-500/50">
+                    <p className="text-xs text-cyan-400 uppercase mb-4 font-bold">VOCÊ</p>
+                    <div className="flex flex-col items-center">
+                      <AvatarSVG avatar={avatarAtivo} tamanho={100} />
+                      <div className="mt-4 text-center">
+                        <div className="font-bold text-white text-lg">{avatarAtivo.nome}</div>
+                        <div className="text-sm text-slate-400">Nv.{avatarAtivo.nivel}</div>
+                        <div className="text-xs text-slate-500">{avatarAtivo.elemento}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* VS */}
+                  <div className="text-6xl font-black text-orange-500 animate-pulse">
+                    VS
+                  </div>
+
+                  {/* Oponente */}
+                  <div className="bg-red-950/30 rounded-xl p-6 border-2 border-red-500/50">
+                    <p className="text-xs text-red-400 uppercase mb-4 font-bold">OPONENTE</p>
+                    <div className="flex flex-col items-center">
+                      <AvatarSVG avatar={oponenteEncontrado.avatar} tamanho={100} />
+                      <div className="mt-4 text-center">
+                        <div className="font-bold text-white text-lg">{oponenteEncontrado.nome}</div>
+                        <div className="text-sm text-slate-400">Nv.{oponenteEncontrado.nivel}</div>
+                        <div className="text-xs text-slate-500">{oponenteEncontrado.avatar.elemento}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-slate-400 text-sm animate-pulse">
+                  Iniciando batalha em 3 segundos...
+                </p>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Modal de Alerta */}
+      {modalAlerta && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-900 rounded-lg border-2 border-red-500 p-6">
+            <h3 className="text-2xl font-black text-red-400 mb-4">{modalAlerta.titulo}</h3>
+            <p className="text-slate-300 mb-6">{modalAlerta.mensagem}</p>
+            <button
+              onClick={() => setModalAlerta(null)}
+              className="w-full px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded transition-colors"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação */}
+      {modalConfirmacao && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-900 rounded-lg border-2 border-orange-500 p-6">
+            <h3 className="text-2xl font-black text-orange-400 mb-4">{modalConfirmacao.titulo}</h3>
+            <p className="text-slate-300 mb-6">{modalConfirmacao.mensagem}</p>
+            <div className="flex gap-4">
+              <button
+                onClick={modalConfirmacao.onCancel}
+                className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={modalConfirmacao.onConfirm}
+                className="flex-1 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded transition-colors"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
