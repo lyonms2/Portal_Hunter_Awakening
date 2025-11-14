@@ -103,9 +103,13 @@ export async function POST(request) {
       nivel: novoNivel,
       experiencia: novaExperiencia,
       exaustao: novaExaustao,
-      vinculo: novoVinculo,
       updated_at: new Date().toISOString()
     };
+
+    // Só atualizar vínculo se foi explicitamente enviado no payload
+    if (vinculo !== undefined && vinculo !== null) {
+      updates.vinculo = novoVinculo;
+    }
 
     console.log('🔄 Atualizando avatar no banco:', {
       avatarId,
