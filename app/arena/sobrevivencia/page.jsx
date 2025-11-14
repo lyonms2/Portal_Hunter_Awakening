@@ -154,9 +154,17 @@ export default function ArenaSobrevivenciaPage() {
     }));
 
     // Inicializar stats do avatar
+    // Calcular HP máximo baseado em resistência e nível
+    const hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
+
+    // Se hp_atual estiver salvo no banco, usar ele. Senão, usar HP máximo (avatar novo)
+    const hpInicial = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
+      ? avatarAtivo.hp_atual
+      : hpMaximo;
+
     const statsIniciais = {
-      hp_atual: avatarAtivo.resistencia * 10,
-      hp_maximo: avatarAtivo.resistencia * 10,
+      hp_atual: hpInicial,
+      hp_maximo: hpMaximo,
       energia_atual: 100,
       energia_maxima: 100,
       forca: avatarAtivo.forca,
@@ -379,6 +387,7 @@ export default function ArenaSobrevivenciaPage() {
           experiencia: recompensasTotais.xp,
           exaustao: Math.floor(exaustaoAcumulada),
           // NÃO enviar 'vinculo' - modo sobrevivência não altera vínculo!
+          hp_atual: statsAvatarAtual?.hp_atual,
           nivel: statsAvatarAtual?.nivel || avatarAtivo.nivel,
           // Atualizar stats se subiram de nível
           forca: statsAvatarAtual?.forca || avatarAtivo.forca,
@@ -399,6 +408,7 @@ export default function ArenaSobrevivenciaPage() {
           nivel: dataAvatar.avatar.nivel,
           experiencia: dataAvatar.avatar.experiencia,
           exaustao: dataAvatar.avatar.exaustao,
+          hp_atual: dataAvatar.avatar.hp_atual,
           forca: dataAvatar.avatar.forca,
           agilidade: dataAvatar.avatar.agilidade,
           resistencia: dataAvatar.avatar.resistencia,
@@ -1051,6 +1061,47 @@ export default function ArenaSobrevivenciaPage() {
                                 className="h-full bg-gradient-to-r from-cyan-600 to-blue-400 transition-all duration-500"
                                 style={{
                                   width: `${Math.min(((avatarAtivo.experiencia || 0) / (avatarAtivo.nivel * 100)) * 100, 100)}%`
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+
+                          {/* Barra de HP */}
+                          <div>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-green-400 font-bold">❤️ HP</span>
+                              <span className="text-slate-400 font-mono">
+                                {(() => {
+                                  const hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
+                                  const hpAtual = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
+                                    ? avatarAtivo.hp_atual
+                                    : hpMaximo;
+                                  return `${hpAtual} / ${hpMaximo}`;
+                                })()}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+                              <div
+                                className={`h-full transition-all duration-500 ${(() => {
+                                  const hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
+                                  const hpAtual = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
+                                    ? avatarAtivo.hp_atual
+                                    : hpMaximo;
+                                  const hpPercent = (hpAtual / hpMaximo) * 100;
+
+                                  if (hpPercent > 70) return 'bg-gradient-to-r from-green-600 to-green-400';
+                                  if (hpPercent > 40) return 'bg-gradient-to-r from-yellow-600 to-yellow-400';
+                                  if (hpPercent > 20) return 'bg-gradient-to-r from-orange-600 to-orange-400';
+                                  return 'bg-gradient-to-r from-red-600 to-red-400';
+                                })()}`}
+                                style={{
+                                  width: `${(() => {
+                                    const hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
+                                    const hpAtual = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
+                                      ? avatarAtivo.hp_atual
+                                      : hpMaximo;
+                                    return Math.min((hpAtual / hpMaximo) * 100, 100);
+                                  })()}%`
                                 }}
                               ></div>
                             </div>
