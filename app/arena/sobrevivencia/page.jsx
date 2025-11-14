@@ -425,7 +425,7 @@ export default function ArenaSobrevivenciaPage() {
 
   const voltarAoLobby = () => {
     setModalGameOver(null);
-    setEstadoJogo('selecao');
+    setEstadoJogo('lobby');
     setOndaAtual(0);
   };
 
@@ -1033,6 +1033,46 @@ export default function ArenaSobrevivenciaPage() {
                                 </>
                               );
                             })()}
+                          </div>
+                        </div>
+
+                        {/* Barras de Progresso */}
+                        <div className="space-y-3 mb-4">
+                          {/* Barra de Level / XP */}
+                          <div>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-cyan-400 font-bold">📊 Nível {avatarAtivo.nivel}</span>
+                              <span className="text-slate-400 font-mono">
+                                {avatarAtivo.experiencia || 0} / {avatarAtivo.nivel * 100} XP
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+                              <div
+                                className="h-full bg-gradient-to-r from-cyan-600 to-blue-400 transition-all duration-500"
+                                style={{
+                                  width: `${Math.min(((avatarAtivo.experiencia || 0) / (avatarAtivo.nivel * 100)) * 100, 100)}%`
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+
+                          {/* Barra de Exaustão */}
+                          <div>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-orange-400 font-bold">😰 Exaustão</span>
+                              <span className="text-slate-400 font-mono">{Math.floor(avatarAtivo.exaustao || 0)}%</span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+                              <div
+                                className={`h-full transition-all duration-500 ${
+                                  (avatarAtivo.exaustao || 0) < 20 ? 'bg-gradient-to-r from-green-600 to-green-400' :
+                                  (avatarAtivo.exaustao || 0) < 40 ? 'bg-gradient-to-r from-green-600 to-yellow-400' :
+                                  (avatarAtivo.exaustao || 0) < 60 ? 'bg-gradient-to-r from-yellow-600 to-orange-400' :
+                                  'bg-gradient-to-r from-orange-600 to-red-600'
+                                }`}
+                                style={{ width: `${Math.min(avatarAtivo.exaustao || 0, 100)}%` }}
+                              ></div>
+                            </div>
                           </div>
                         </div>
 
