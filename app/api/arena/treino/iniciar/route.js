@@ -6,6 +6,7 @@ import { getSupabaseServiceClient } from '@/lib/supabase/serverClient';
 import { inicializarBatalha } from '@/lib/arena/batalhaEngine';
 import { selecionarHabilidadesIniciais } from '@/app/avatares/sistemas/abilitiesSystem';
 import { gerarStatsBalanceados } from '@/app/avatares/sistemas/statsSystem';
+import { aplicarPenalidadesExaustao } from '@/app/avatares/sistemas/exhaustionSystem';
 
 /**
  * Gera um avatar inimigo para treino
@@ -139,11 +140,29 @@ export async function POST(request) {
       console.log('✅ Habilidades atualizadas no banco:', avatar.habilidades.map(h => h.nome));
     }
 
+    // Aplicar penalidades de exaustão aos stats do avatar ANTES de entrar em batalha
+    const statsBase = {
+      forca: avatar.forca,
+      agilidade: avatar.agilidade,
+      resistencia: avatar.resistencia,
+      foco: avatar.foco
+    };
+    const statsComPenalidades = aplicarPenalidadesExaustao(statsBase, avatar.exaustao || 0);
+
+    // Atualizar stats do avatar com penalidades aplicadas
+    const avatarComPenalidades = {
+      ...avatar,
+      forca: statsComPenalidades.forca,
+      agilidade: statsComPenalidades.agilidade,
+      resistencia: statsComPenalidades.resistencia,
+      foco: statsComPenalidades.foco
+    };
+
     // Gerar inimigo
     const inimigo = gerarAvatarInimigo(avatar.nivel, dificuldade);
 
-    // Inicializar batalha
-    const estadoBatalha = inicializarBatalha(avatar, inimigo, dificuldade);
+    // Inicializar batalha com stats já penalizados
+    const estadoBatalha = inicializarBatalha(avatarComPenalidades, inimigo, dificuldade);
     
     // Salvar estado da batalha no localStorage/sessionStorage
     // (Por enquanto, retorna o estado para o frontend gerenciar)

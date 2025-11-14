@@ -154,8 +154,17 @@ export default function ArenaSobrevivenciaPage() {
     }));
 
     // Inicializar stats do avatar
-    // Calcular HP máximo baseado em resistência e nível
-    const hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
+    // IMPORTANTE: Aplicar penalidades de exaustão ANTES de entrar em combate
+    const statsBase = {
+      forca: avatarAtivo.forca,
+      agilidade: avatarAtivo.agilidade,
+      resistencia: avatarAtivo.resistencia,
+      foco: avatarAtivo.foco
+    };
+    const statsComPenalidades = aplicarPenalidadesExaustao(statsBase, avatarAtivo.exaustao || 0);
+
+    // Calcular HP máximo baseado em resistência (JÁ com penalidade aplicada)
+    const hpMaximo = statsComPenalidades.resistencia * 10 + avatarAtivo.nivel * 5;
 
     // Se hp_atual estiver salvo no banco, usar ele. Senão, usar HP máximo (avatar novo)
     const hpInicial = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
@@ -167,17 +176,17 @@ export default function ArenaSobrevivenciaPage() {
       hp_maximo: hpMaximo,
       energia_atual: 100,
       energia_maxima: 100,
-      forca: avatarAtivo.forca,
-      agilidade: avatarAtivo.agilidade,
-      resistencia: avatarAtivo.resistencia,
-      foco: avatarAtivo.foco,
+      forca: statsComPenalidades.forca,
+      agilidade: statsComPenalidades.agilidade,
+      resistencia: statsComPenalidades.resistencia,
+      foco: statsComPenalidades.foco,
       nivel: avatarAtivo.nivel,
       xp_atual: avatarAtivo.experiencia || 0
     };
 
     setStatsAvatarAtual(statsIniciais);
     setRecompensasAcumuladas({ xp: 0, moedas: 0, fragmentos: 0 });
-    setExaustaoAcumulada(0);
+    setExaustaoAcumulada(avatarAtivo.exaustao || 0); // Começar com exaustão salva no banco
     setEstadoJogo('preparando');
     setOndaAtual(1);
 
