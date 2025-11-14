@@ -14,8 +14,6 @@ export default function ArenaSobrevivenciaPage() {
   const [estadoJogo, setEstadoJogo] = useState('selecao'); // selecao, preparando, sobrevivendo, game_over
   const [ondaAtual, setOndaAtual] = useState(0);
   const [recordePessoal, setRecordePessoal] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(false); // Modo auto-play
-  const autoPlayRef = useRef(false); // Ref para acesso imediato ao valor de autoPlay
 
   // Estados de combate
   const [statsAvatarAtual, setStatsAvatarAtual] = useState(null); // HP, energia, stats atuais
@@ -78,19 +76,16 @@ export default function ArenaSobrevivenciaPage() {
     return 5.35 + ((onda - 12) * 0.8); // 5.35+ (quase impossível)
   };
 
-  const calcularRecompensasOnda = (onda, isAutoPlay = false) => {
+  const calcularRecompensasOnda = (onda) => {
     const base_xp = 30;
     const base_moedas = 20;
 
     const isBossWave = onda % 5 === 0;
     const bossBonus = isBossWave ? 2 : 1;
 
-    // ANTI-FARM: Auto-play recebe 40% das recompensas (-60%)
-    const penaltyAutoPlay = isAutoPlay ? 0.4 : 1.0;
-
     return {
-      xp: Math.floor(base_xp * onda * 0.8 * bossBonus * penaltyAutoPlay),
-      moedas: Math.floor(base_moedas * onda * 0.6 * bossBonus * penaltyAutoPlay),
+      xp: Math.floor(base_xp * onda * 0.8 * bossBonus),
+      moedas: Math.floor(base_moedas * onda * 0.6 * bossBonus),
       chance_fragmento: isBossWave ? 0.3 + (Math.floor(onda / 10) * 0.1) : 0.05 + (Math.floor(onda / 10) * 0.02),
       fragmentos_garantidos: onda >= 20 && isBossWave ? 1 : 0
     };
@@ -114,7 +109,7 @@ export default function ArenaSobrevivenciaPage() {
     return { nome: 'IMPOSSÍVEL', cor: 'text-red-600' };
   };
 
-  const iniciarSobrevivencia = (comAutoPlay = false) => {
+  const iniciarSobrevivencia = () => {
     if (!avatarSelecionado) {
       setModalAlerta({
         titulo: '⚠️ Avatar não selecionado',
@@ -174,8 +169,6 @@ export default function ArenaSobrevivenciaPage() {
     setStatsAvatarAtual(statsIniciais);
     setRecompensasAcumuladas({ xp: 0, moedas: 0, fragmentos: 0 });
     setExaustaoAcumulada(0);
-    setAutoPlay(comAutoPlay);
-    autoPlayRef.current = comAutoPlay; // Sincronizar ref imediatamente
     setEstadoJogo('preparando');
     setOndaAtual(1);
 
@@ -192,7 +185,7 @@ export default function ArenaSobrevivenciaPage() {
     const danoBase = 15 * multiplicador;
     const gastoEnergiaBase = 20 + (onda * 2);
 
-    const tempoCombate = autoPlayRef.current ? 800 : 2500;
+    const tempoCombate = 2500;
 
     setTimeout(() => {
       // Calcular dano recebido na onda (progressivo e balanceado)
@@ -233,8 +226,6 @@ export default function ArenaSobrevivenciaPage() {
 
           // Aguardar um frame para garantir que o estado foi atualizado
           setTimeout(() => {
-            setAutoPlay(false);
-            autoPlayRef.current = false;
             finalizarSobrevivencia(onda, true);
           }, 100);
         } else {
@@ -251,8 +242,8 @@ export default function ArenaSobrevivenciaPage() {
       localStorage.setItem(`survival_record_${user.id}`, onda.toString());
     }
 
-    // Calcular recompensas da onda (passar flag de auto-play)
-    const recompensas = calcularRecompensasOnda(onda, autoPlayRef.current);
+    // Calcular recompensas da onda
+    const recompensas = calcularRecompensasOnda(onda);
 
     // Acumular recompensas
     setRecompensasAcumuladas(prev => ({
@@ -281,12 +272,10 @@ export default function ArenaSobrevivenciaPage() {
         const nivelNovo = nivelAnterior + 1;
         houveLevelUp = true;
 
-        // Mostrar animação de level up (mas só no modo normal)
-        if (!autoPlayRef.current) {
-          setTimeout(() => {
-            setModalLevelUp({ nivelAnterior, nivelNovo });
-          }, 1500);
-        }
+        // Mostrar animação de level up
+        setTimeout(() => {
+          setModalLevelUp({ nivelAnterior, nivelNovo });
+        }, 1500);
 
         // Aumentar stats ao subir de nível
         return {
@@ -306,19 +295,9 @@ export default function ArenaSobrevivenciaPage() {
       return { ...prev, xp_atual: novoXP };
     });
 
-    // Decidir próxima ação - verificar imediatamente se é autoPlay
-    if (autoPlayRef.current) {
-      // Continuar para próxima onda
-      const proximaOnda = onda + 1;
-      setOndaAtual(proximaOnda);
-      setTimeout(() => {
-        iniciarOndaAtual(proximaOnda);
-      }, 300); // Delay curto entre ondas no auto-play
-    } else {
-      // Modo normal - mostrar modal de onda completa
-      const exaustao = calcularExaustaoOnda(onda);
-      setModalOndaCompleta({ onda, recompensas, exaustao });
-    }
+    // Mostrar modal de onda completa
+    const exaustao = calcularExaustaoOnda(onda);
+    setModalOndaCompleta({ onda, recompensas, exaustao });
   };
 
   const continuarParaProximaOnda = () => {
@@ -455,8 +434,7 @@ export default function ArenaSobrevivenciaPage() {
     let totalFragmentos = 0;
 
     for (let i = 1; i <= ondaFinal; i++) {
-      // Passar flag de auto-play para cálculo correto
-      const recompensas = calcularRecompensasOnda(i, autoPlayRef.current);
+      const recompensas = calcularRecompensasOnda(i);
       totalXP += recompensas.xp;
       totalMoedas += recompensas.moedas;
       totalFragmentos += recompensas.fragmentos_garantidos;
@@ -489,29 +467,52 @@ export default function ArenaSobrevivenciaPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950 text-gray-100">
       {/* Modal de Alerta */}
       {modalAlerta && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-gradient-to-br from-slate-900 to-slate-950 rounded-xl border-2 border-orange-500 p-8">
-            <div className="text-center mb-6">
-              <div className="text-6xl mb-4">{modalAlerta.titulo.split(' ')[0]}</div>
-              <h2 className="text-2xl font-black text-white mb-2">
-                {modalAlerta.titulo.substring(2)}
-              </h2>
-              <p className="text-slate-300">{modalAlerta.mensagem}</p>
-            </div>
-            <button
-              onClick={() => setModalAlerta(null)}
-              className="w-full px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-lg transition-colors"
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 overflow-y-auto p-4"
+          onClick={() => setModalAlerta(null)}
+        >
+          <div className="min-h-full flex items-center justify-center py-8">
+            <div
+              className="max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
             >
-              Entendi
-            </button>
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/30 via-red-500/30 to-orange-500/30 rounded-lg blur opacity-75"></div>
+                <div className="relative bg-gradient-to-br from-slate-900 to-slate-950 rounded-xl border-2 border-orange-500 p-8">
+                  <div className="text-center mb-6">
+                    <div className="text-6xl mb-4">{modalAlerta.titulo.split(' ')[0]}</div>
+                    <h2 className="text-2xl font-black text-white mb-2">
+                      {modalAlerta.titulo.substring(2)}
+                    </h2>
+                    <p className="text-slate-300">{modalAlerta.mensagem}</p>
+                  </div>
+                  <button
+                    onClick={() => setModalAlerta(null)}
+                    className="w-full px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-lg transition-colors"
+                  >
+                    Entendi
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Modal de Onda Completa */}
       {modalOndaCompleta && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full bg-gradient-to-br from-purple-900/50 to-slate-950 rounded-2xl border-2 border-purple-500 p-8">
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 overflow-y-auto p-4"
+          onClick={desistirSobrevivencia}
+        >
+          <div className="min-h-full flex items-center justify-center py-8">
+            <div
+              className="max-w-2xl w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-purple-500/30 rounded-lg blur opacity-75"></div>
+                <div className="relative bg-gradient-to-br from-purple-900/50 to-slate-950 rounded-2xl border-2 border-purple-500 p-8">
             <div className="text-center mb-8">
               <div className="text-7xl mb-4 animate-bounce">🎉</div>
               <h2 className="text-5xl font-black text-purple-400 mb-2">
@@ -652,14 +653,27 @@ export default function ArenaSobrevivenciaPage() {
                 ⚔️ Próxima Onda ({modalOndaCompleta.onda + 1})
               </button>
             </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Modal de Level Up */}
       {modalLevelUp && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-gradient-to-br from-yellow-900 via-orange-900 to-yellow-900 rounded-2xl border-4 border-yellow-400 p-8 shadow-2xl shadow-yellow-500/50 animate-pulse">
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto p-4"
+          onClick={() => setModalLevelUp(null)}
+        >
+          <div className="min-h-full flex items-center justify-center py-8">
+            <div
+              className="max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500/50 via-orange-500/50 to-yellow-500/50 rounded-lg blur opacity-75 animate-pulse"></div>
+                <div className="relative bg-gradient-to-br from-yellow-900 via-orange-900 to-yellow-900 rounded-2xl border-4 border-yellow-400 p-8 shadow-2xl shadow-yellow-500/50">
             <div className="text-center">
               <div className="text-8xl mb-4 animate-bounce">⭐</div>
               <h2 className="text-6xl font-black text-yellow-300 mb-2 drop-shadow-lg">
@@ -702,14 +716,27 @@ export default function ArenaSobrevivenciaPage() {
                 🎉 CONTINUAR
               </button>
             </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Modal de Game Over */}
       {modalGameOver && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border-2 border-purple-500 p-8">
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 overflow-y-auto p-4"
+          onClick={voltarAoLobby}
+        >
+          <div className="min-h-full flex items-center justify-center py-8">
+            <div
+              className="max-w-2xl w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-red-500/30 rounded-lg blur opacity-75"></div>
+                <div className="relative bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border-2 border-purple-500 p-8">
             <div className="text-center mb-8">
               <div className="text-8xl mb-4">
                 {modalGameOver.derrota ? '💀' : '🏆'}
@@ -752,6 +779,9 @@ export default function ArenaSobrevivenciaPage() {
             >
               ← Voltar ao Lobby
             </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -866,10 +896,6 @@ export default function ArenaSobrevivenciaPage() {
                     <li className="flex items-start gap-2">
                       <span className="text-green-400 mt-1">▸</span>
                       <span><strong>Fragmentos:</strong> Chance alta em boss waves, garantido na onda 20+</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-yellow-400 mt-1">⚠</span>
-                      <span><strong className="text-yellow-400">Auto-play:</strong> Recompensas reduzidas em 60%</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-green-400 mt-1">▸</span>
@@ -1041,9 +1067,9 @@ export default function ArenaSobrevivenciaPage() {
                   </div>
                 )}
 
-                {/* Botão Principal */}
+                {/* Botão Iniciar */}
                 <button
-                  onClick={() => iniciarSobrevivencia(false)}
+                  onClick={() => iniciarSobrevivencia()}
                   disabled={!avatarSelecionado}
                   className="w-full group relative disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1053,26 +1079,6 @@ export default function ArenaSobrevivenciaPage() {
                     <span className="text-2xl font-black tracking-wider uppercase bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                       💀 INICIAR SOBREVIVÊNCIA
                     </span>
-                  </div>
-                </button>
-
-                {/* Botão Auto-Play */}
-                <button
-                  onClick={() => iniciarSobrevivencia(true)}
-                  disabled={!avatarSelecionado}
-                  className="w-full group relative disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-red-500 to-red-700 rounded-xl blur opacity-40 group-hover:opacity-60 transition-all"></div>
-
-                  <div className="relative px-8 py-4 bg-slate-950 rounded-xl border-2 border-red-500/70 group-hover:border-red-400 transition-all">
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="text-xl font-black tracking-wider uppercase bg-gradient-to-r from-red-300 to-orange-300 bg-clip-text text-transparent">
-                        ⚡ AUTO-PLAY (ATÉ MORRER)
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-2 text-center">
-                      Passa automaticamente pelas ondas até a derrota
-                    </p>
                   </div>
                 </button>
 
@@ -1122,127 +1128,13 @@ export default function ArenaSobrevivenciaPage() {
                 </div>
 
                 <p className="text-slate-500 text-sm font-mono">
-                  {autoPlay ? 'Modo AUTO-PLAY ativado...' : 'Boa sorte, caçador...'}
+                  Boa sorte, caçador...
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Estado: Sobrevivendo (Auto-Play) */}
-        {estadoJogo === 'sobrevivendo' && autoPlay && (
-          <div className="max-w-3xl mx-auto">
-            <div className="bg-gradient-to-br from-red-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-red-500/30">
-              <div className="text-center space-y-6">
-                <div className="relative">
-                  <div className="w-40 h-40 mx-auto relative">
-                    <div className="absolute inset-0 border-4 border-red-500/20 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                    <div className="absolute inset-4 border-4 border-orange-500/20 rounded-full"></div>
-                    <div className="absolute inset-4 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
-                    <div className="absolute inset-0 flex items-center justify-center text-6xl animate-pulse">
-                      ⚡
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h2 className="text-4xl font-black text-red-400 mb-2 animate-pulse">
-                    AUTO-PLAY ATIVO
-                  </h2>
-                  <p className="text-white font-mono text-2xl mb-1">
-                    Onda {ondaAtual}
-                  </p>
-                  <p className={`font-bold ${getNomeDificuldadeOnda(ondaAtual).cor}`}>
-                    {getNomeDificuldadeOnda(ondaAtual).nome}
-                  </p>
-                </div>
-
-                {/* Card de Stats do Avatar */}
-                {statsAvatarAtual && (
-                  <div className="bg-slate-950/50 rounded-lg p-6 border border-red-700/50 space-y-4">
-                    <div className="flex items-center gap-4 justify-center">
-                      <AvatarSVG avatar={avatarSelecionado} tamanho={80} />
-                      <div className="text-left">
-                        <div className="font-bold text-white text-lg">{avatarSelecionado.nome}</div>
-                        <div className="text-slate-400 text-sm">Nv.{statsAvatarAtual.nivel} • {avatarSelecionado.elemento}</div>
-                      </div>
-                    </div>
-
-                    {/* Barras de HP, Energia e Exaustão */}
-                    <div className="space-y-2">
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-red-400 font-bold">❤️ HP</span>
-                          <span className="text-slate-300 font-mono">{Math.floor(statsAvatarAtual.hp_atual)} / {statsAvatarAtual.hp_maximo}</span>
-                        </div>
-                        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-500 ${
-                              (statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) > 0.5 ? 'bg-gradient-to-r from-green-600 to-green-400' :
-                              (statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) > 0.25 ? 'bg-gradient-to-r from-yellow-600 to-yellow-400' :
-                              'bg-gradient-to-r from-red-600 to-red-400'
-                            }`}
-                            style={{ width: `${(statsAvatarAtual.hp_atual / statsAvatarAtual.hp_maximo) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-blue-400 font-bold">⚡ Energia</span>
-                          <span className="text-slate-300 font-mono">{Math.floor(statsAvatarAtual.energia_atual)} / {statsAvatarAtual.energia_maxima}</span>
-                        </div>
-                        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-500"
-                            style={{ width: `${(statsAvatarAtual.energia_atual / statsAvatarAtual.energia_maxima) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-orange-400 font-bold">😰 Exaustão</span>
-                          <span className="text-slate-300 font-mono">{Math.floor(exaustaoAcumulada)}%</span>
-                        </div>
-                        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-500 ${
-                              exaustaoAcumulada < 40 ? 'bg-gradient-to-r from-green-600 to-green-400' :
-                              exaustaoAcumulada < 60 ? 'bg-gradient-to-r from-yellow-600 to-orange-400' :
-                              'bg-gradient-to-r from-orange-600 to-red-600'
-                            }`}
-                            style={{ width: `${Math.min(exaustaoAcumulada, 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="text-red-400 text-sm font-bold text-center">
-                      ⚔️ Batalhando automaticamente...
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => {
-                    setAutoPlay(false);
-                    autoPlayRef.current = false;
-                    finalizarSobrevivencia(ondaAtual, false);
-                  }}
-                  className="px-8 py-3 bg-red-900/50 hover:bg-red-900/70 text-red-300 rounded-lg border border-red-700 transition-colors font-bold"
-                >
-                  ✕ Parar Auto-Play
-                </button>
-
-                <p className="text-xs text-slate-500 font-mono">
-                  O auto-play continuará até seu avatar ser derrotado
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
