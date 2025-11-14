@@ -131,78 +131,7 @@ export async function POST(request) {
         );
       }
 
-      // Processar efeito do item
-      let resultado = {};
-
-      if (item.efeito === 'cura_hp') {
-        // Calcular HP máximo
-        const hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
-        const hpAtual = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
-          ? avatarAtivo.hp_atual
-          : hpMaximo;
-
-        // Verificar se já está com HP cheio
-        if (hpAtual >= hpMaximo) {
-          return Response.json(
-            { message: "Avatar já está com HP cheio!" },
-            { status: 400 }
-          );
-        }
-
-        // Calcular novo HP (não pode passar do máximo)
-        const novoHP = Math.min(hpAtual + item.valor_efeito, hpMaximo);
-        const hpCurado = novoHP - hpAtual;
-
-        // Atualizar HP do avatar
-        const { error: updateError } = await supabase
-          .from('avatares')
-          .update({ hp_atual: novoHP })
-          .eq('id', avatarAtivo.id);
-
-        if (updateError) {
-          console.error("Erro ao atualizar HP:", updateError);
-          return Response.json(
-            { message: "Erro ao aplicar efeito do item" },
-            { status: 500 }
-          );
-        }
-
-        resultado = {
-          tipo: 'cura_hp',
-          avatar: avatarAtivo.nome,
-          hp_curado: hpCurado,
-          hp_anterior: hpAtual,
-          hp_novo: novoHP,
-          hp_maximo: hpMaximo
-        };
-      } else if (item.efeito === 'cura_exaustao') {
-        // Implementar cura de exaustão (futuro)
-        const exaustaoAtual = avatarAtivo.exaustao || 0;
-        const novaExaustao = Math.max(0, exaustaoAtual - item.valor_efeito);
-
-        const { error: updateError } = await supabase
-          .from('avatares')
-          .update({ exaustao: novaExaustao })
-          .eq('id', avatarAtivo.id);
-
-        if (updateError) {
-          console.error("Erro ao atualizar exaustão:", updateError);
-          return Response.json(
-            { message: "Erro ao aplicar efeito do item" },
-            { status: 500 }
-          );
-        }
-
-        resultado = {
-          tipo: 'cura_exaustao',
-          avatar: avatarAtivo.nome,
-          exaustao_reduzida: exaustaoAtual - novaExaustao,
-          exaustao_anterior: exaustaoAtual,
-          exaustao_nova: novaExaustao
-        };
-      }
-
-      // Consumir item do inventário
+      // PRIMEIRO: Verificar e validar item no inventário
       const { data: inventoryItem, error: invError } = await supabase
         .from('player_inventory')
         .select('quantidade')
@@ -217,21 +146,112 @@ export async function POST(request) {
         );
       }
 
+      // SEGUNDO: Calcular efeito (mas NÃO aplicar ainda)
+      let resultado = {};
+      let novoHP, hpCurado, hpMaximo, novaExaustao, exaustaoReduzida;
+
+      if (item.efeito === 'cura_hp') {
+        // Calcular HP máximo
+        hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
+        const hpAtual = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
+          ? avatarAtivo.hp_atual
+          : hpMaximo;
+
+        // Verificar se já está com HP cheio
+        if (hpAtual >= hpMaximo) {
+          return Response.json(
+            { message: "Avatar já está com HP cheio!" },
+            { status: 400 }
+          );
+        }
+
+        // Calcular novo HP (não pode passar do máximo)
+        novoHP = Math.min(hpAtual + item.valor_efeito, hpMaximo);
+        hpCurado = novoHP - hpAtual;
+
+        resultado = {
+          tipo: 'cura_hp',
+          avatar: avatarAtivo.nome,
+          hp_curado: hpCurado,
+          hp_anterior: hpAtual,
+          hp_novo: novoHP,
+          hp_maximo: hpMaximo
+        };
+      } else if (item.efeito === 'cura_exaustao') {
+        const exaustaoAtual = avatarAtivo.exaustao || 0;
+        novaExaustao = Math.max(0, exaustaoAtual - item.valor_efeito);
+        exaustaoReduzida = exaustaoAtual - novaExaustao;
+
+        resultado = {
+          tipo: 'cura_exaustao',
+          avatar: avatarAtivo.nome,
+          exaustao_reduzida: exaustaoReduzida,
+          exaustao_anterior: exaustaoAtual,
+          exaustao_nova: novaExaustao
+        };
+      }
+
+      // TERCEIRO: Consumir item do inventário
       if (inventoryItem.quantidade > 1) {
         // Reduzir quantidade
-        await supabase
+        const { error: updateInvError } = await supabase
           .from('player_inventory')
           .update({
             quantidade: inventoryItem.quantidade - 1,
             updated_at: new Date().toISOString()
           })
           .eq('id', inventoryItemId);
+
+        if (updateInvError) {
+          console.error("Erro ao consumir item:", updateInvError);
+          return Response.json(
+            { message: "Erro ao consumir item do inventário" },
+            { status: 500 }
+          );
+        }
       } else {
         // Remover item do inventário
-        await supabase
+        const { error: deleteInvError } = await supabase
           .from('player_inventory')
           .delete()
           .eq('id', inventoryItemId);
+
+        if (deleteInvError) {
+          console.error("Erro ao remover item:", deleteInvError);
+          return Response.json(
+            { message: "Erro ao remover item do inventário" },
+            { status: 500 }
+          );
+        }
+      }
+
+      // QUARTO: Aplicar efeito no avatar (só depois de consumir o item!)
+      if (item.efeito === 'cura_hp') {
+        const { error: updateError } = await supabase
+          .from('avatares')
+          .update({ hp_atual: novoHP })
+          .eq('id', avatarAtivo.id);
+
+        if (updateError) {
+          console.error("ERRO CRÍTICO - Item foi consumido mas HP não foi atualizado:", updateError);
+          return Response.json(
+            { message: "Erro ao aplicar efeito. Contate o suporte." },
+            { status: 500 }
+          );
+        }
+      } else if (item.efeito === 'cura_exaustao') {
+        const { error: updateError } = await supabase
+          .from('avatares')
+          .update({ exaustao: novaExaustao })
+          .eq('id', avatarAtivo.id);
+
+        if (updateError) {
+          console.error("ERRO CRÍTICO - Item foi consumido mas exaustão não foi atualizada:", updateError);
+          return Response.json(
+            { message: "Erro ao aplicar efeito. Contate o suporte." },
+            { status: 500 }
+          );
+        }
       }
 
       return Response.json({

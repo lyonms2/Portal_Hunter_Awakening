@@ -112,7 +112,21 @@ export async function POST(request) {
       const quantidadeComprada = novaQuantidade - inventoryItem.quantidade;
       const custoReal = item.preco_compra * quantidadeComprada;
 
-      // Atualizar quantidade no inventário
+      // PRIMEIRO: Deduzir moedas (se falhar aqui, nada aconteceu ainda)
+      const { error: updateStatsError } = await supabase
+        .from('player_stats')
+        .update({ moedas: stats.moedas - custoReal })
+        .eq('user_id', userId);
+
+      if (updateStatsError) {
+        console.error("Erro ao processar pagamento:", updateStatsError);
+        return Response.json(
+          { message: "Erro ao processar pagamento" },
+          { status: 500 }
+        );
+      }
+
+      // SEGUNDO: Atualizar quantidade no inventário (só depois de pagar!)
       const { error: updateInvError } = await supabase
         .from('player_inventory')
         .update({
@@ -122,23 +136,9 @@ export async function POST(request) {
         .eq('id', inventoryItem.id);
 
       if (updateInvError) {
-        console.error("Erro ao atualizar inventário:", updateInvError);
+        console.error("ERRO CRÍTICO - Moedas foram deduzidas mas item não foi adicionado:", updateInvError);
         return Response.json(
-          { message: "Erro ao adicionar item ao inventário" },
-          { status: 500 }
-        );
-      }
-
-      // Deduzir moedas
-      const { error: updateStatsError } = await supabase
-        .from('player_stats')
-        .update({ moedas: stats.moedas - custoReal })
-        .eq('user_id', userId);
-
-      if (updateStatsError) {
-        console.error("Erro ao atualizar moedas:", updateStatsError);
-        return Response.json(
-          { message: "Erro ao processar pagamento" },
+          { message: "Erro ao adicionar item. Contate o suporte com esta mensagem." },
           { status: 500 }
         );
       }
@@ -157,7 +157,21 @@ export async function POST(request) {
       });
 
     } else {
-      // Adicionar novo item ao inventário
+      // PRIMEIRO: Deduzir moedas (se falhar aqui, nada aconteceu ainda)
+      const { error: updateStatsError } = await supabase
+        .from('player_stats')
+        .update({ moedas: stats.moedas - custoTotal })
+        .eq('user_id', userId);
+
+      if (updateStatsError) {
+        console.error("Erro ao processar pagamento:", updateStatsError);
+        return Response.json(
+          { message: "Erro ao processar pagamento" },
+          { status: 500 }
+        );
+      }
+
+      // SEGUNDO: Adicionar novo item ao inventário (só depois de pagar!)
       const { error: insertError } = await supabase
         .from('player_inventory')
         .insert({
@@ -167,23 +181,9 @@ export async function POST(request) {
         });
 
       if (insertError) {
-        console.error("Erro ao adicionar item:", insertError);
+        console.error("ERRO CRÍTICO - Moedas foram deduzidas mas item não foi adicionado:", insertError);
         return Response.json(
-          { message: "Erro ao adicionar item ao inventário" },
-          { status: 500 }
-        );
-      }
-
-      // Deduzir moedas
-      const { error: updateStatsError } = await supabase
-        .from('player_stats')
-        .update({ moedas: stats.moedas - custoTotal })
-        .eq('user_id', userId);
-
-      if (updateStatsError) {
-        console.error("Erro ao atualizar moedas:", updateStatsError);
-        return Response.json(
-          { message: "Erro ao processar pagamento" },
+          { message: "Erro ao adicionar item. Contate o suporte com esta mensagem." },
           { status: 500 }
         );
       }

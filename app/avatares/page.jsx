@@ -260,8 +260,8 @@ export default function AvatarsPage() {
                     <span><strong className="text-slate-200">Recupera ao subir de nível:</strong> +20 HP</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-400 mt-0.5">🔮</span>
-                    <span>Use itens ou habilidades de cura (em breve)</span>
+                    <span className="text-purple-400 mt-0.5">🧪</span>
+                    <span><strong className="text-slate-200">Use Poções de Vida:</strong> Compre no Inventário (100 moedas cada)</span>
                   </li>
                 </ul>
               </div>
