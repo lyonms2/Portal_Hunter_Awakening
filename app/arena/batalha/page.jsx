@@ -366,8 +366,8 @@ function BatalhaContent() {
 
           sessionStorage.removeItem('batalha_pvp_dados');
           router.push('/arena/pvp');
-        } else if (resultado.vencedor === 'jogador') {
-          // Modo Treino - aplicar XP e Vínculo (SEM moedas!)
+        } else {
+          // Modo Treino (vitória ou derrota)
           await fetch('/api/atualizar-avatar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -379,10 +379,6 @@ function BatalhaContent() {
             })
           });
 
-          localStorage.removeItem('batalha_atual');
-          router.push('/arena/treinamento');
-        } else {
-          // Derrota no treino
           localStorage.removeItem('batalha_atual');
           router.push('/arena/treinamento');
         }
