@@ -445,17 +445,28 @@ function BatalhaContent() {
 
             <div className="bg-slate-800 rounded-lg p-6 mb-6">
               <h3 className="text-cyan-400 font-bold mb-4 text-center">🎁 RECOMPENSAS</h3>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="text-center p-4 bg-slate-900 rounded">
-                  <div className="text-3xl font-bold text-blue-400">{resultado.recompensas.xp}</div>
-                  <div className="text-xs text-slate-400">XP Ganho</div>
+
+              {/* Modo PvP ou Sobrevivência: Mostrar XP + Moedas */}
+              {resultado.pvp || resultado.modo === 'sobrevivencia' ? (
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="text-center p-4 bg-slate-900 rounded">
+                    <div className="text-3xl font-bold text-blue-400">{resultado.recompensas.xp}</div>
+                    <div className="text-xs text-slate-400">XP Ganho</div>
+                  </div>
+                  <div className="text-center p-4 bg-slate-900 rounded">
+                    <div className="text-3xl font-bold text-yellow-400">{resultado.recompensas.moedas}</div>
+                    <div className="text-xs text-slate-400">Moedas</div>
+                  </div>
                 </div>
-                <div className="text-center p-4 bg-slate-900 rounded">
-                  <div className="text-3xl font-bold text-yellow-400">{resultado.recompensas.moedas}</div>
-                  <div className="text-xs text-slate-400">Moedas</div>
+              ) : (
+                /* Modo Treino: Mostrar apenas XP (centralizado) */
+                <div className="mb-4">
+                  <div className="text-center p-4 bg-slate-900 rounded">
+                    <div className="text-3xl font-bold text-blue-400">{resultado.recompensas.xp}</div>
+                    <div className="text-xs text-slate-400">XP Ganho</div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {resultado.recompensas.fragmentos > 0 && (
                 <div className="text-center p-3 bg-purple-900/30 rounded border border-purple-500/50 mb-4">
@@ -827,7 +838,7 @@ function BatalhaContent() {
               {/* Ataque Básico */}
               <div className="mb-4">
                 <button
-                  onClick={() => !turnoIA && !processando && executarAcao('atacar')}
+                  onClick={() => !turnoIA && !processando && executarAcao('ataque_basico')}
                   disabled={turnoIA || processando}
                   className="w-full p-4 rounded-lg border-2 transition-all text-left bg-gradient-to-r from-red-900/40 to-orange-900/40 border-red-500 hover:from-red-900/60 hover:to-orange-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
