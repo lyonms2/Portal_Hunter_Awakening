@@ -332,28 +332,70 @@ function BatalhaContent() {
     if (resultado) {
       try {
         if (modoPvP) {
-          // Modo PvP - atualizar ranking com sistema de Fama
+          // Modo PvP - salvar resultado no banco via API
+          const venceuBatalha = resultado.vencedor === 'jogador';
+          const jogador1Id = userData.id;
+          const jogador2Id = 'oponente_simulado'; // TODO: usar ID real do oponente quando tiver matchmaking real
+
+          // Obter fama atual do jogador
           const rankingKey = `pvp_ranking_${userData.id}`;
           const rankingData = JSON.parse(localStorage.getItem(rankingKey) || '{"fama": 1000, "vitorias": 0, "derrotas": 0, "streak": 0}');
+          const famaAntes = rankingData.fama || 1000;
 
-          // Atualizar Fama (não pode ficar negativo)
-          const novaFama = Math.max(0, (rankingData.fama || rankingData.pontos || 1000) + (resultado.recompensas.fama || 0));
+          try {
+            // Salvar resultado da batalha no banco (atualiza rankings automaticamente)
+            const responseBatalha = await fetch('/api/pvp/batalha', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jogador1Id: jogador1Id,
+                jogador2Id: jogador2Id,
+                vencedorId: venceuBatalha ? jogador1Id : jogador2Id,
+                jogador1FamaAntes: famaAntes,
+                jogador2FamaAntes: dadosPvP.famaOponente || 1000,
+                jogador1FamaGanho: venceuBatalha ? resultado.recompensas.fama : resultado.recompensas.fama, // Já vem negativo na derrota
+                jogador2FamaGanho: venceuBatalha ? -resultado.recompensas.fama : Math.abs(resultado.recompensas.fama),
+                duracaoRodadas: resultado.estado.rodada,
+                jogador1Recompensas: {
+                  xp: resultado.recompensas.xp,
+                  moedas: resultado.recompensas.moedas,
+                  fragmentos: resultado.recompensas.fragmentos || 0,
+                  vinculo: resultado.recompensas.vinculo || 0,
+                  exaustao: resultado.recompensas.exaustao
+                },
+                jogador2Recompensas: {},
+                salvarLog: true
+              })
+            });
 
-          if (resultado.vencedor === 'jogador') {
-            // Vitória: incrementar vitórias e streak
-            rankingData.vitorias = (rankingData.vitorias || 0) + 1;
-            rankingData.streak = (rankingData.streak || 0) + 1;
-          } else if (resultado.vencedor === 'inimigo') {
-            // Derrota: incrementar derrotas e resetar streak
-            rankingData.derrotas = (rankingData.derrotas || 0) + 1;
-            rankingData.streak = 0;
+            if (responseBatalha.ok) {
+              const dataBatalha = await responseBatalha.json();
+              // Atualizar localStorage com dados do banco
+              if (dataBatalha.success && dataBatalha.jogador1) {
+                localStorage.setItem(rankingKey, JSON.stringify(dataBatalha.jogador1));
+              }
+            } else {
+              console.warn('Erro ao salvar resultado no banco, salvando localmente');
+              // Fallback para localStorage se API falhar
+              const novaFama = Math.max(0, famaAntes + resultado.recompensas.fama);
+              rankingData.fama = novaFama;
+              rankingData.vitorias = venceuBatalha ? (rankingData.vitorias || 0) + 1 : rankingData.vitorias;
+              rankingData.derrotas = !venceuBatalha ? (rankingData.derrotas || 0) + 1 : rankingData.derrotas;
+              rankingData.streak = venceuBatalha ? (rankingData.streak || 0) + 1 : 0;
+              localStorage.setItem(rankingKey, JSON.stringify(rankingData));
+            }
+          } catch (error) {
+            console.error('Erro ao salvar batalha PvP:', error);
+            // Fallback para localStorage
+            const novaFama = Math.max(0, famaAntes + resultado.recompensas.fama);
+            rankingData.fama = novaFama;
+            rankingData.vitorias = venceuBatalha ? (rankingData.vitorias || 0) + 1 : rankingData.vitorias;
+            rankingData.derrotas = !venceuBatalha ? (rankingData.derrotas || 0) + 1 : rankingData.derrotas;
+            rankingData.streak = venceuBatalha ? (rankingData.streak || 0) + 1 : 0;
+            localStorage.setItem(rankingKey, JSON.stringify(rankingData));
           }
 
-          rankingData.fama = novaFama;
-
-          localStorage.setItem(rankingKey, JSON.stringify(rankingData));
-
-          // Aplicar recompensas (XP, moedas, etc.)
+          // Aplicar recompensas de moedas e fragmentos
           await fetch('/api/atualizar-stats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -364,13 +406,14 @@ function BatalhaContent() {
             })
           });
 
+          // Aplicar recompensas de avatar (XP, exaustão, vínculo)
           await fetch('/api/atualizar-avatar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               avatarId: estado.jogador.id,
               experiencia: resultado.recompensas.xp,
-              exaustao: resultado.recompensas.exaustao, // 15 vitória, 20 derrota
+              exaustao: resultado.recompensas.exaustao,
               vinculo: resultado.recompensas.vinculo || 0
             })
           });

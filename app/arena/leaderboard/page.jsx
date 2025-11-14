@@ -23,21 +23,46 @@ export default function LeaderboardPage() {
 
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
-
-    // Carregar dados do ranking do jogador
-    const rankingData = JSON.parse(localStorage.getItem(`pvp_ranking_${parsedUser.id}`) || '{"fama": 1000}');
-    const famaJogador = rankingData.fama || 1000;
-
-    // Carregar leaderboard
-    const lbData = getLeaderboard(parsedUser.id, famaJogador);
-    setLeaderboardData(lbData);
+    carregarLeaderboard(parsedUser.id);
 
     // Carregar info da temporada
     const tempInfo = getInfoTemporada();
     setInfoTemporada(tempInfo);
-
-    setLoading(false);
   }, [router]);
+
+  const carregarLeaderboard = async (userId) => {
+    try {
+      setLoading(true);
+
+      // Buscar ranking do jogador
+      let famaJogador = 1000;
+      try {
+        const response = await fetch(`/api/pvp/ranking?userId=${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.ranking) {
+            famaJogador = data.ranking.fama || 1000;
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar ranking, usando localStorage:', error);
+        const rankingData = JSON.parse(localStorage.getItem(`pvp_ranking_${userId}`) || '{"fama": 1000}');
+        famaJogador = rankingData.fama || 1000;
+      }
+
+      // Carregar leaderboard (agora é async)
+      const lbData = await getLeaderboard(userId, famaJogador);
+      setLeaderboardData(lbData);
+    } catch (error) {
+      console.error('Erro ao carregar leaderboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (

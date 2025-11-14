@@ -44,44 +44,54 @@ export default function ArenaPvPPage() {
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
     carregarAvatarAtivo(parsedUser.id);
-
-    // Verificar reset de temporada
-    const resetInfo = verificarResetTemporada(parsedUser.id);
-    if (resetInfo.precisaReset) {
-      // Mostrar modal de nova temporada
-      setModalNovaTemporada({
-        temporadaAnterior: resetInfo.temporadaAnterior,
-        temporadaAtual: resetInfo.temporadaAtual,
-        dadosAntigos: resetInfo.dadosAntigos,
-        novosDados: resetInfo.novosDados
-      });
-
-      // Aplicar reset
-      localStorage.setItem(`pvp_ranking_${parsedUser.id}`, JSON.stringify(resetInfo.novosDados));
-
-      // Carregar novos dados
-      setFama(1000);
-      setVitorias(0);
-      setDerrotas(0);
-      setStreak(0);
-    } else {
-      // Carregar dados de ranking do localStorage
-      const rankingData = JSON.parse(localStorage.getItem(`pvp_ranking_${parsedUser.id}`) || '{}');
-      setFama(rankingData.fama || rankingData.pontos || 1000); // Backward compatibility
-      setVitorias(rankingData.vitorias || 0);
-      setDerrotas(rankingData.derrotas || 0);
-      setStreak(rankingData.streak || 0);
-    }
+    carregarRankingData(parsedUser.id);
 
     // Carregar info da temporada
     const tempInfo = getInfoTemporada();
     setInfoTemporada(tempInfo);
-
-    // Carregar posição no leaderboard
-    const famaAtual = resetInfo.precisaReset ? 1000 : (JSON.parse(localStorage.getItem(`pvp_ranking_${parsedUser.id}`) || '{}').fama || 1000);
-    const posicao = getPosicaoJogador(parsedUser.id, famaAtual);
-    setPosicaoLeaderboard(posicao);
   }, [router]);
+
+  const carregarRankingData = async (userId) => {
+    try {
+      // Buscar ranking do banco via API
+      const response = await fetch(`/api/pvp/ranking?userId=${userId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.ranking) {
+          // Atualizar estado com dados do banco
+          setFama(data.ranking.fama || 1000);
+          setVitorias(data.ranking.vitorias || 0);
+          setDerrotas(data.ranking.derrotas || 0);
+          setStreak(data.ranking.streak || 0);
+
+          // Buscar posição no leaderboard
+          const posicao = await getPosicaoJogador(userId, data.ranking.fama || 1000);
+          setPosicaoLeaderboard(posicao);
+
+          // Salvar no localStorage como backup
+          localStorage.setItem(`pvp_ranking_${userId}`, JSON.stringify(data.ranking));
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('Erro ao buscar ranking do banco, usando localStorage:', error);
+    }
+
+    // Fallback: usar localStorage se API falhar
+    const rankingData = JSON.parse(localStorage.getItem(`pvp_ranking_${userId}`) || '{}');
+    setFama(rankingData.fama || rankingData.pontos || 1000);
+    setVitorias(rankingData.vitorias || 0);
+    setDerrotas(rankingData.derrotas || 0);
+    setStreak(rankingData.streak || 0);
+
+    // Buscar posição no leaderboard (modo fallback)
+    const posicao = await getPosicaoJogador(userId, rankingData.fama || 1000);
+    setPosicaoLeaderboard(posicao);
+  };
 
   // Timer de espera no matchmaking
   useEffect(() => {
