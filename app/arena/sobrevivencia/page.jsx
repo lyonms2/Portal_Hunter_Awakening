@@ -17,7 +17,6 @@ export default function ArenaSobrevivenciaPage() {
   // Estados de combate
   const [statsAvatarAtual, setStatsAvatarAtual] = useState(null); // HP, energia, stats atuais
   const [recompensasAcumuladas, setRecompensasAcumuladas] = useState({ xp: 0, moedas: 0, fragmentos: 0 });
-  const [modalLevelUp, setModalLevelUp] = useState(null); // { nivelAnterior, nivelNovo }
   const [exaustaoAcumulada, setExaustaoAcumulada] = useState(0); // Exaustão total acumulada
 
   // Estados para modais
@@ -276,26 +275,17 @@ export default function ArenaSobrevivenciaPage() {
   const ondaCompleta = (onda) => {
     const recompensas = processarRecompensasOnda(onda);
 
-    // Verificar level up e atualizar XP
-    let houveLevelUp = false;
-    let nivelAnterior = 0;
-    let nivelNovo = 0;
-
+    // Atualizar XP e verificar level up
     setStatsAvatarAtual(prev => {
       if (!prev) return prev;
 
       const novoXP = prev.xp_atual + recompensas.xp;
-      const xpParaProximoNivel = prev.nivel * 100; // Fórmula simples
+      const xpParaProximoNivel = prev.nivel * 100;
 
       if (novoXP >= xpParaProximoNivel) {
-        // Level up!
-        nivelAnterior = prev.nivel;
-        nivelNovo = nivelAnterior + 1;
-        houveLevelUp = true;
+        // Level up! Aumentar stats
+        const nivelNovo = prev.nivel + 1;
 
-        console.log('🎉 LEVEL UP DETECTADO!', { nivelAnterior, nivelNovo, novoXP, xpParaProximoNivel });
-
-        // Aumentar stats ao subir de nível
         return {
           ...prev,
           nivel: nivelNovo,
@@ -315,23 +305,8 @@ export default function ArenaSobrevivenciaPage() {
 
     const exaustao = calcularExaustaoOnda(onda);
 
-    // Se houve level up, mostrar modal de level up PRIMEIRO
-    // IMPORTANTE: Usar setTimeout para garantir que o setState acima complete primeiro
-    setTimeout(() => {
-      if (houveLevelUp) {
-        console.log('⭐ Mostrando modal de LEVEL UP:', { nivelAnterior, nivelNovo });
-        setModalLevelUp({
-          nivelAnterior,
-          nivelNovo,
-          // Guardar dados da onda para mostrar depois
-          proximoModal: { onda, recompensas, exaustao }
-        });
-      } else {
-        // Sem level up, mostrar modal de onda completa direto
-        console.log('📊 Sem level up, mostrando modal de onda completa');
-        setModalOndaCompleta({ onda, recompensas, exaustao });
-      }
-    }, 800);
+    // Mostrar modal de onda completa
+    setModalOndaCompleta({ onda, recompensas, exaustao });
   };
 
   const continuarParaProximaOnda = () => {
@@ -687,81 +662,6 @@ export default function ArenaSobrevivenciaPage() {
                 className="px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black rounded-lg transition-all shadow-lg shadow-purple-500/30"
               >
                 ⚔️ Próxima Onda ({modalOndaCompleta.onda + 1})
-              </button>
-            </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Level Up */}
-      {modalLevelUp && (
-        <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] overflow-y-auto p-4"
-          onClick={() => {
-            // Se tem próximo modal (onda completa), mostrar ele
-            if (modalLevelUp.proximoModal) {
-              setModalOndaCompleta(modalLevelUp.proximoModal);
-            }
-            setModalLevelUp(null);
-          }}
-        >
-          <div className="min-h-full flex items-center justify-center py-8">
-            <div
-              className="max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500/50 via-orange-500/50 to-yellow-500/50 rounded-lg blur opacity-75 animate-pulse"></div>
-                <div className="relative bg-gradient-to-br from-yellow-900 via-orange-900 to-yellow-900 rounded-2xl border-4 border-yellow-400 p-8 shadow-2xl shadow-yellow-500/50">
-            <div className="text-center">
-              <div className="text-8xl mb-4 animate-bounce">⭐</div>
-              <h2 className="text-6xl font-black text-yellow-300 mb-2 drop-shadow-lg">
-                LEVEL UP!
-              </h2>
-              <div className="text-4xl font-bold text-white mb-6">
-                {modalLevelUp.nivelAnterior} → {modalLevelUp.nivelNovo}
-              </div>
-
-              <div className="bg-black/40 rounded-lg p-6 mb-6">
-                <h3 className="text-yellow-400 font-bold mb-4 text-lg">✨ MELHORIAS</h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="bg-green-900/50 border border-green-500 rounded p-2">
-                    <div className="text-green-400 font-bold">+20 HP</div>
-                    <div className="text-xs text-slate-300">Recuperado</div>
-                  </div>
-                  <div className="bg-blue-900/50 border border-blue-500 rounded p-2">
-                    <div className="text-blue-400 font-bold">+30 Energia</div>
-                    <div className="text-xs text-slate-300">Recuperada</div>
-                  </div>
-                  <div className="bg-red-900/50 border border-red-500 rounded p-2">
-                    <div className="text-red-400 font-bold">+1 Força</div>
-                  </div>
-                  <div className="bg-green-900/50 border border-green-500 rounded p-2">
-                    <div className="text-green-400 font-bold">+1 Agilidade</div>
-                  </div>
-                  <div className="bg-blue-900/50 border border-blue-500 rounded p-2">
-                    <div className="text-blue-400 font-bold">+1 Resistência</div>
-                  </div>
-                  <div className="bg-purple-900/50 border border-purple-500 rounded p-2">
-                    <div className="text-purple-400 font-bold">+1 Foco</div>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  // Se tem próximo modal (onda completa), mostrar ele
-                  if (modalLevelUp.proximoModal) {
-                    setModalOndaCompleta(modalLevelUp.proximoModal);
-                  }
-                  setModalLevelUp(null);
-                }}
-                className="w-full px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black rounded-lg transition-all text-lg shadow-lg"
-              >
-                🎉 CONTINUAR
               </button>
             </div>
                 </div>

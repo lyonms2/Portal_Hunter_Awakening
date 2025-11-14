@@ -214,6 +214,61 @@ export default function AvatarsPage() {
           </div>
         </div>
 
+        {/* Informação sobre Recuperação */}
+        {avatares.length > 0 && (
+          <div className="mb-8 bg-gradient-to-r from-blue-950/50 to-purple-950/50 border border-blue-500/30 rounded-lg p-6">
+            <h3 className="text-cyan-400 font-bold mb-3 flex items-center gap-2">
+              <span className="text-xl">ℹ️</span>
+              <span>RECUPERAÇÃO DE AVATARES</span>
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4 text-sm">
+              {/* Exaustão */}
+              <div className="bg-slate-900/50 border border-orange-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">😰</span>
+                  <span className="text-orange-400 font-bold">EXAUSTÃO</span>
+                </div>
+                <ul className="text-slate-300 space-y-1 text-xs">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span><strong className="text-slate-200">Avatares inativos:</strong> Recuperam 8 pontos/hora automaticamente</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-400 mt-0.5">✗</span>
+                    <span><strong className="text-slate-200">Avatar ativo:</strong> NÃO recupera exaustão (em uso)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-cyan-400 mt-0.5">⏱️</span>
+                    <span>Mínimo 5 minutos para processar recuperação</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* HP */}
+              <div className="bg-slate-900/50 border border-green-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">❤️</span>
+                  <span className="text-green-400 font-bold">HP (SAÚDE)</span>
+                </div>
+                <ul className="text-slate-300 space-y-1 text-xs">
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-400 mt-0.5">✗</span>
+                    <span><strong className="text-slate-200">Sem recuperação automática</strong></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-400 mt-0.5">⭐</span>
+                    <span><strong className="text-slate-200">Recupera ao subir de nível:</strong> +20 HP</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">🔮</span>
+                    <span>Use itens ou habilidades de cura (em breve)</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Lista vazia */}
         {avatares.length === 0 && (
           <div className="max-w-2xl mx-auto text-center py-20">
