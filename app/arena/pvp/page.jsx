@@ -6,7 +6,7 @@ import { aplicarPenalidadesExaustao, getNivelExaustao } from "../../avatares/sis
 import { getNivelVinculo } from "../../avatares/sistemas/bondSystem";
 import { calcularHPMaximoCompleto } from "../../../lib/combat/statsCalculator";
 import AvatarSVG from "../../components/AvatarSVG";
-import { getTierPorPontos, getProgressoNoTier, getProximoTier } from "../../../lib/pvp/rankingSystem";
+import { getTierPorFama, getProgressoNoTier, getProximoTier } from "../../../lib/pvp/rankingSystem";
 
 export default function ArenaPvPPage() {
   const router = useRouter();
@@ -17,10 +17,11 @@ export default function ArenaPvPPage() {
   const [tempoEspera, setTempoEspera] = useState(0);
   const [oponenteEncontrado, setOponenteEncontrado] = useState(null);
 
-  // Sistema de Ranking
-  const [pontosRanking, setPontosRanking] = useState(1000); //Começa em Bronze (1000 pontos)
+  // Sistema de Ranking (Fama)
+  const [fama, setFama] = useState(1000); // Começa em Bronze (1000 fama)
   const [vitorias, setVitorias] = useState(0);
   const [derrotas, setDerrotas] = useState(0);
+  const [streak, setStreak] = useState(0); // Streak de vitórias consecutivas
 
   // Modais
   const [modalAlerta, setModalAlerta] = useState(null);
@@ -40,10 +41,11 @@ export default function ArenaPvPPage() {
     // Carregar dados de ranking do localStorage
     const rankingData = localStorage.getItem(`pvp_ranking_${parsedUser.id}`);
     if (rankingData) {
-      const { pontos, vitorias: v, derrotas: d } = JSON.parse(rankingData);
-      setPontosRanking(pontos || 1000);
+      const { fama: f, pontos, vitorias: v, derrotas: d, streak: s } = JSON.parse(rankingData);
+      setFama(f || pontos || 1000); // Backward compatibility com "pontos"
       setVitorias(v || 0);
       setDerrotas(d || 0);
+      setStreak(s || 0);
     }
   }, [router]);
 
@@ -186,9 +188,10 @@ export default function ArenaPvPPage() {
       avatarJogador: avatarComPenalidades,
       avatarOponente: oponenteEncontrado.avatar,
       nomeOponente: oponenteEncontrado.nome,
-      pontosRankingJogador: pontosRanking,
-      pontosRankingOponente: oponenteEncontrado.avatar.nivel * 200 + 1000, // Simular pontos do oponente
-      tierJogador: getTierPorPontos(pontosRanking)
+      famaJogador: fama,
+      famaOponente: oponenteEncontrado.avatar.nivel * 200 + 1000, // Simular fama do oponente
+      tierJogador: getTierPorFama(fama),
+      streakJogador: streak
     };
 
     sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));
@@ -219,8 +222,8 @@ export default function ArenaPvPPage() {
   const temPenalidade = nivelExaustao && nivelExaustao.penalidades.stats !== undefined;
 
   // Tier info
-  const tierAtual = getTierPorPontos(pontosRanking);
-  const progressoTier = getProgressoNoTier(pontosRanking, tierAtual);
+  const tierAtual = getTierPorFama(fama);
+  const progressoTier = getProgressoNoTier(fama, tierAtual);
   const proximoTier = getProximoTier(tierAtual);
 
   if (loading) {
@@ -485,7 +488,7 @@ export default function ArenaPvPPage() {
                       <div className="text-center">
                         <div className="text-4xl mb-2">{tierAtual.icone}</div>
                         <div className={`text-2xl font-black ${tierAtual.corTexto}`}>{tierAtual.nome}</div>
-                        <div className="text-sm text-slate-400 mt-1">{pontosRanking} Pontos</div>
+                        <div className="text-sm text-slate-400 mt-1">{fama} Fama</div>
                       </div>
                     </div>
 
@@ -503,7 +506,7 @@ export default function ArenaPvPPage() {
                           ></div>
                         </div>
                         <div className="text-[10px] text-slate-500 mt-1 text-center">
-                          {proximoTier.minPontos - pontosRanking} pontos restantes
+                          {proximoTier.minFama - fama} fama restante
                         </div>
                       </div>
                     )}
@@ -527,6 +530,27 @@ export default function ArenaPvPPage() {
                           {Math.round((vitorias / (vitorias + derrotas)) * 100)}%
                         </div>
                         <div className="text-[10px] text-slate-500 uppercase">Taxa de Vitória</div>
+                      </div>
+                    )}
+
+                    {/* Streak */}
+                    {streak > 0 && (
+                      <div className={`rounded-lg p-3 text-center border-2 ${
+                        streak >= 10 ? 'bg-purple-950/50 border-purple-500' :
+                        streak >= 5 ? 'bg-orange-950/50 border-orange-500' :
+                        'bg-yellow-950/50 border-yellow-500'
+                      }`}>
+                        <div className="text-lg font-bold">
+                          {streak >= 10 ? '🔥' : streak >= 5 ? '⚡' : '✨'}
+                          <span className={
+                            streak >= 10 ? 'text-purple-400' :
+                            streak >= 5 ? 'text-orange-400' :
+                            'text-yellow-400'
+                          }> {streak}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 uppercase">
+                          {streak >= 10 ? 'STREAK LENDÁRIO!' : streak >= 5 ? 'HOT STREAK!' : 'Vitórias Seguidas'}
+                        </div>
                       </div>
                     )}
                   </div>

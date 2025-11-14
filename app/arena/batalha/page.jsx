@@ -289,23 +289,30 @@ function BatalhaContent() {
     }
 
     let recompensas;
-    let pontosGanhos = 0;
 
     if (modoPvP && dadosPvP) {
-      // Calcular recompensas PvP
+      // Calcular recompensas PvP com o novo sistema de Fama
       const venceu = vencedor === 'jogador';
-      recompensas = calcularRecompensasPvP(venceu, dadosPvP.tierJogador, estadoFinal.rodada);
+      recompensas = calcularRecompensasPvP(
+        venceu,
+        dadosPvP.famaJogador,
+        dadosPvP.famaOponente,
+        dadosPvP.tierJogador,
+        dadosPvP.streakJogador || 0,
+        estadoFinal.rodada
+      );
 
-      // Calcular pontos de ranking
+      // Log de ganho/perda de fama
       if (venceu) {
-        pontosGanhos = calcularPontosVitoria(dadosPvP.pontosRankingJogador, dadosPvP.pontosRankingOponente);
-        adicionarLog(`🏆 +${pontosGanhos} pontos de ranking!`);
+        adicionarLog(`🏆 +${recompensas.fama} Fama!`);
       } else {
-        pontosGanhos = -calcularPerda(dadosPvP.pontosRankingOponente, dadosPvP.pontosRankingJogador);
-        adicionarLog(`📉 ${pontosGanhos} pontos de ranking`);
+        adicionarLog(`📉 ${recompensas.fama} Fama`); // Já vem negativo
       }
 
-      recompensas.pontos_ranking = pontosGanhos;
+      // Exibir mensagens especiais (upset, streak, etc.)
+      if (recompensas.mensagens && recompensas.mensagens.length > 0) {
+        recompensas.mensagens.forEach(msg => adicionarLog(msg));
+      }
     } else {
       // Calcular recompensas de treino
       recompensas = calcularRecompensasTreino(estadoFinal, vencedor);
@@ -325,20 +332,24 @@ function BatalhaContent() {
     if (resultado) {
       try {
         if (modoPvP) {
-          // Modo PvP - atualizar ranking
+          // Modo PvP - atualizar ranking com sistema de Fama
           const rankingKey = `pvp_ranking_${userData.id}`;
-          const rankingData = JSON.parse(localStorage.getItem(rankingKey) || '{"pontos": 1000, "vitorias": 0, "derrotas": 0}');
+          const rankingData = JSON.parse(localStorage.getItem(rankingKey) || '{"fama": 1000, "vitorias": 0, "derrotas": 0, "streak": 0}');
 
-          // Atualizar pontos e estatísticas
-          const novosPontos = Math.max(0, rankingData.pontos + (resultado.recompensas.pontos_ranking || 0));
+          // Atualizar Fama (não pode ficar negativo)
+          const novaFama = Math.max(0, (rankingData.fama || rankingData.pontos || 1000) + (resultado.recompensas.fama || 0));
 
           if (resultado.vencedor === 'jogador') {
+            // Vitória: incrementar vitórias e streak
             rankingData.vitorias = (rankingData.vitorias || 0) + 1;
+            rankingData.streak = (rankingData.streak || 0) + 1;
           } else if (resultado.vencedor === 'inimigo') {
+            // Derrota: incrementar derrotas e resetar streak
             rankingData.derrotas = (rankingData.derrotas || 0) + 1;
+            rankingData.streak = 0;
           }
 
-          rankingData.pontos = novosPontos;
+          rankingData.fama = novaFama;
 
           localStorage.setItem(rankingKey, JSON.stringify(rankingData));
 
@@ -359,7 +370,7 @@ function BatalhaContent() {
             body: JSON.stringify({
               avatarId: estado.jogador.id,
               experiencia: resultado.recompensas.xp,
-              exaustao: 15, // Exaustão fixa para PvP
+              exaustao: resultado.recompensas.exaustao, // 15 vitória, 20 derrota
               vinculo: resultado.recompensas.vinculo || 0
             })
           });
@@ -472,22 +483,22 @@ function BatalhaContent() {
                 </div>
               )}
 
-              {/* Pontos de Ranking (PvP) */}
-              {resultado.pvp && resultado.recompensas.pontos_ranking !== undefined && (
+              {/* Fama (PvP) */}
+              {resultado.pvp && resultado.recompensas.fama !== undefined && (
                 <div className={`text-center p-4 rounded border mb-4 ${
-                  resultado.recompensas.pontos_ranking > 0
+                  resultado.recompensas.fama > 0
                     ? 'bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-yellow-500/50'
                     : 'bg-gradient-to-r from-red-900/30 to-orange-900/30 border-red-500/50'
                 }`}>
                   <div className="text-4xl mb-2">
-                    {resultado.recompensas.pontos_ranking > 0 ? '🏆' : '📉'}
+                    {resultado.recompensas.fama > 0 ? '🏆' : '📉'}
                   </div>
                   <div className={`text-3xl font-black ${
-                    resultado.recompensas.pontos_ranking > 0 ? 'text-yellow-400' : 'text-red-400'
+                    resultado.recompensas.fama > 0 ? 'text-yellow-400' : 'text-red-400'
                   }`}>
-                    {resultado.recompensas.pontos_ranking > 0 ? '+' : ''}{resultado.recompensas.pontos_ranking}
+                    {resultado.recompensas.fama > 0 ? '+' : ''}{resultado.recompensas.fama}
                   </div>
-                  <div className="text-sm text-slate-400">Pontos de Ranking</div>
+                  <div className="text-sm text-slate-400">Fama</div>
                 </div>
               )}
 
@@ -499,10 +510,10 @@ function BatalhaContent() {
                     </span>
                   </div>
                 )}
-                {resultado.pvp && (
+                {resultado.pvp && resultado.recompensas.exaustao && (
                   <div className="text-center p-3 bg-orange-900/30 rounded border border-orange-500/50">
                     <span className="text-orange-400 text-sm">
-                      😰 +15 Exaustão
+                      😰 +{resultado.recompensas.exaustao} Exaustão
                     </span>
                   </div>
                 )}
