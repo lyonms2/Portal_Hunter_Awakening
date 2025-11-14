@@ -150,10 +150,28 @@ export default function ArenaPvPPage() {
   };
 
   const iniciarBatalha = () => {
+    // Aplicar penalidades de exaustão aos stats do avatar ANTES de entrar em batalha
+    const statsBase = {
+      forca: avatarSelecionado.forca,
+      agilidade: avatarSelecionado.agilidade,
+      resistencia: avatarSelecionado.resistencia,
+      foco: avatarSelecionado.foco
+    };
+    const statsComPenalidades = aplicarPenalidadesExaustao(statsBase, avatarSelecionado.exaustao || 0);
+
+    // Avatar com stats penalizados
+    const avatarComPenalidades = {
+      ...avatarSelecionado,
+      forca: statsComPenalidades.forca,
+      agilidade: statsComPenalidades.agilidade,
+      resistencia: statsComPenalidades.resistencia,
+      foco: statsComPenalidades.foco
+    };
+
     // Armazenar dados da partida PvP no sessionStorage
     const dadosPartida = {
       tipo: 'pvp',
-      avatarJogador: avatarSelecionado,
+      avatarJogador: avatarComPenalidades,
       avatarOponente: oponenteEncontrado.avatar,
       nomeOponente: oponenteEncontrado.nome,
       pontosRankingJogador: pontosRanking,

@@ -8,7 +8,7 @@ import { getNivelVinculo } from '@/app/avatares/sistemas/bondSystem';
 
 export async function POST(request) {
   try {
-    const { avatarId, experiencia, exaustao, vinculo } = await request.json();
+    const { avatarId, experiencia, exaustao, vinculo, hp_atual, nivel, forca, agilidade, resistencia, foco } = await request.json();
 
     if (!avatarId) {
       return NextResponse.json(
@@ -109,6 +109,11 @@ export async function POST(request) {
     // Só atualizar vínculo se foi explicitamente enviado no payload
     if (vinculo !== undefined && vinculo !== null) {
       updates.vinculo = novoVinculo;
+    }
+
+    // Só atualizar hp_atual se foi explicitamente enviado no payload
+    if (hp_atual !== undefined && hp_atual !== null) {
+      updates.hp_atual = hp_atual;
     }
 
     console.log('🔄 Atualizando avatar no banco:', {
