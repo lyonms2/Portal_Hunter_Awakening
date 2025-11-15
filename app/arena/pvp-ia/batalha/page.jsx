@@ -60,6 +60,9 @@ export default function BatalhaIAPage() {
   const [mostrarModalRender, setMostrarModalRender] = useState(false);
   const [mostrarModalFuga, setMostrarModalFuga] = useState(false);
 
+  // Timer
+  const [tempoRestante, setTempoRestante] = useState(30);
+
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -113,6 +116,31 @@ export default function BatalhaIAPage() {
       executarTurnoIA();
     }
   }, [ehMeuTurno, batalhaConcluida]);
+
+  // Timer - conta regressiva no turno do jogador
+  useEffect(() => {
+    if (ehMeuTurno && !batalhaConcluida) {
+      // Resetar timer ao iniciar turno
+      setTempoRestante(30);
+
+      const interval = setInterval(() => {
+        setTempoRestante((prev) => {
+          if (prev <= 1) {
+            // Tempo esgotado - passar turno automaticamente
+            addLog('⏰ Tempo esgotado! Pulando turno...', 'aviso');
+            setTimeout(() => {
+              setEhMeuTurno(false);
+              setTurnoAtual((t) => t + 1);
+            }, 500);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [ehMeuTurno, batalhaConcluida, turnoAtual]);
 
   const addLog = (mensagem, tipo = 'info') => {
     const cores = {
@@ -649,6 +677,14 @@ export default function BatalhaIAPage() {
           </h1>
           <div className="flex justify-center gap-4 text-sm">
             <span className="text-gray-400">Turno: <span className="text-white font-bold">{turnoAtual}</span></span>
+            {ehMeuTurno && !batalhaConcluida && (
+              <span className="text-gray-400">
+                Tempo: <span className={`font-bold ${
+                  tempoRestante <= 5 ? 'text-red-500 animate-pulse' :
+                  tempoRestante <= 10 ? 'text-orange-500' : 'text-cyan-400'
+                }`}>⏱️ {tempoRestante}s</span>
+              </span>
+            )}
             <span className="text-gray-400">Fama Apostada: <span className="text-yellow-400 font-bold">{dadosPartida.famaApostada}</span></span>
             <span className="text-red-400 font-bold">💀 MORTE REAL</span>
           </div>
