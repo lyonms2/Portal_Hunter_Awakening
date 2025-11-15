@@ -54,7 +54,38 @@ function BatalhaTesteContent() {
     addLog(`🎯 Oponente: ${dados.nomeOponente}`);
 
     setLoading(false);
+
+    // Marcar como pronto automaticamente
+    marcarComoPronte(dados.matchId, parsedUser.id);
   }, [router]);
+
+  const marcarComoPronte = async (matchId, userId) => {
+    try {
+      addLog("🔄 Marcando como pronto...");
+      const response = await fetch('/api/pvp/battle/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          matchId: matchId,
+          userId: userId,
+          action: 'ready'
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        addLog("✅ Marcado como pronto!");
+        if (data.battleStarted) {
+          addLog("🎮 Batalha iniciada! Ambos jogadores prontos.");
+        }
+      } else {
+        addLog(`⚠️ Erro ao marcar como pronto: ${data.error || 'desconhecido'}`);
+      }
+    } catch (error) {
+      addLog(`❌ Erro ao marcar como pronto: ${error.message}`);
+    }
+  };
 
   // Polling para sincronizar estado da batalha
   useEffect(() => {
