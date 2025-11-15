@@ -30,6 +30,7 @@ export async function GET(request) {
     // Tenta até 3 vezes com delays crescentes: 100ms, 200ms, 400ms (total 700ms max)
     let queueEntry = null;
     let queueError = null;
+    let battleRoom = null;
     const maxRetries = 3;
     const retryDelays = [100, 200, 400]; // ms
 
@@ -48,6 +49,36 @@ export async function GET(request) {
         await supabase.rpc('cleanup_expired_queue_entries');
       }
 
+      // NOVA ESTRATÉGIA: Consultar pvp_battle_rooms como FONTE DE VERDADE
+      // A battle room é criada no MESMO UPDATE que marca os players como matched
+      // Consultar ela PRIMEIRO evita problemas de transaction isolation
+      const { data: battleRoomData, error: battleRoomError } = await supabase
+        .from('pvp_battle_rooms')
+        .select('*')
+        .or(`player1_user_id.eq.${userId},player2_user_id.eq.${userId}`)
+        .eq('status', 'waiting')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      battleRoom = battleRoomData;
+
+      console.log(`🏰 [${requestId}] Battle room check (attempt ${attempt + 1}/${maxRetries}):`, {
+        userId,
+        found: !!battleRoom,
+        battleRoomId: battleRoom?.id,
+        player1: battleRoom?.player1_user_id,
+        player2: battleRoom?.player2_user_id,
+        timestamp: new Date().toISOString()
+      });
+
+      // Se encontrou battle room, o match FOI CRIADO (fonte de verdade!)
+      if (battleRoom) {
+        console.log(`✅ [${requestId}] Battle room encontrada! Match CONFIRMADO na tentativa ${attempt + 1}`);
+        break;
+      }
+
+      // Se não encontrou battle room, consultar a queue normalmente
       // Buscar entrada na fila
       // IMPORTANTE: Usar .order() + .limit(1) + .maybeSingle() para FORÇAR query fresca
       // sem cache do Supabase client e evitar connection pooling issues
@@ -71,9 +102,9 @@ export async function GET(request) {
         timestamp: new Date().toISOString()
       });
 
-      // Se encontrou matched, retorna imediatamente (sucesso!)
-      if (queueEntry?.status === 'matched') {
-        console.log(`✅ [${requestId}] Status=matched encontrado na tentativa ${attempt + 1}`);
+      // Se encontrou battle room OU status=matched, retorna imediatamente (sucesso!)
+      if (battleRoom || queueEntry?.status === 'matched') {
+        console.log(`✅ [${requestId}] Match encontrado na tentativa ${attempt + 1} (via ${battleRoom ? 'battle_room' : 'queue status'})`);
         break;
       }
 
@@ -96,6 +127,47 @@ export async function GET(request) {
       }
     }
 
+    // PRIORITY 1: Se encontrou battle room, processar via battle room (fonte de verdade!)
+    if (battleRoom) {
+      console.log(`🎯 [${requestId}] Match encontrado via BATTLE ROOM (fonte de verdade)!`);
+      console.log(`   Battle Room ID: ${battleRoom.id}`);
+      console.log(`   Player 1: ${battleRoom.player1_user_id}`);
+      console.log(`   Player 2: ${battleRoom.player2_user_id}`);
+
+      // Determinar quem é o oponente
+      const isPlayer1 = battleRoom.player1_user_id === userId;
+      const opponentUserId = isPlayer1 ? battleRoom.player2_user_id : battleRoom.player1_user_id;
+      const opponentAvatarId = isPlayer1 ? battleRoom.player2_avatar_id : battleRoom.player1_avatar_id;
+
+      console.log(`   Opponent User ID: ${opponentUserId}`);
+      console.log(`   Opponent Avatar ID: ${opponentAvatarId}`);
+
+      // Buscar dados do avatar do oponente
+      const { data: opponentAvatar, error: avatarError } = await supabase
+        .from('avatares')
+        .select('*')
+        .eq('id', opponentAvatarId)
+        .single();
+
+      console.log(`✅ [${requestId}] Retornando match encontrado via battle room`);
+
+      return NextResponse.json({
+        success: true,
+        inQueue: true,
+        matched: true,
+        matchId: battleRoom.id,
+        opponentUserId: opponentUserId,
+        opponentAvatarId: opponentAvatarId,
+        opponent: {
+          userId: opponentUserId,
+          avatarId: opponentAvatarId,
+          nome: opponentAvatar?.nome || 'Oponente',
+          avatar: opponentAvatar
+        }
+      });
+    }
+
+    // PRIORITY 2: Se não encontrou na fila e nem battle room
     if (queueError || !queueEntry) {
       console.log(`⚠️ [${requestId}] Não encontrado na fila:`, queueError?.message);
       return NextResponse.json({
@@ -105,7 +177,7 @@ export async function GET(request) {
       });
     }
 
-    // Se ainda está aguardando, retornar status de espera
+    // PRIORITY 3: Se ainda está aguardando
     // IMPORTANTE: NÃO chamamos find_pvp_match() aqui para evitar race conditions!
     // O matchmaking é feito APENAS no /join
     if (queueEntry.status === 'waiting') {
@@ -119,7 +191,7 @@ export async function GET(request) {
       });
     }
 
-    // Se já encontrou match
+    // PRIORITY 4: Se já encontrou match via queue status
     if (queueEntry.status === 'matched') {
       console.log('🎯 Jogador JÁ está matched!');
       console.log('   Match ID:', queueEntry.match_id);
