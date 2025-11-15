@@ -64,9 +64,7 @@ export async function GET(request) {
       'Caçador Misterioso',
       'Guerreiro Sombrio',
       'Mestre Elemental',
-      'Invocador Anciã
-
-o',
+      'Invocador Ancião',
       'Guardião do Portal',
       'Cavaleiro das Trevas',
       'Feiticeira Lunar',
