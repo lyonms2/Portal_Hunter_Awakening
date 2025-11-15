@@ -55,13 +55,18 @@ function BatalhaTesteContent() {
 
     setLoading(false);
 
-    // Marcar como pronto automaticamente
-    marcarComoPronte(dados.matchId, parsedUser.id);
+    // Aguardar 1 segundo antes de marcar como pronto (dar tempo para sala ser criada)
+    addLog("⏱️ Aguardando 1 segundo para garantir que sala foi criada...");
+    setTimeout(() => {
+      marcarComoPronte(dados.matchId, parsedUser.id);
+    }, 1000);
   }, [router]);
 
   const marcarComoPronte = async (matchId, userId) => {
     try {
-      addLog("🔄 Marcando como pronto...");
+      addLog(`🔄 Marcando como pronto... Match ID: ${matchId}`);
+      addLog(`👤 User ID: ${userId}`);
+
       const response = await fetch('/api/pvp/battle/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,6 +78,8 @@ function BatalhaTesteContent() {
       });
 
       const data = await response.json();
+      addLog(`📡 Response status: ${response.status}`);
+      addLog(`📡 Response data: ${JSON.stringify(data)}`);
 
       if (response.ok && data.success) {
         addLog("✅ Marcado como pronto!");
@@ -81,6 +88,11 @@ function BatalhaTesteContent() {
         }
       } else {
         addLog(`⚠️ Erro ao marcar como pronto: ${data.error || 'desconhecido'}`);
+        // Tentar buscar a sala diretamente para debug
+        addLog(`🔍 Verificando se sala existe no Supabase...`);
+        const debugResponse = await fetch(`/api/pvp/battle/debug?matchId=${matchId}`);
+        const debugData = await debugResponse.json();
+        addLog(`🔍 Debug result: ${JSON.stringify(debugData)}`);
       }
     } catch (error) {
       addLog(`❌ Erro ao marcar como pronto: ${error.message}`);
