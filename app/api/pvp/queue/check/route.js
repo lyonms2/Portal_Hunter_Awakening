@@ -43,7 +43,7 @@ export async function GET(request) {
     });
 
     if (queueError || !queueEntry) {
-      console.log('⚠️ Não encontrado na fila:', queueError?.message);
+      console.log(`⚠️ [${requestId}] Não encontrado na fila:`, queueError?.message);
       return NextResponse.json({
         success: true,
         inQueue: false,
@@ -51,53 +51,12 @@ export async function GET(request) {
       });
     }
 
-    // Se ainda está aguardando, tentar encontrar match novamente
+    // Se ainda está aguardando, retornar status de espera
+    // IMPORTANTE: NÃO chamamos find_pvp_match() aqui para evitar race conditions!
+    // O matchmaking é feito APENAS no /join
     if (queueEntry.status === 'waiting') {
-      console.log(`🔄 [${requestId}] ⚠️ CHAMANDO find_pvp_match() VIA /check para userId=${userId}`);
-      console.log(`🔄 [${requestId}] Timestamp ANTES do find_pvp_match: ${new Date().toISOString()}`);
+      console.log(`⏳ [${requestId}] Jogador ainda aguardando na fila`);
 
-      const { data: matchResult, error: matchError } = await supabase
-        .rpc('find_pvp_match', {
-          p_user_id: userId,
-          p_nivel: queueEntry.nivel,
-          p_poder_total: queueEntry.poder_total,
-          p_fama: queueEntry.fama
-        });
-
-      console.log(`🔄 [${requestId}] Timestamp DEPOIS do find_pvp_match: ${new Date().toISOString()}`);
-      console.log(`🔄 [${requestId}] Match result:`, JSON.stringify(matchResult, null, 2));
-
-      if (matchError) {
-        console.error(`❌ [${requestId}] Erro ao buscar match:`, matchError);
-      }
-
-      // Se encontrou match agora
-      if (matchResult && matchResult.length > 0 && matchResult[0].matched) {
-        console.log(`✅ [${requestId}] MATCH ENCONTRADO via /check!`);
-        // Buscar dados do avatar do oponente
-        const { data: opponentAvatar, error: avatarError } = await supabase
-          .from('avatares')
-          .select('*')
-          .eq('id', matchResult[0].opponent_avatar_id)
-          .single();
-
-        return NextResponse.json({
-          success: true,
-          inQueue: true,
-          matched: true,
-          matchId: matchResult[0].match_id,
-          opponentUserId: matchResult[0].opponent_user_id,
-          opponentAvatarId: matchResult[0].opponent_avatar_id,
-          opponent: {
-            userId: matchResult[0].opponent_user_id,
-            avatarId: matchResult[0].opponent_avatar_id,
-            nome: opponentAvatar?.nome || 'Oponente',
-            avatar: opponentAvatar
-          }
-        });
-      }
-
-      // Ainda aguardando
       return NextResponse.json({
         success: true,
         inQueue: true,
