@@ -329,10 +329,16 @@ export default function PvPIAPage() {
                     </div>
                   </div>
 
-                  {/* Poder Total */}
-                  <div className="mb-4 text-center">
-                    <div className="text-xs text-gray-400">Poder Total</div>
-                    <div className="text-cyan-400 font-bold text-lg">{oponente.poderTotal}</div>
+                  {/* Poder Total e Elemento */}
+                  <div className="mb-4 grid grid-cols-2 gap-3">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-400">Poder Total</div>
+                      <div className="text-cyan-400 font-bold text-lg">{oponente.poderTotal}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-400">Elemento</div>
+                      <div className="text-purple-400 font-bold text-lg">{oponente.avatar.elemento}</div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2 text-xs text-center mb-4">
