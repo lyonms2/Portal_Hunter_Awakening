@@ -646,6 +646,14 @@ export default function BatalhaIAPage() {
       } else {
         console.log('✅ Resultado salvo com sucesso!');
         addLog('💾 Resultado da batalha salvo!', 'info');
+
+        // Atualizar resultado com dados do ranking
+        if (data.ranking) {
+          setResultado(prev => ({
+            ...prev,
+            ranking: data.ranking
+          }));
+        }
       }
     } catch (error) {
       console.error('Erro ao salvar resultado:', error);
@@ -945,39 +953,72 @@ export default function BatalhaIAPage() {
 
               {batalhaConcluida && resultado && (
                 <div className="space-y-3">
-                  <div className={`text-center text-2xl font-black ${
+                  <div className={`text-center text-3xl font-black ${
                     resultado.vitoria ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {resultado.vitoria ? '🎉 VITÓRIA!' : '💀 DERROTA'}
                   </div>
 
-                  <div className="bg-slate-800 rounded p-3 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Fama:</span>
-                      <span className={resultado.famaGanha >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {resultado.famaGanha >= 0 ? '+' : ''}{resultado.famaGanha}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Vínculo:</span>
-                      <span className="text-purple-400">+{resultado.vinculoGanho}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Exaustão:</span>
-                      <span className="text-yellow-400">+{resultado.exaustaoGanha}%</span>
-                    </div>
-                    {resultado.avatarMorreu && (
-                      <div className="text-red-400 text-center font-bold mt-2">
-                        💀 SEU AVATAR MORREU
+                  {/* Premiações */}
+                  <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg p-4 border border-yellow-500/30">
+                    <h4 className="text-yellow-400 font-bold text-center mb-3">💰 PREMIAÇÕES</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between bg-slate-950/50 p-2 rounded">
+                        <span className="text-gray-400">Fama:</span>
+                        <span className={`font-bold ${resultado.famaGanha >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {resultado.famaGanha >= 0 ? '+' : ''}{resultado.famaGanha}
+                        </span>
                       </div>
-                    )}
+                      <div className="flex justify-between bg-slate-950/50 p-2 rounded">
+                        <span className="text-gray-400">Vínculo:</span>
+                        <span className="text-purple-400 font-bold">+{resultado.vinculoGanho}</span>
+                      </div>
+                      <div className="flex justify-between bg-slate-950/50 p-2 rounded">
+                        <span className="text-gray-400">Exaustão:</span>
+                        <span className="text-yellow-400 font-bold">+{resultado.exaustaoGanha}%</span>
+                      </div>
+                      {resultado.avatarMorreu && (
+                        <div className="text-red-400 text-center font-bold mt-2 p-2 bg-red-950/30 rounded border border-red-500">
+                          💀 SEU AVATAR MORREU
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Ranking */}
+                  {resultado.ranking && (
+                    <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 rounded-lg p-4 border border-purple-500/30">
+                      <h4 className="text-purple-400 font-bold text-center mb-3">🏆 SEU RANKING</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between bg-slate-950/50 p-2 rounded">
+                          <span className="text-gray-400">Fama Total:</span>
+                          <span className="text-yellow-400 font-bold">{resultado.ranking.fama}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-green-950/30 p-2 rounded text-center border border-green-500/30">
+                            <div className="text-xs text-gray-400">Vitórias</div>
+                            <div className="text-green-400 font-bold text-lg">{resultado.ranking.vitorias}</div>
+                          </div>
+                          <div className="bg-red-950/30 p-2 rounded text-center border border-red-500/30">
+                            <div className="text-xs text-gray-400">Derrotas</div>
+                            <div className="text-red-400 font-bold text-lg">{resultado.ranking.derrotas}</div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between bg-slate-950/50 p-2 rounded">
+                          <span className="text-gray-400">Sequência:</span>
+                          <span className="text-orange-400 font-bold">
+                            {resultado.ranking.streak > 0 ? `🔥 ${resultado.ranking.streak}` : resultado.ranking.streak}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     onClick={voltarArena}
-                    className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-lg"
+                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg"
                   >
-                    Voltar à Arena
+                    ← Voltar à Arena
                   </button>
                 </div>
               )}

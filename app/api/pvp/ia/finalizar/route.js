@@ -106,9 +106,17 @@ export async function POST(request) {
       }
     }
 
+    // Buscar ranking atualizado para retornar ao frontend
+    const { data: rankingAtualizado } = await supabase
+      .from('pvp_rankings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
     return NextResponse.json({
       success: true,
-      message: 'Resultado da batalha salvo com sucesso'
+      message: 'Resultado da batalha salvo com sucesso',
+      ranking: rankingAtualizado || null
     });
 
   } catch (error) {
