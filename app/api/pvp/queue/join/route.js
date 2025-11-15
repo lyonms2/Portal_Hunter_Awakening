@@ -44,17 +44,36 @@ export async function POST(request) {
 
       // Se já encontrou match, retornar o match
       if (existingEntry.status === 'matched') {
+        console.log('♻️ Jogador já estava matched, retornando match existente');
+
+        // Buscar avatar_id do oponente
+        const { data: opponentQueue } = await supabase
+          .from('pvp_matchmaking_queue')
+          .select('avatar_id')
+          .eq('user_id', existingEntry.opponent_user_id)
+          .single();
+
         return NextResponse.json({
           success: true,
           matched: true,
           matchId: existingEntry.match_id,
-          opponentUserId: existingEntry.opponent_user_id
+          opponentUserId: existingEntry.opponent_user_id,
+          opponentAvatarId: opponentQueue?.avatar_id
         });
       }
     }
 
-    // Remover entrada antiga se existir
+    // Remover entrada antiga se existir (EXCETO se já estiver matched)
     if (existingEntry) {
+      if (existingEntry.status === 'matched') {
+        // Não deve chegar aqui (já retornou acima), mas por segurança
+        console.error('⚠️ Tentativa de recriar entrada matched - abortando');
+        return NextResponse.json({
+          error: 'Jogador já está em uma partida matched'
+        }, { status: 400 });
+      }
+
+      console.log('🗑️ Removendo entrada antiga com status:', existingEntry.status);
       await supabase
         .from('pvp_matchmaking_queue')
         .delete()
