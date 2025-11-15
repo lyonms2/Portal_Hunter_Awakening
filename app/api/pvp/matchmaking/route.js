@@ -139,22 +139,12 @@ export async function GET(request) {
     const randomIndex = Math.floor(Math.random() * topCandidatos.length);
     const oponenteSelecionado = topCandidatos[randomIndex];
 
-    // Buscar informações do usuário oponente
-    const { data: usuarioOponente, error: errorUsuario } = await supabase
-      .from('usuarios')
-      .select('id, nome_usuario')
-      .eq('id', oponenteSelecionado.avatar.user_id)
-      .single();
-
-    if (errorUsuario) {
-      console.error('Erro ao buscar usuário oponente:', errorUsuario);
-    }
-
+    // Usar nome do avatar (tabela usuarios não existe)
     return NextResponse.json({
       success: true,
       oponente: {
         id: oponenteSelecionado.avatar.user_id,
-        nome: usuarioOponente?.nome_usuario || 'Jogador Desconhecido',
+        nome: oponenteSelecionado.avatar.nome || 'Jogador Desconhecido',
         nivel: oponenteSelecionado.avatar.nivel,
         fama: oponenteSelecionado.famaOponente,
         avatar: {

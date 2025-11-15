@@ -28,7 +28,16 @@ export async function GET(request) {
       .eq('user_id', userId)
       .single();
 
+    console.log('🔍 Queue entry check:', {
+      userId,
+      found: !!queueEntry,
+      status: queueEntry?.status,
+      matchId: queueEntry?.match_id,
+      opponentUserId: queueEntry?.opponent_user_id
+    });
+
     if (queueError || !queueEntry) {
+      console.log('⚠️ Não encontrado na fila:', queueError?.message);
       return NextResponse.json({
         success: true,
         inQueue: false,

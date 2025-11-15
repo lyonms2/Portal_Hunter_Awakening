@@ -45,13 +45,13 @@ export async function GET(request) {
     // Buscar avatares dos jogadores
     const { data: player1Avatar, error: p1Error } = await supabase
       .from('avatares')
-      .select('*, usuarios!inner(id, nome_usuario)')
+      .select('*')
       .eq('id', room.player1_avatar_id)
       .single();
 
     const { data: player2Avatar, error: p2Error } = await supabase
       .from('avatares')
-      .select('*, usuarios!inner(id, nome_usuario)')
+      .select('*')
       .eq('id', room.player2_avatar_id)
       .single();
 
@@ -84,7 +84,7 @@ export async function GET(request) {
       player1: {
         userId: room.player1_user_id,
         avatarId: room.player1_avatar_id,
-        nome: player1Avatar?.usuarios?.nome_usuario || 'Jogador 1',
+        nome: player1Avatar?.nome || 'Jogador 1',
         avatar: player1Avatar,
         ready: room.player1_ready,
         connected: room.player1_connected
@@ -92,7 +92,7 @@ export async function GET(request) {
       player2: {
         userId: room.player2_user_id,
         avatarId: room.player2_avatar_id,
-        nome: player2Avatar?.usuarios?.nome_usuario || 'Jogador 2',
+        nome: player2Avatar?.nome || 'Jogador 2',
         avatar: player2Avatar,
         ready: room.player2_ready,
         connected: room.player2_connected

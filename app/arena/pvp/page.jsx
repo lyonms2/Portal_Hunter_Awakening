@@ -389,14 +389,29 @@ export default function ArenaPvPPage() {
     };
     const statsComPenalidades = aplicarPenalidadesExaustao(statsBase, avatarAtivo.exaustao || 0);
 
-    // Avatar com stats penalizados
+    // Avatar com stats penalizados - GARANTIR habilidades é array
     const avatarComPenalidades = {
       ...avatarAtivo,
       forca: statsComPenalidades.forca,
       agilidade: statsComPenalidades.agilidade,
       resistencia: statsComPenalidades.resistencia,
-      foco: statsComPenalidades.foco
+      foco: statsComPenalidades.foco,
+      habilidades: Array.isArray(avatarAtivo.habilidades) ? avatarAtivo.habilidades : []
     };
+
+    // Avatar oponente - GARANTIR habilidades é array
+    const avatarOponenteSeguro = {
+      ...oponente.avatar,
+      habilidades: Array.isArray(oponente.avatar.habilidades) ? oponente.avatar.habilidades : []
+    };
+
+    console.log('🎮 Iniciando batalha PvP:', {
+      avatarJogador: avatarComPenalidades.nome,
+      habilidadesJogador: avatarComPenalidades.habilidades?.length || 0,
+      avatarOponente: avatarOponenteSeguro.nome,
+      habilidadesOponente: avatarOponenteSeguro.habilidades?.length || 0,
+      matchId: oponente.matchId
+    });
 
     // Armazenar dados da partida PvP no sessionStorage
     const dadosPartida = {
@@ -404,14 +419,14 @@ export default function ArenaPvPPage() {
       pvpAoVivo: true, // Flag para indicar PvP em tempo real
       matchId: oponente.matchId, // ID da sala de batalha
       avatarJogador: avatarComPenalidades,
-      avatarOponente: oponente.avatar,
-      nomeOponente: oponente.nome,
+      avatarOponente: avatarOponenteSeguro,
+      nomeOponente: oponente.avatar.nome || 'Oponente',
       famaJogador: fama,
       famaOponente: oponente.fama || 1000,
       tierJogador: getTierPorFama(fama),
       streakJogador: streak,
       oponenteReal: true, // Sempre jogador real
-      oponenteId: oponente.id // ID do oponente real
+      oponenteId: oponente.userId // ID do oponente real (corrigido)
     };
 
     sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));

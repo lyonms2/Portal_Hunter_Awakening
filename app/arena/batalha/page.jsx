@@ -81,10 +81,11 @@ function BatalhaContent() {
           setMatchId(dados.matchId);
         }
 
-        // Construir estado de batalha a partir dos dados PvP
+        // Construir estado de batalha a partir dos dados PvP - GARANTIR habilidades
         const batalha = {
           jogador: {
             ...dados.avatarJogador,
+            habilidades: Array.isArray(dados.avatarJogador.habilidades) ? dados.avatarJogador.habilidades : [],
             hp_atual: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
             hp_maximo: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
             energia_atual: 100,
@@ -93,7 +94,8 @@ function BatalhaContent() {
           },
           inimigo: {
             ...dados.avatarOponente,
-            nome: dados.nomeOponente,
+            nome: dados.nomeOponente || dados.avatarOponente.nome,
+            habilidades: Array.isArray(dados.avatarOponente.habilidades) ? dados.avatarOponente.habilidades : [],
             hp_atual: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
             hp_maximo: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
             energia_atual: 100,
