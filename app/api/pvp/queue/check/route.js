@@ -8,6 +8,9 @@ export const dynamic = 'force-dynamic';
  * Verifica se o jogador encontrou um match
  */
 export async function GET(request) {
+  const requestId = `check_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const timestamp = new Date().toISOString();
+
   try {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
@@ -16,6 +19,8 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+
+    console.log(`🔍 [${requestId}] ${timestamp} - /check INICIADO para userId=${userId}`);
 
     if (!userId) {
       return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
@@ -28,12 +33,13 @@ export async function GET(request) {
       .eq('user_id', userId)
       .single();
 
-    console.log('🔍 Queue entry check:', {
+    console.log(`🔍 [${requestId}] Queue entry check:`, {
       userId,
       found: !!queueEntry,
       status: queueEntry?.status,
       matchId: queueEntry?.match_id,
-      opponentUserId: queueEntry?.opponent_user_id
+      opponentUserId: queueEntry?.opponent_user_id,
+      timestamp: new Date().toISOString()
     });
 
     if (queueError || !queueEntry) {
@@ -47,6 +53,9 @@ export async function GET(request) {
 
     // Se ainda está aguardando, tentar encontrar match novamente
     if (queueEntry.status === 'waiting') {
+      console.log(`🔄 [${requestId}] ⚠️ CHAMANDO find_pvp_match() VIA /check para userId=${userId}`);
+      console.log(`🔄 [${requestId}] Timestamp ANTES do find_pvp_match: ${new Date().toISOString()}`);
+
       const { data: matchResult, error: matchError } = await supabase
         .rpc('find_pvp_match', {
           p_user_id: userId,
@@ -55,12 +64,16 @@ export async function GET(request) {
           p_fama: queueEntry.fama
         });
 
+      console.log(`🔄 [${requestId}] Timestamp DEPOIS do find_pvp_match: ${new Date().toISOString()}`);
+      console.log(`🔄 [${requestId}] Match result:`, JSON.stringify(matchResult, null, 2));
+
       if (matchError) {
-        console.error('Erro ao buscar match:', matchError);
+        console.error(`❌ [${requestId}] Erro ao buscar match:`, matchError);
       }
 
       // Se encontrou match agora
       if (matchResult && matchResult.length > 0 && matchResult[0].matched) {
+        console.log(`✅ [${requestId}] MATCH ENCONTRADO via /check!`);
         // Buscar dados do avatar do oponente
         const { data: opponentAvatar, error: avatarError } = await supabase
           .from('avatares')
