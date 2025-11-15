@@ -26,21 +26,63 @@ export async function GET(request) {
       return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
-    // Buscar entrada na fila
-    const { data: queueEntry, error: queueError } = await supabase
-      .from('pvp_matchmaking_queue')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // INTELLIGENT RETRY LOGIC para lidar com read replica lag
+    // Tenta até 3 vezes com delays crescentes: 100ms, 200ms, 400ms (total 700ms max)
+    let queueEntry = null;
+    let queueError = null;
+    const maxRetries = 3;
+    const retryDelays = [100, 200, 400]; // ms
 
-    console.log(`🔍 [${requestId}] Queue entry check:`, {
-      userId,
-      found: !!queueEntry,
-      status: queueEntry?.status,
-      matchId: queueEntry?.match_id,
-      opponentUserId: queueEntry?.opponent_user_id,
-      timestamp: new Date().toISOString()
-    });
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      if (attempt > 0) {
+        const delay = retryDelays[attempt - 1];
+        console.log(`⏱️ [${requestId}] Retry ${attempt}/${maxRetries - 1} após ${delay}ms devido a replica lag...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+
+      // Buscar entrada na fila
+      const { data, error } = await supabase
+        .from('pvp_matchmaking_queue')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      queueEntry = data;
+      queueError = error;
+
+      console.log(`🔍 [${requestId}] Queue entry check (attempt ${attempt + 1}/${maxRetries}):`, {
+        userId,
+        found: !!queueEntry,
+        status: queueEntry?.status,
+        matchId: queueEntry?.match_id,
+        opponentUserId: queueEntry?.opponent_user_id,
+        timestamp: new Date().toISOString()
+      });
+
+      // Se encontrou matched, retorna imediatamente (sucesso!)
+      if (queueEntry?.status === 'matched') {
+        console.log(`✅ [${requestId}] Status=matched encontrado na tentativa ${attempt + 1}`);
+        break;
+      }
+
+      // Se está waiting e é a última tentativa, aceita o resultado
+      if (attempt === maxRetries - 1) {
+        console.log(`⏹️ [${requestId}] Última tentativa: status=${queueEntry?.status || 'not found'}`);
+        break;
+      }
+
+      // Se está waiting, pode ser replica lag, então tenta novamente
+      if (queueEntry?.status === 'waiting') {
+        console.log(`⚠️ [${requestId}] Status=waiting detectado, pode ser replica lag. Tentando novamente...`);
+        continue;
+      }
+
+      // Se não encontrou na fila, não precisa retry
+      if (!queueEntry) {
+        console.log(`ℹ️ [${requestId}] Não encontrado na fila, não há necessidade de retry`);
+        break;
+      }
+    }
 
     if (queueError || !queueEntry) {
       console.log(`⚠️ [${requestId}] Não encontrado na fila:`, queueError?.message);
