@@ -114,8 +114,8 @@ export default function ArenaPvPPage() {
     // Verificar imediatamente
     verificarEEntrarEmDesafiosAceitos();
 
-    // Polling a cada 2 segundos
-    const interval = setInterval(verificarEEntrarEmDesafiosAceitos, 2000);
+    // Polling a cada 500ms (mais rápido!)
+    const interval = setInterval(verificarEEntrarEmDesafiosAceitos, 500);
 
     return () => {
       clearInterval(interval);
@@ -252,28 +252,18 @@ export default function ArenaPvPPage() {
 
   const entrarNaBatalhaComoDesafiante = async (desafioAceito) => {
     try {
-      // Buscar dados completos da battle room
-      const response = await fetch(`/api/pvp/battle/room?matchId=${desafioAceito.matchId}&userId=${user.id}`);
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        console.error('Erro ao buscar dados da batalha:', data);
-        return;
-      }
-
-      const battleRoom = data.room;
-
-      // Você é o player1 (desafiante), então o oponente é player2
+      // Usar dados do desafio diretamente (mais rápido)
       const oponente = {
-        userId: battleRoom.player2_user_id,
-        avatarId: battleRoom.player2_avatar_id,
-        avatar: desafioAceito.challengedAvatar, // Do cache do desafio
+        userId: desafioAceito.challengedUserId,
+        avatarId: desafioAceito.challengedAvatarId,
+        avatar: desafioAceito.challengedAvatar,
         fama: desafioAceito.challengedFama,
         matchId: desafioAceito.matchId
       };
 
-      // Se o avatar do oponente não tiver habilidades, buscar completo
+      // Verificar se avatar tem habilidades
       if (!oponente.avatar?.habilidades) {
+        console.warn('Avatar sem habilidades, buscando dados completos...');
         const avatarResponse = await fetch(`/api/buscar-avatar?avatarId=${oponente.avatarId}`);
         if (avatarResponse.ok) {
           const avatarData = await avatarResponse.json();
@@ -285,6 +275,8 @@ export default function ArenaPvPPage() {
       await fetch(`/api/pvp/challenge/processed?challengeId=${desafioAceito.id}`, {
         method: 'DELETE'
       });
+
+      console.log('🎮 Desafiante entrando na batalha com oponente:', oponente);
 
       iniciarBatalhaComOponente(oponente);
     } catch (error) {
