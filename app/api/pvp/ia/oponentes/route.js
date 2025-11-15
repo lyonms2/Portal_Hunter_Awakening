@@ -32,7 +32,7 @@ export async function GET(request) {
     // Calculamos poder total = forca + agilidade + resistencia + foco
     const { data: avatares, error } = await supabase
       .from('avatares')
-      .select('id, user_id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, habilidades, vivo')
+      .select('id, user_id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, habilidades, vivo, experiencia')
       .neq('user_id', userId || '00000000-0000-0000-0000-000000000000') // Excluir próprio usuário
       .eq('vivo', true) // Apenas avatares vivos
       .gte('nivel', 1) // Apenas avatares com nível
@@ -58,22 +58,19 @@ export async function GET(request) {
     // Buscar nomes dos caçadores (donos dos avatares)
     const userIds = [...new Set(avataresFiltrados.map(a => a.user_id))];
 
-    // Como não temos tabela de users, vamos usar um nome genérico ou buscar de auth.users
-    // Por enquanto, vamos criar nomes genéricos
-    const nomesGenericos = [
-      'Caçador Misterioso',
-      'Guerreiro Sombrio',
-      'Mestre Elemental',
-      'Invocador Ancião',
-      'Guardião do Portal',
-      'Cavaleiro das Trevas',
-      'Feiticeira Lunar',
-      'Druida Selvagem',
-      'Arqueiro Fantasma',
-      'Paladino Sagrado',
-      'Necromante Exilado',
-      'Monge do Vento'
-    ];
+    // Buscar usuários reais do banco
+    const { data: usuarios } = await supabase
+      .from('users')
+      .select('id, nome')
+      .in('id', userIds);
+
+    // Criar mapa de userId -> nome
+    const nomesMap = {};
+    if (usuarios && usuarios.length > 0) {
+      usuarios.forEach(user => {
+        nomesMap[user.id] = user.nome || 'Caçador Misterioso';
+      });
+    }
 
     const oponentesFormatados = avataresFiltrados.map((avatar, index) => ({
       avatar: {
@@ -86,10 +83,11 @@ export async function GET(request) {
         agilidade: avatar.agilidade,
         resistencia: avatar.resistencia,
         foco: avatar.foco,
-        habilidades: avatar.habilidades || []
+        habilidades: avatar.habilidades || [],
+        experiencia: avatar.experiencia || 0
       },
       poderTotal: avatar.poderTotal,
-      cacadorNome: nomesGenericos[Math.floor(Math.random() * nomesGenericos.length)],
+      cacadorNome: nomesMap[avatar.user_id] || 'Caçador Misterioso',
       userId: avatar.user_id
     }));
 
