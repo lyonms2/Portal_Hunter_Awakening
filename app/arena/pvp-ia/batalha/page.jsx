@@ -15,6 +15,7 @@ import {
   deveIARender,
   escolherPersonalidade
 } from "@/lib/pvp/ai-engine";
+import AvatarSVG from "../../../components/AvatarSVG";
 
 export default function BatalhaIAPage() {
   const router = useRouter();
@@ -624,9 +625,11 @@ export default function BatalhaIAPage() {
                 </div>
 
                 {/* Avatar Visual */}
-                <div className="bg-slate-800 rounded-lg p-8 mb-4 text-center">
-                  <div className="text-6xl mb-2">{dadosPartida.avatarJogador.aparencia || '👤'}</div>
-                  <div className="text-yellow-400 text-sm">Nível {dadosPartida.avatarJogador.nivel}</div>
+                <div className="bg-gradient-to-b from-slate-950/50 to-slate-800 rounded-lg p-6 mb-4 flex justify-center">
+                  <AvatarSVG avatar={dadosPartida.avatarJogador} tamanho={220} />
+                </div>
+                <div className="text-center mb-4">
+                  <div className="text-yellow-400 text-sm font-bold">Nível {dadosPartida.avatarJogador.nivel}</div>
                 </div>
 
                 {/* HP Bar */}
@@ -685,14 +688,16 @@ export default function BatalhaIAPage() {
                 </div>
 
                 {/* Avatar Visual */}
-                <div className="bg-slate-800 rounded-lg p-8 mb-4 text-center relative">
-                  <div className="text-6xl mb-2">{dadosPartida.avatarOponente.aparencia || '👾'}</div>
-                  <div className="text-yellow-400 text-sm">Nível {dadosPartida.avatarOponente.nivel}</div>
+                <div className="bg-gradient-to-b from-slate-950/50 to-slate-800 rounded-lg p-6 mb-4 flex justify-center relative">
+                  <AvatarSVG avatar={dadosPartida.avatarOponente} tamanho={220} isEnemy={true} />
                   {iaPensando && (
                     <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                      <div className="text-orange-400 animate-pulse">Pensando...</div>
+                      <div className="text-orange-400 animate-pulse text-lg font-bold">⚡ Pensando...</div>
                     </div>
                   )}
+                </div>
+                <div className="text-center mb-4">
+                  <div className="text-yellow-400 text-sm font-bold">Nível {dadosPartida.avatarOponente.nivel}</div>
                 </div>
 
                 {/* HP Bar */}

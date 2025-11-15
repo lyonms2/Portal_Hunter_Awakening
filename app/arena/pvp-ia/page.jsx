@@ -9,6 +9,7 @@ import {
   getNivelExaustao,
   getNivelVinculo
 } from "@/lib/gameLogic";
+import AvatarSVG from "../../components/AvatarSVG";
 
 export default function PvPIAPage() {
   const router = useRouter();
@@ -223,6 +224,13 @@ export default function PvPIAPage() {
         <div className="bg-slate-900 border border-cyan-500 rounded-lg p-6 mb-8">
           <h2 className="text-2xl font-bold text-cyan-400 mb-4">Seu Avatar</h2>
           <div className="flex items-center gap-6">
+            {/* Avatar Image */}
+            <div className="flex-shrink-0">
+              <div className="p-4 bg-gradient-to-b from-cyan-900/20 to-transparent rounded-lg">
+                <AvatarSVG avatar={avatarAtivo} tamanho={160} />
+              </div>
+            </div>
+
             <div className="flex-1">
               <h3 className="text-xl font-bold text-white mb-1">{avatarAtivo.nome}</h3>
               <div className="flex gap-4 text-sm mb-2">
@@ -289,6 +297,11 @@ export default function PvPIAPage() {
                         {oponente.avatar.raridade}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Avatar Image */}
+                  <div className="flex justify-center mb-4 p-3 bg-gradient-to-b from-slate-950/50 to-transparent rounded-lg">
+                    <AvatarSVG avatar={oponente.avatar} tamanho={140} isEnemy={true} />
                   </div>
 
                   <div className="space-y-2 text-sm mb-4">
