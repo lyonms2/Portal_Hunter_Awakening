@@ -265,22 +265,53 @@ export default function ArenaPvPPage() {
   const processarMatch = async (matchData) => {
     console.log('Match encontrado!', matchData);
 
-    // Montar objeto do oponente
-    const oponente = {
-      id: matchData.opponent.userId,
-      nome: matchData.opponent.nome,
-      fama: matchData.opponent.avatar?.fama || 1000,
-      avatar: matchData.opponent.avatar,
-      matchId: matchData.matchId
-    };
+    try {
+      // Buscar dados completos do avatar do oponente
+      const avatarResponse = await fetch(`/api/buscar-avatar?avatarId=${matchData.opponentAvatarId}`);
 
-    setOponenteEncontrado(oponente);
-    setEstadoMatchmaking('encontrado');
+      if (!avatarResponse.ok) {
+        throw new Error('Erro ao buscar dados do oponente');
+      }
 
-    // Auto-iniciar após 3 segundos
-    setTimeout(() => {
-      iniciarBatalhaComOponente(oponente);
-    }, 3000);
+      const avatarData = await avatarResponse.json();
+      const avatarOponente = avatarData.avatar;
+
+      // Buscar dados de ranking do oponente
+      const rankingResponse = await fetch(`/api/pvp/ranking?userId=${matchData.opponentUserId}`);
+      let famaOponente = 1000;
+
+      if (rankingResponse.ok) {
+        const rankingData = await rankingResponse.json();
+        if (rankingData.success && rankingData.ranking) {
+          famaOponente = rankingData.ranking.fama || 1000;
+        }
+      }
+
+      // Montar objeto do oponente
+      const oponente = {
+        userId: matchData.opponentUserId,
+        avatarId: matchData.opponentAvatarId,
+        fama: famaOponente,
+        avatar: avatarOponente,
+        matchId: matchData.matchId
+      };
+
+      setOponenteEncontrado(oponente);
+      setEstadoMatchmaking('encontrado');
+
+      // Auto-iniciar após 3 segundos
+      setTimeout(() => {
+        iniciarBatalhaComOponente(oponente);
+      }, 3000);
+
+    } catch (error) {
+      console.error('Erro ao processar match:', error);
+      setEstadoMatchmaking('lobby');
+      setModalAlerta({
+        titulo: '⚠️ Erro',
+        mensagem: 'Erro ao carregar dados do oponente. Tente novamente.'
+      });
+    }
   };
 
   const cancelarMatchmaking = async () => {
