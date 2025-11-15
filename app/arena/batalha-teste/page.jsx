@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function BatalhaTestePage() {
+function BatalhaTesteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const modo = searchParams.get('modo');
@@ -312,5 +312,17 @@ export default function BatalhaTestePage() {
         </details>
       </div>
     </div>
+  );
+}
+
+export default function BatalhaTestePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="text-2xl animate-pulse">Carregando batalha teste...</div>
+      </div>
+    }>
+      <BatalhaTesteContent />
+    </Suspense>
   );
 }
