@@ -9,6 +9,9 @@ export const dynamic = 'force-dynamic';
  * Body: { userId, avatarId, nivel, poderTotal, fama }
  */
 export async function POST(request) {
+  const requestId = `join_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const timestamp = new Date().toISOString();
+
   try {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
@@ -17,6 +20,8 @@ export async function POST(request) {
 
     const body = await request.json();
     const { userId, avatarId, nivel, poderTotal, fama } = body;
+
+    console.log(`🚀 [${requestId}] ${timestamp} - /join INICIADO para userId=${userId}`);
 
     if (!userId || !avatarId || !nivel || !poderTotal) {
       return NextResponse.json(
@@ -100,6 +105,9 @@ export async function POST(request) {
     }
 
     // Tentar encontrar match imediatamente
+    console.log(`🔄 [${requestId}] ⚠️ CHAMANDO find_pvp_match() VIA /join para userId=${userId}`);
+    console.log(`🔄 [${requestId}] Timestamp ANTES do find_pvp_match: ${new Date().toISOString()}`);
+
     const { data: matchResult, error: matchError } = await supabase
       .rpc('find_pvp_match', {
         p_user_id: userId,
@@ -108,7 +116,8 @@ export async function POST(request) {
         p_fama: fama || 1000
       });
 
-    console.log('🔍 Match result:', JSON.stringify(matchResult, null, 2));
+    console.log(`🔄 [${requestId}] Timestamp DEPOIS do find_pvp_match: ${new Date().toISOString()}`);
+    console.log(`🔍 [${requestId}] Match result:`, JSON.stringify(matchResult, null, 2));
 
     if (matchError) {
       console.error('Erro ao buscar match:', matchError);
@@ -116,23 +125,25 @@ export async function POST(request) {
 
     // Se encontrou match
     if (matchResult && matchResult.length > 0 && matchResult[0].matched) {
-      console.log('✅ ============ MATCH ENCONTRADO! ============');
-      console.log('   Player 1 (esperando):', matchResult[0].opponent_user_id);
-      console.log('   Player 2 (novo):', userId);
-      console.log('   Match ID:', matchResult[0].match_id);
-      console.log('   Avatar Oponente:', matchResult[0].opponent_avatar_id);
+      console.log(`✅ [${requestId}] ============ MATCH ENCONTRADO! ============`);
+      console.log(`   [${requestId}] Player 1 (esperando):`, matchResult[0].opponent_user_id);
+      console.log(`   [${requestId}] Player 2 (novo):`, userId);
+      console.log(`   [${requestId}] Match ID:`, matchResult[0].match_id);
+      console.log(`   [${requestId}] Avatar Oponente:`, matchResult[0].opponent_avatar_id);
 
       // Verificar se ambos foram atualizados na fila
+      console.log(`🔍 [${requestId}] Verificando status na fila após match (timestamp: ${new Date().toISOString()})...`);
+
       const { data: queueCheck } = await supabase
         .from('pvp_matchmaking_queue')
         .select('user_id, status, match_id, opponent_user_id')
         .in('user_id', [userId, matchResult[0].opponent_user_id]);
 
-      console.log('📋 Status dos jogadores na fila após match:');
+      console.log(`📋 [${requestId}] Status dos jogadores na fila após match (timestamp: ${new Date().toISOString()}):`);
       queueCheck?.forEach(entry => {
-        console.log(`   User ${entry.user_id === userId ? '(novo)' : '(esperando)'}: status=${entry.status}, match_id=${entry.match_id}`);
+        console.log(`   [${requestId}] User ${entry.user_id === userId ? '(novo)' : '(esperando)'}: status=${entry.status}, match_id=${entry.match_id}`);
       });
-      console.log('==========================================');
+      console.log(`   [${requestId}] ==========================================`);
 
       return NextResponse.json({
         success: true,
