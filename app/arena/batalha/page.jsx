@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { processarAcaoJogador, verificarVitoria, iniciarTurno } from "@/lib/arena/batalhaEngine";
 import { processarTurnoIA, getMensagemIA } from "@/lib/arena/iaEngine";
 import { calcularRecompensasTreino } from "@/lib/arena/recompensasCalc";
 import { calcularRecompensasPvP, calcularPontosVitoria, calcularPerda } from "@/lib/pvp/rankingSystem";
+import { BattleSyncManager, enviarAcaoPvP, buscarEstadoSala, marcarComoPronto, notificarDesconexao } from "@/lib/pvp/battleSync";
 import AvatarSVG from "@/app/components/AvatarSVG";
 
 // CSS personalizado para animações
@@ -52,6 +53,15 @@ function BatalhaContent() {
   // Dados PvP
   const [dadosPvP, setDadosPvP] = useState(null);
 
+  // Estados PvP Ao Vivo
+  const [pvpAoVivo, setPvpAoVivo] = useState(false);
+  const [matchId, setMatchId] = useState(null);
+  const [playerNumber, setPlayerNumber] = useState(null); // 1 ou 2
+  const [isYourTurn, setIsYourTurn] = useState(false);
+  const [syncManager, setSyncManager] = useState(null);
+  const [aguardandoOponente, setAguardandoOponente] = useState(false);
+  const [oponenteDesconectou, setOponenteDesconectou] = useState(false);
+
   useEffect(() => {
     // Carregar estado da batalha
     let batalhaJSON;
@@ -62,6 +72,14 @@ function BatalhaContent() {
       if (batalhaJSON) {
         const dados = JSON.parse(batalhaJSON);
         setDadosPvP(dados);
+
+        // Detectar PvP ao vivo
+        const isPvpRealTime = dados.pvpAoVivo === true;
+        setPvpAoVivo(isPvpRealTime);
+
+        if (isPvpRealTime && dados.matchId) {
+          setMatchId(dados.matchId);
+        }
 
         // Construir estado de batalha a partir dos dados PvP
         const batalha = {
@@ -93,8 +111,15 @@ function BatalhaContent() {
         adicionarLog(`Você: ${batalha.jogador.nome} (${batalha.jogador.elemento})`);
         adicionarLog(`VS`);
         adicionarLog(`${dados.nomeOponente}: ${batalha.inimigo.nome} (${batalha.inimigo.elemento})`);
-        adicionarLog(`Tier: ${dados.tierJogador.nome} ${dados.tierJogador.icone}`);
+        if (dados.tierJogador) {
+          adicionarLog(`Tier: ${dados.tierJogador.nome} ${dados.tierJogador.icone}`);
+        }
         adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+        // Inicializar PvP ao vivo se aplicável
+        if (isPvpRealTime && dados.matchId) {
+          inicializarPvPAoVivo(dados);
+        }
       }
     } else {
       // Modo Treino - carregar de localStorage
@@ -128,6 +153,11 @@ function BatalhaContent() {
       return;
     }
 
+    // PvP ao vivo - só contar tempo se for seu turno
+    if (pvpAoVivo && !isYourTurn) {
+      return;
+    }
+
     const interval = setInterval(() => {
       setTempoRestante((prev) => {
         if (prev <= 1) {
@@ -141,14 +171,170 @@ function BatalhaContent() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timerAtivo, turnoIA, processando, resultado]);
+  }, [timerAtivo, turnoIA, processando, resultado, pvpAoVivo, isYourTurn]);
+
+  // Cleanup PvP ao sair
+  useEffect(() => {
+    return () => {
+      // Cleanup ao sair
+      if (syncManager) {
+        syncManager.cleanup();
+      }
+
+      // Notificar desconexão se PvP ao vivo
+      if (pvpAoVivo && matchId && !resultado) {
+        const userData = JSON.parse(localStorage.getItem('user'));
+        if (userData) {
+          notificarDesconexao(matchId, userData.id);
+        }
+      }
+    };
+  }, [syncManager, pvpAoVivo, matchId, resultado]);
 
   const adicionarLog = (mensagem) => {
     setLog(prev => [...prev, { texto: mensagem, timestamp: Date.now() }]);
   };
 
+  // === FUNÇÕES PvP AO VIVO ===
+  const inicializarPvPAoVivo = async (dados) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      if (!userData) return;
+
+      // Buscar estado da sala
+      const roomState = await buscarEstadoSala(dados.matchId, userData.id);
+
+      if (!roomState.success) {
+        console.error('Erro ao buscar sala:', roomState);
+        return;
+      }
+
+      // Configurar player number
+      setPlayerNumber(roomState.playerNumber);
+      setIsYourTurn(roomState.isYourTurn);
+
+      // Marcar como pronto
+      await marcarComoPronto(dados.matchId, userData.id);
+      adicionarLog(`✅ Conectado à sala de batalha!`);
+      adicionarLog(`🎮 Você é o Player ${roomState.playerNumber}`);
+
+      // Iniciar sincronização
+      const sync = new BattleSyncManager(
+        dados.matchId,
+        userData.id,
+        handleRoomStateUpdate,
+        handleOpponentAction
+      );
+
+      sync.startPolling(2000); // Poll a cada 2 segundos
+      setSyncManager(sync);
+
+      adicionarLog(`⏳ Aguardando ambos jogadores estarem prontos...`);
+
+    } catch (error) {
+      console.error('Erro ao inicializar PvP ao vivo:', error);
+      adicionarLog('❌ Erro ao conectar à sala. Retornando ao lobby...');
+      setTimeout(() => router.push('/arena/pvp'), 3000);
+    }
+  };
+
+  const handleRoomStateUpdate = (roomState) => {
+    // Verificar se batalha começou
+    if (roomState.room.status === 'active' && !estado) {
+      adicionarLog(`🎮 Ambos prontos! Batalha iniciada!`);
+    }
+
+    // Verificar se oponente desconectou
+    const opponent = roomState.playerNumber === 1 ? roomState.player2 : roomState.player1;
+
+    if (!opponent.connected) {
+      setOponenteDesconectou(true);
+      adicionarLog(`🚪 ${opponent.nome} desconectou!`);
+      adicionarLog(`🏆 Você venceu por W.O.!`);
+
+      setTimeout(() => {
+        if (estado) {
+          finalizarBatalha(estado, 'jogador');
+        }
+      }, 2000);
+    }
+
+    // Atualizar turno
+    setIsYourTurn(roomState.isYourTurn);
+    setAguardandoOponente(!roomState.isYourTurn && roomState.room.status === 'active');
+  };
+
+  const handleOpponentAction = (actionData) => {
+    const action = actionData.action;
+
+    adicionarLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    adicionarLog(`🔴 Oponente usou ${action.tipo}!`);
+
+    if (action.dano > 0) {
+      adicionarLog(`💥 Você recebeu ${action.dano} de dano`);
+
+      // Animação de dano
+      setAnimacaoDano({
+        tipo: 'jogador',
+        valor: action.dano,
+        critico: action.critico || false
+      });
+      setTimeout(() => setAnimacaoDano(null), 1500);
+    }
+
+    if (action.cura > 0) {
+      adicionarLog(`💚 Oponente se curou em ${action.cura} HP`);
+    }
+
+    // Atualizar estado local com dados do servidor
+    setEstado(prev => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        jogador: {
+          ...prev.jogador,
+          hp_atual: action.hp_inimigo_atual // Do POV do oponente, você é o inimigo
+        },
+        inimigo: {
+          ...prev.inimigo,
+          hp_atual: action.hp_jogador_atual
+        }
+      };
+    });
+
+    // Agora é SEU turno
+    setIsYourTurn(true);
+    setAguardandoOponente(false);
+
+    // Verificar vitória
+    if (action.resultado === 'vitoria') {
+      adicionarLog(`☠️ Você foi derrotado!`);
+      setTimeout(() => {
+        if (estado) {
+          finalizarBatalha(estado, 'inimigo');
+        }
+      }, 1000);
+    }
+  };
+
   const executarAcao = async (tipo, habilidadeIndex = null) => {
-    if (!estado || turnoIA || processando) return;
+    if (!estado) return;
+
+    // NOVO: Verificações PvP ao vivo
+    if (pvpAoVivo) {
+      if (!isYourTurn) {
+        adicionarLog('⚠️ Aguarde seu turno!');
+        return;
+      }
+      if (aguardandoOponente) {
+        adicionarLog('⏳ Aguardando oponente...');
+        return;
+      }
+    } else {
+      // Modo treino - verificações antigas
+      if (turnoIA || processando) return;
+    }
 
     setProcessando(true);
     setTempoRestante(30); // Reset timer
@@ -177,6 +363,10 @@ function BatalhaContent() {
         adicionarLog(`💥 ${resultado.dano} de dano causado`);
       }
 
+      if (resultado.cura > 0) {
+        adicionarLog(`💚 +${resultado.cura} HP recuperado`);
+      }
+
       if (resultado.buffs && resultado.buffs.length > 0) {
         resultado.buffs.forEach(buff => {
           if (buff.tipo === 'defesa') {
@@ -187,9 +377,42 @@ function BatalhaContent() {
 
       // Verificar vitória
       const vitoria = verificarVitoria(novoEstado);
-      
+
+      // === MODO PVP AO VIVO ===
+      if (pvpAoVivo && matchId) {
+        const userData = JSON.parse(localStorage.getItem('user'));
+
+        // Enviar ação para servidor
+        await enviarAcaoPvP(matchId, userData.id, {
+          tipo,
+          dano: resultado.dano || 0,
+          cura: resultado.cura || 0,
+          critico: resultado.critico || false,
+          energiaGasta: resultado.energiaGasta || 0,
+          hp_jogador_atual: novoEstado.jogador.hp_atual,
+          hp_inimigo_atual: novoEstado.inimigo.hp_atual,
+          resultado: vitoria.fim ? 'vitoria' : null
+        });
+
+        // Atualizar estado local
+        setEstado(novoEstado);
+        setIsYourTurn(false); // Agora é turno do oponente
+        setAguardandoOponente(true);
+        adicionarLog('⏳ Aguardando oponente...');
+
+        if (vitoria.fim) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          finalizarBatalha(novoEstado, vitoria.vencedor);
+        }
+
+        setProcessando(false);
+        return;
+      }
+
+      // === MODO TREINO (IA LOCAL) ===
       if (vitoria.fim) {
         finalizarBatalha(novoEstado, vitoria.vencedor);
+        setProcessando(false);
         return;
       }
 
@@ -604,7 +827,15 @@ function BatalhaContent() {
             ⏰ R{estado.rodada} | 🎯 {estado.dificuldade}
           </div>
           <div className="text-xs font-bold">
-            {turnoIA ? '🤖 Oponente' : '🎮 Seu Turno'}
+            {pvpAoVivo ? (
+              isYourTurn ? (
+                <span className="text-green-400 animate-pulse">🟢 SEU TURNO</span>
+              ) : (
+                <span className="text-orange-400">🟠 Aguardando Oponente...</span>
+              )
+            ) : (
+              turnoIA ? '🤖 Oponente' : '🎮 Seu Turno'
+            )}
           </div>
 
           {/* Timer Compacto Inline */}
