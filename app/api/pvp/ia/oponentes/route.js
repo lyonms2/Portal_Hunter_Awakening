@@ -32,7 +32,7 @@ export async function GET(request) {
     // Calculamos poder total = forca + agilidade + resistencia + foco
     const { data: avatares, error } = await supabase
       .from('avatares')
-      .select('id, user_id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, aparencia, habilidades, vivo')
+      .select('id, user_id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, habilidades, vivo')
       .neq('user_id', userId || '00000000-0000-0000-0000-000000000000') // Excluir próprio usuário
       .eq('vivo', true) // Apenas avatares vivos
       .gte('nivel', 1) // Apenas avatares com nível
@@ -86,7 +86,6 @@ export async function GET(request) {
         agilidade: avatar.agilidade,
         resistencia: avatar.resistencia,
         foco: avatar.foco,
-        aparencia: avatar.aparencia,
         habilidades: avatar.habilidades || []
       },
       poderTotal: avatar.poderTotal,
