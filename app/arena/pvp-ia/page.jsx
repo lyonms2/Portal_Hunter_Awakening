@@ -397,20 +397,6 @@ export default function PvPIAPage() {
                     </div>
                   </div>
 
-                  {/* EXP Bar */}
-                  <div className="mb-3">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-400">Experiência</span>
-                      <span className="text-purple-400 font-bold">Nv. {oponente.avatar.nivel}</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-purple-500 h-full transition-all"
-                        style={{ width: `${((oponente.avatar.experiencia || 0) / 100) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-
                   {/* Poder Total e Elemento */}
                   <div className="mb-4 grid grid-cols-2 gap-3">
                     <div className="text-center">
