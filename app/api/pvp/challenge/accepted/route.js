@@ -22,6 +22,8 @@ export async function GET(request) {
     }
 
     // Buscar desafios que você enviou (challenger) e que foram aceitos
+    console.log('[ACCEPTED] Buscando desafios aceitos para userId:', userId);
+
     const { data: challenges, error } = await supabase
       .from('pvp_challenges')
       .select('*')
@@ -29,6 +31,12 @@ export async function GET(request) {
       .eq('status', 'accepted')
       .not('match_id', 'is', null)
       .order('responded_at', { ascending: false });
+
+    console.log('[ACCEPTED] Query result:', {
+      error,
+      challengesCount: challenges?.length || 0,
+      challenges: challenges
+    });
 
     if (error) {
       console.error('Erro ao buscar desafios aceitos:', error);
