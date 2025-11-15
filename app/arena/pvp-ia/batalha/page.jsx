@@ -606,10 +606,10 @@ export default function BatalhaIAPage() {
     });
 
     // Salvar resultado no backend
-    await salvarResultadoBatalha(vitoria, famaGanha, vinculoGanho, exaustaoGanha, tipoResultado === 'derrota');
+    await salvarResultadoBatalha(vitoria, famaGanha, vinculoGanho, exaustaoGanha, tipoResultado === 'derrota', jogadorHP);
   };
 
-  const salvarResultadoBatalha = async (vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu) => {
+  const salvarResultadoBatalha = async (vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinal) => {
     try {
       console.log('[SALVANDO RESULTADO]', {
         userId: user.id,
@@ -618,7 +618,8 @@ export default function BatalhaIAPage() {
         famaGanha,
         vinculoGanho,
         exaustaoGanha,
-        avatarMorreu
+        avatarMorreu,
+        hpFinal
       });
 
       const response = await fetch('/api/pvp/ia/finalizar', {
@@ -631,7 +632,8 @@ export default function BatalhaIAPage() {
           famaGanha,
           vinculoGanho,
           exaustaoGanha,
-          avatarMorreu
+          avatarMorreu,
+          hpFinal
         })
       });
 

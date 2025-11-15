@@ -15,9 +15,9 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu } = body;
+    const { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinal } = body;
 
-    console.log('[PVP IA FINALIZAR]', { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu });
+    console.log('[PVP IA FINALIZAR]', { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinal });
 
     // 1. Atualizar ranking PVP (fama)
     const { data: rankingAtual, error: rankingError } = await supabase
@@ -82,6 +82,7 @@ export async function POST(request) {
       const updates = {
         vinculo: novoVinculo,
         exaustao: novaExaustao,
+        hp_atual: avatarMorreu ? 0 : Math.max(0, hpFinal || 0), // Salvar HP atual
         updated_at: new Date().toISOString()
       };
 
@@ -89,7 +90,6 @@ export async function POST(request) {
       if (avatarMorreu) {
         updates.vivo = false;
         updates.marca_morte = true;
-        updates.hp_atual = 0;
       }
 
       console.log('[ATUALIZANDO AVATAR]', updates);
