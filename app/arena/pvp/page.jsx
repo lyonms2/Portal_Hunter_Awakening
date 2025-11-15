@@ -512,8 +512,8 @@ export default function ArenaPvPPage() {
 
     sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));
 
-    // Redirecionar para batalha
-    router.push('/arena/batalha?modo=pvp');
+    // Redirecionar para batalha TESTE (DEBUG)
+    router.push('/arena/batalha-teste?modo=pvp');
   };
 
   // Calcular stats do avatar
