@@ -24,6 +24,64 @@ export async function GET(request) {
     // Buscar desafios que você enviou (challenger) e que foram aceitos
     console.log('[ACCEPTED] Buscando desafios aceitos para userId:', userId);
 
+    // WORKAROUND: Buscar salas de batalha onde você é player1 e está em waiting
+    // Isso é mais confiável do que depender da tabela pvp_challenges
+    const { data: battleRooms, error: roomError } = await supabase
+      .from('pvp_battle_rooms')
+      .select('*')
+      .eq('player1_user_id', userId)
+      .eq('status', 'waiting')
+      .order('created_at', { ascending: false });
+
+    console.log('[ACCEPTED] Battle rooms encontradas:', {
+      error: roomError,
+      roomsCount: battleRooms?.length || 0,
+      rooms: battleRooms
+    });
+
+    if (roomError) {
+      console.error('Erro ao buscar salas:', roomError);
+      return NextResponse.json({ error: 'Erro ao buscar salas' }, { status: 500 });
+    }
+
+    // Se encontrou salas em waiting, buscar dados dos avatares
+    if (battleRooms && battleRooms.length > 0) {
+      const room = battleRooms[0]; // Pegar a mais recente
+
+      // Buscar avatar do oponente (player2)
+      const { data: opponentAvatar } = await supabase
+        .from('avatares')
+        .select('*')
+        .eq('id', room.player2_avatar_id)
+        .single();
+
+      // Buscar fama do oponente
+      const { data: opponentRanking } = await supabase
+        .from('pvp_rankings')
+        .select('fama')
+        .eq('user_id', room.player2_user_id)
+        .single();
+
+      const challengesWithData = [{
+        id: room.id, // Usar room ID como challenge ID
+        matchId: room.id,
+        challengerUserId: room.player1_user_id,
+        challengedUserId: room.player2_user_id,
+        challengedAvatarId: room.player2_avatar_id,
+        challengedAvatar: opponentAvatar,
+        challengedFama: opponentRanking?.fama || 1000,
+        respondedAt: room.created_at
+      }];
+
+      console.log('[ACCEPTED] Retornando sala como desafio aceito:', challengesWithData);
+
+      return NextResponse.json({
+        success: true,
+        challenges: challengesWithData
+      });
+    }
+
+    // Fallback: tentar buscar da tabela pvp_challenges
     const { data: challenges, error } = await supabase
       .from('pvp_challenges')
       .select('*')
@@ -32,7 +90,7 @@ export async function GET(request) {
       .not('match_id', 'is', null)
       .order('responded_at', { ascending: false });
 
-    console.log('[ACCEPTED] Query result:', {
+    console.log('[ACCEPTED] Fallback - Query result:', {
       error,
       challengesCount: challenges?.length || 0,
       challenges: challenges
