@@ -36,17 +36,23 @@ export default function PvPIAPage() {
 
   const carregarAvatarAtivo = async (userId) => {
     try {
-      const response = await fetch(`/api/buscar-avatar?userId=${userId}`);
+      setLoading(true);
+      const response = await fetch(`/api/meus-avatares?userId=${userId}`);
       const data = await response.json();
 
-      if (response.ok && data.avatar) {
-        setAvatarAtivo(data.avatar);
-        // Buscar oponentes com poder similar
-        buscarOponentes(data.avatar);
+      if (response.ok) {
+        const ativo = data.avatares.find(av => av.ativo && av.vivo);
+        if (ativo) {
+          setAvatarAtivo(ativo);
+          // Buscar oponentes com poder similar
+          buscarOponentes(ativo);
+        } else {
+          setAvatarAtivo(null);
+        }
       }
-      setLoading(false);
     } catch (error) {
-      console.error("Erro ao buscar avatar:", error);
+      console.error("Erro ao carregar avatar ativo:", error);
+    } finally {
       setLoading(false);
     }
   };
@@ -293,20 +299,6 @@ export default function PvPIAPage() {
                       (avatarAtivo.exaustao || 0) >= 40 ? 'bg-yellow-500' : 'bg-gray-600'
                     }`}
                     style={{ width: `${avatarAtivo.exaustao || 0}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Experiência Bar */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-gray-400">Experiência</span>
-                  <span className="text-purple-400 font-bold">{avatarAtivo.experiencia || 0} XP</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="bg-purple-500 h-full transition-all"
-                    style={{ width: `${((avatarAtivo.experiencia || 0) / 100) * 100}%` }}
                   />
                 </div>
               </div>
