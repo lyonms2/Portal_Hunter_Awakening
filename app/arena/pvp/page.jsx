@@ -183,12 +183,13 @@ export default function ArenaPvPPage() {
       if (response.ok && data.success) {
         if (data.oponente) {
           // Oponente real encontrado!
-          setOponenteEncontrado(data.oponente);
+          const oponente = data.oponente;
+          setOponenteEncontrado(oponente);
           setEstadoMatchmaking('encontrado');
 
-          // Auto-iniciar após 3 segundos
+          // Auto-iniciar após 3 segundos, passando o oponente para evitar closure issues
           setTimeout(() => {
-            iniciarBatalha();
+            iniciarBatalhaComOponente(oponente);
           }, 3000);
         } else {
           // Nenhum oponente disponível, usar fallback de oponente simulado
@@ -206,7 +207,7 @@ export default function ArenaPvPPage() {
           setEstadoMatchmaking('encontrado');
 
           setTimeout(() => {
-            iniciarBatalha();
+            iniciarBatalhaComOponente(oponenteSimulado);
           }, 3000);
         }
       } else {
@@ -225,7 +226,7 @@ export default function ArenaPvPPage() {
         setEstadoMatchmaking('encontrado');
 
         setTimeout(() => {
-          iniciarBatalha();
+          iniciarBatalhaComOponente(oponenteSimulado);
         }, 3000);
       }
     } catch (error) {
@@ -245,7 +246,7 @@ export default function ArenaPvPPage() {
       setEstadoMatchmaking('encontrado');
 
       setTimeout(() => {
-        iniciarBatalha();
+        iniciarBatalhaComOponente(oponenteSimulado);
       }, 3000);
     }
   };
@@ -273,7 +274,29 @@ export default function ArenaPvPPage() {
     };
   };
 
-  const iniciarBatalha = () => {
+  const iniciarBatalhaComOponente = (oponente) => {
+    // Validação de segurança
+    if (!oponente || !oponente.avatar) {
+      console.error('Erro: Oponente não encontrado ou dados incompletos', oponente);
+      setModalAlerta({
+        titulo: '⚠️ Erro no Matchmaking',
+        mensagem: 'Houve um erro ao iniciar a batalha. Tente novamente.'
+      });
+      setEstadoMatchmaking('lobby');
+      setOponenteEncontrado(null);
+      return;
+    }
+
+    if (!avatarAtivo) {
+      console.error('Erro: Avatar ativo não encontrado');
+      setModalAlerta({
+        titulo: '⚠️ Erro',
+        mensagem: 'Avatar ativo não encontrado. Recarregue a página.'
+      });
+      setEstadoMatchmaking('lobby');
+      return;
+    }
+
     // Aplicar penalidades de exaustão aos stats do avatar ANTES de entrar em batalha
     const statsBase = {
       forca: avatarAtivo.forca,
@@ -296,14 +319,14 @@ export default function ArenaPvPPage() {
     const dadosPartida = {
       tipo: 'pvp',
       avatarJogador: avatarComPenalidades,
-      avatarOponente: oponenteEncontrado.avatar,
-      nomeOponente: oponenteEncontrado.nome,
+      avatarOponente: oponente.avatar,
+      nomeOponente: oponente.nome,
       famaJogador: fama,
-      famaOponente: oponenteEncontrado.fama || (oponenteEncontrado.avatar.nivel * 200 + 1000), // Usar fama real ou simular
+      famaOponente: oponente.fama || (oponente.avatar.nivel * 200 + 1000), // Usar fama real ou simular
       tierJogador: getTierPorFama(fama),
       streakJogador: streak,
-      oponenteReal: !oponenteEncontrado.isSimulado, // Flag para saber se é oponente real
-      oponenteId: oponenteEncontrado.isSimulado ? null : oponenteEncontrado.id // ID do oponente real
+      oponenteReal: !oponente.isSimulado, // Flag para saber se é oponente real
+      oponenteId: oponente.isSimulado ? null : oponente.id // ID do oponente real
     };
 
     sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));
