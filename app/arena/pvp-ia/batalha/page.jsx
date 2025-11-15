@@ -709,6 +709,42 @@ export default function BatalhaIAPage() {
                   </div>
                 </div>
 
+                {/* Exaustão Bar */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-400">Exaustão</span>
+                    <span className={`font-bold ${
+                      (dadosPartida?.avatarJogador?.exaustao || 0) >= 80 ? 'text-red-500' :
+                      (dadosPartida?.avatarJogador?.exaustao || 0) >= 60 ? 'text-orange-500' :
+                      (dadosPartida?.avatarJogador?.exaustao || 0) >= 40 ? 'text-yellow-500' : 'text-gray-400'
+                    }`}>{dadosPartida?.avatarJogador?.exaustao || 0}</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        (dadosPartida?.avatarJogador?.exaustao || 0) >= 80 ? 'bg-red-500' :
+                        (dadosPartida?.avatarJogador?.exaustao || 0) >= 60 ? 'bg-orange-500' :
+                        (dadosPartida?.avatarJogador?.exaustao || 0) >= 40 ? 'bg-yellow-500' : 'bg-gray-600'
+                      }`}
+                      style={{ width: `${dadosPartida?.avatarJogador?.exaustao || 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Experiência Bar */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-400">Experiência</span>
+                    <span className="text-purple-400 font-bold">{dadosPartida?.avatarJogador?.experiencia || 0} XP</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2">
+                    <div
+                      className="bg-purple-500 h-full transition-all duration-300"
+                      style={{ width: `${((dadosPartida?.avatarJogador?.experiencia || 0) / 100) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
                 {/* Status */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-slate-800 rounded p-2 text-center">
