@@ -28,6 +28,33 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Erro ao buscar leaderboard' }, { status: 500 });
     }
 
+    // Buscar títulos ativos dos jogadores no leaderboard
+    if (leaderboard && leaderboard.length > 0) {
+      const userIds = leaderboard.map(p => p.user_id);
+
+      const { data: titulos, error: errorTitulos } = await supabase
+        .from('pvp_titulos')
+        .select('user_id, titulo_nome, titulo_icone')
+        .in('user_id', userIds)
+        .eq('ativo', true);
+
+      if (!errorTitulos && titulos) {
+        // Criar mapa de userId -> título
+        const titulosMap = {};
+        titulos.forEach(titulo => {
+          titulosMap[titulo.user_id] = {
+            nome: titulo.titulo_nome,
+            icone: titulo.titulo_icone
+          };
+        });
+
+        // Adicionar título a cada jogador
+        leaderboard.forEach(jogador => {
+          jogador.titulo = titulosMap[jogador.user_id] || null;
+        });
+      }
+    }
+
     // Se userId foi fornecido, buscar posição do jogador
     let posicaoJogador = null;
     let jogadorNoTop = false;

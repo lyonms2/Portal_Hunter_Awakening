@@ -209,7 +209,7 @@ export default function PvPIAPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
             <button
               onClick={() => router.push('/arena')}
               className="text-cyan-400 hover:text-cyan-300 flex items-center gap-2"
@@ -217,12 +217,35 @@ export default function PvPIAPage() {
               ← Voltar para Arena
             </button>
 
-            <button
-              onClick={() => router.push('/arena/pvp-ia/leaderboard')}
-              className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"
-            >
-              🏆 Leaderboard
-            </button>
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={() => router.push('/arena/pvp-ia/leaderboard')}
+                className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                🏆 Ranking
+              </button>
+
+              <button
+                onClick={() => router.push('/recompensas')}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                🎁 Recompensas
+              </button>
+
+              <button
+                onClick={() => router.push('/titulos')}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                🏆 Títulos
+              </button>
+
+              <button
+                onClick={() => router.push('/historico-pvp')}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                📜 Histórico
+              </button>
+            </div>
           </div>
 
           <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 mb-2">
