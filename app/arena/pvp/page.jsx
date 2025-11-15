@@ -128,6 +128,12 @@ export default function ArenaPvPPage() {
     try {
       const desafiosAceitos = await verificarDesafiosAceitos(user.id);
 
+      // Log detalhado para debug
+      if (desafiosAceitos && desafiosAceitos.length > 0) {
+        console.log('🔔 [POLLING] Desafios aceitos encontrados:', desafiosAceitos.length);
+        console.log('🔔 [POLLING] Primeiro desafio:', desafiosAceitos[0]);
+      }
+
       if (desafiosAceitos && desafiosAceitos.length > 0) {
         const desafioAceito = desafiosAceitos[0];
         console.log('🎉 Seu desafio foi aceito! Entrando na batalha...', desafioAceito);
@@ -237,10 +243,14 @@ export default function ArenaPvPPage() {
   const verificarDesafiosAceitos = async (userId) => {
     try {
       // Buscar desafios que você enviou e que foram aceitos
+      console.log('[POLLING] Verificando desafios aceitos para userId:', userId);
       const response = await fetch(`/api/pvp/challenge/accepted?userId=${userId}`);
       const data = await response.json();
 
+      console.log('[POLLING] Response:', { status: response.status, data });
+
       if (response.ok && data.success) {
+        console.log('[POLLING] Desafios retornados:', data.challenges?.length || 0);
         return data.challenges || [];
       }
       return [];
@@ -252,6 +262,9 @@ export default function ArenaPvPPage() {
 
   const entrarNaBatalhaComoDesafiante = async (desafioAceito) => {
     try {
+      console.log('🚀 [ENTRADA] Iniciando entrada na batalha como desafiante...');
+      console.log('🚀 [ENTRADA] Dados do desafio:', desafioAceito);
+
       // Usar dados do desafio diretamente (mais rápido)
       const oponente = {
         userId: desafioAceito.challengedUserId,
@@ -261,26 +274,30 @@ export default function ArenaPvPPage() {
         matchId: desafioAceito.matchId
       };
 
+      console.log('🚀 [ENTRADA] Oponente preparado:', oponente);
+
       // Verificar se avatar tem habilidades
       if (!oponente.avatar?.habilidades) {
-        console.warn('Avatar sem habilidades, buscando dados completos...');
+        console.warn('⚠️ [ENTRADA] Avatar sem habilidades, buscando dados completos...');
         const avatarResponse = await fetch(`/api/buscar-avatar?avatarId=${oponente.avatarId}`);
         if (avatarResponse.ok) {
           const avatarData = await avatarResponse.json();
           oponente.avatar = avatarData.avatar;
+          console.log('✅ [ENTRADA] Avatar completo obtido');
         }
       }
 
       // Deletar o desafio aceito para não tentar entrar novamente
+      console.log('🗑️ [ENTRADA] Deletando desafio processado...');
       await fetch(`/api/pvp/challenge/processed?challengeId=${desafioAceito.id}`, {
         method: 'DELETE'
       });
 
-      console.log('🎮 Desafiante entrando na batalha com oponente:', oponente);
+      console.log('🎮 [ENTRADA] Desafiante entrando na batalha com oponente:', oponente);
 
       iniciarBatalhaComOponente(oponente);
     } catch (error) {
-      console.error('Erro ao entrar na batalha como desafiante:', error);
+      console.error('❌ [ENTRADA] Erro ao entrar na batalha como desafiante:', error);
       setBatalhaEmAndamento(false);
     }
   };
