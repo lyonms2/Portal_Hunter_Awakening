@@ -88,9 +88,18 @@ export default function BatalhaIAPage() {
     const jogadorHPMaximo = calcularHPMaximoCompleto(dados.avatarJogador);
     const iaHPMaximo = calcularHPMaximoCompleto(dados.avatarOponente);
 
-    setJogadorHP(jogadorHPMaximo);
+    // Usar HP atual do avatar se existir, senão usar HP máximo
+    const jogadorHPAtual = dados.avatarJogador.hp_atual !== null && dados.avatarJogador.hp_atual !== undefined
+      ? dados.avatarJogador.hp_atual
+      : jogadorHPMaximo;
+
+    const iaHPAtual = dados.avatarOponente.hp_atual !== null && dados.avatarOponente.hp_atual !== undefined
+      ? dados.avatarOponente.hp_atual
+      : iaHPMaximo;
+
+    setJogadorHP(Math.max(1, jogadorHPAtual)); // Mínimo 1 HP se estiver vivo
     setJogadorHPMax(jogadorHPMaximo);
-    setIaHP(iaHPMaximo);
+    setIaHP(Math.max(1, iaHPAtual)); // Mínimo 1 HP se estiver vivo
     setIaHPMax(iaHPMaximo);
 
     // Escolher personalidade da IA
