@@ -5,7 +5,7 @@
 -- Tabela para gerenciar a fila de jogadores procurando partida
 CREATE TABLE IF NOT EXISTS pvp_matchmaking_queue (
   id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL, -- Referência ao auth.users do Supabase
   avatar_id BIGINT NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
 
   -- Stats do avatar para matchmaking
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS pvp_matchmaking_queue (
   -- Status da fila
   status VARCHAR(20) NOT NULL DEFAULT 'waiting', -- 'waiting', 'matched', 'in_battle'
   match_id UUID, -- ID da partida quando encontrar oponente
-  opponent_user_id UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  opponent_user_id UUID, -- Referência ao auth.users do Supabase
 
   -- Timestamps
   entered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -43,13 +43,13 @@ CREATE TABLE IF NOT EXISTS pvp_battle_rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Jogadores
-  player1_user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  player1_user_id UUID NOT NULL, -- Referência ao auth.users do Supabase
   player1_avatar_id BIGINT NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
   player1_ready BOOLEAN DEFAULT FALSE,
   player1_connected BOOLEAN DEFAULT TRUE,
   player1_last_action TIMESTAMPTZ DEFAULT NOW(),
 
-  player2_user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  player2_user_id UUID NOT NULL, -- Referência ao auth.users do Supabase
   player2_avatar_id BIGINT NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
   player2_ready BOOLEAN DEFAULT FALSE,
   player2_connected BOOLEAN DEFAULT TRUE,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS pvp_battle_rooms (
   status VARCHAR(20) NOT NULL DEFAULT 'waiting', -- 'waiting', 'active', 'finished', 'cancelled'
   current_turn INT DEFAULT 1,
   current_player INT DEFAULT 1, -- 1 ou 2
-  winner_user_id UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  winner_user_id UUID, -- Referência ao auth.users do Supabase
 
   -- Dados da batalha (JSON com histórico de ações)
   battle_data JSONB DEFAULT '{"rounds": [], "actions": []}',
