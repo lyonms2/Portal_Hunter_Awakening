@@ -40,21 +40,21 @@ export default function ArenaLobby() {
       id: 'pvp',
       nome: 'Arena PvP',
       emoji: '⚔️',
-      descricao: 'Enfrente outros jogadores em batalhas 1v1',
-      detalhes: 'Sistema de matchmaking em desenvolvimento. Teste a interface de seleção de avatares e busca de oponentes.',
+      descricao: 'Batalhe contra avatares de outros jogadores controlados por IA',
+      detalhes: 'Sistema de IA inteligente que simula batalhas realistas contra avatares reais. Ganhe ou perca Fama, com risco de morte permanente!',
       recursos: [
-        'Interface de matchmaking ativa',
-        'Seleção de avatares',
-        'Sistema de busca (simulado)',
-        'Em desenvolvimento: batalhas reais'
+        'IA com 5 personalidades diferentes',
+        'Avatares reais de outros jogadores',
+        'Sistema de Fama e Rankings',
+        '💀 MORTE REAL - Batalhe com cautela!',
+        'Mecânicas de Render e Fuga'
       ],
       cor: 'from-red-600 to-red-800',
       corBorda: 'border-red-500',
       corBg: 'bg-red-900/10',
       corHover: 'hover:border-red-400',
-      disponivel: true, // INTERFACE DISPONÍVEL
-      rota: '/arena/pvp',
-      beta: true // Badge BETA ao invés de "Em Breve"
+      disponivel: true,
+      rota: '/arena/pvp-ia'
     },
     {
       id: 'sobrevivencia',
