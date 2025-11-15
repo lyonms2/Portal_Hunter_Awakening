@@ -64,6 +64,47 @@ export default function BatalhaIAPage() {
   // Timer
   const [tempoRestante, setTempoRestante] = useState(30);
 
+  // Função para salvar estado da batalha
+  const salvarEstadoBatalha = () => {
+    if (!dadosPartida) return;
+
+    const estadoAtual = {
+      turnoAtual,
+      ehMeuTurno,
+      batalhaConcluida,
+      resultado,
+      jogadorHP,
+      jogadorHPMax,
+      jogadorEnergia,
+      jogadorDefesa,
+      iaHP,
+      iaHPMax,
+      iaEnergia,
+      iaDefesa,
+      cooldownsJogador,
+      cooldownsIA,
+      logBatalha,
+      iaFugiu,
+      iaRendeu,
+      timestamp: Date.now()
+    };
+
+    sessionStorage.setItem('batalha_pvp_ia_estado', JSON.stringify(estadoAtual));
+  };
+
+  // Salvar estado sempre que mudar
+  useEffect(() => {
+    if (dadosPartida && !loading) {
+      salvarEstadoBatalha();
+    }
+  }, [
+    turnoAtual, ehMeuTurno, batalhaConcluida, resultado,
+    jogadorHP, jogadorEnergia, jogadorDefesa,
+    iaHP, iaEnergia, iaDefesa,
+    cooldownsJogador, cooldownsIA, logBatalha,
+    iaFugiu, iaRendeu
+  ]);
+
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -84,6 +125,61 @@ export default function BatalhaIAPage() {
     const dados = JSON.parse(dadosBatalha);
     setDadosPartida(dados);
 
+    // Verificar se existe estado salvo (batalha em andamento)
+    const estadoSalvo = sessionStorage.getItem('batalha_pvp_ia_estado');
+
+    if (estadoSalvo) {
+      // RESTAURAR ESTADO DA BATALHA
+      console.log('[BATALHA] Restaurando estado salvo...');
+      const estado = JSON.parse(estadoSalvo);
+
+      // Verificar se o estado não é muito antigo (máximo 1 hora)
+      const tempoDecorrido = Date.now() - (estado.timestamp || 0);
+      const umaHora = 60 * 60 * 1000;
+
+      if (tempoDecorrido < umaHora) {
+        // Restaurar todos os estados
+        setTurnoAtual(estado.turnoAtual || 1);
+        setEhMeuTurno(estado.ehMeuTurno !== undefined ? estado.ehMeuTurno : true);
+        setBatalhaConcluida(estado.batalhaConcluida || false);
+        setResultado(estado.resultado || null);
+
+        setJogadorHP(estado.jogadorHP || 100);
+        setJogadorHPMax(estado.jogadorHPMax || 100);
+        setJogadorEnergia(estado.jogadorEnergia || 100);
+        setJogadorDefesa(estado.jogadorDefesa || 0);
+
+        setIaHP(estado.iaHP || 100);
+        setIaHPMax(estado.iaHPMax || 100);
+        setIaEnergia(estado.iaEnergia || 100);
+        setIaDefesa(estado.iaDefesa || 0);
+
+        setCooldownsJogador(estado.cooldownsJogador || {});
+        setCooldownsIA(estado.cooldownsIA || {});
+        setLogBatalha(estado.logBatalha || []);
+        setIaFugiu(estado.iaFugiu || false);
+        setIaRendeu(estado.iaRendeu || false);
+
+        // Escolher personalidade da IA (mesma seed para consistência)
+        const personalidade = escolherPersonalidade();
+        setPersonalidadeIA(personalidade);
+
+        console.log('[BATALHA] Estado restaurado com sucesso!');
+      } else {
+        // Estado muito antigo, iniciar nova batalha
+        console.log('[BATALHA] Estado salvo expirado, iniciando nova batalha');
+        iniciarNovaBatalha(dados);
+      }
+    } else {
+      // Nenhum estado salvo, iniciar nova batalha
+      console.log('[BATALHA] Iniciando nova batalha...');
+      iniciarNovaBatalha(dados);
+    }
+
+    setLoading(false);
+  }, [router]);
+
+  const iniciarNovaBatalha = (dados) => {
     // Inicializar HP
     const jogadorHPMaximo = calcularHPMaximoCompleto(dados.avatarJogador);
     const iaHPMaximo = calcularHPMaximoCompleto(dados.avatarOponente);
@@ -97,9 +193,9 @@ export default function BatalhaIAPage() {
       ? dados.avatarOponente.hp_atual
       : iaHPMaximo;
 
-    setJogadorHP(Math.max(1, jogadorHPAtual)); // Mínimo 1 HP se estiver vivo
+    setJogadorHP(Math.max(1, jogadorHPAtual));
     setJogadorHPMax(jogadorHPMaximo);
-    setIaHP(Math.max(1, iaHPAtual)); // Mínimo 1 HP se estiver vivo
+    setIaHP(Math.max(1, iaHPAtual));
     setIaHPMax(iaHPMaximo);
 
     // Escolher personalidade da IA
@@ -109,9 +205,7 @@ export default function BatalhaIAPage() {
     addLog(`⚔️ Batalha iniciada contra ${dados.nomeOponente}!`);
     addLog(`💀 MODO MORTE REAL ATIVADO - Batalhe com cautela!`);
     addLog(`🏆 Fama apostada: ${dados.famaApostada} pontos`);
-
-    setLoading(false);
-  }, [router]);
+  };
 
   // Auto-scroll do log (scroll para o topo pois está reverso)
   useEffect(() => {
@@ -562,6 +656,10 @@ export default function BatalhaIAPage() {
   const finalizarBatalha = async (tipoResultado) => {
     setBatalhaConcluida(true);
 
+    // LIMPAR ESTADO SALVO - batalha terminou
+    sessionStorage.removeItem('batalha_pvp_ia_estado');
+    console.log('[BATALHA] Estado salvo limpo - batalha finalizada');
+
     let vitoria = false;
     let famaGanha = 0;
     let vinculoGanho = 0;
@@ -674,6 +772,7 @@ export default function BatalhaIAPage() {
 
   const voltarArena = () => {
     sessionStorage.removeItem('batalha_pvp_ia_dados');
+    sessionStorage.removeItem('batalha_pvp_ia_estado'); // Limpar estado salvo também
     router.push('/arena/pvp-ia');
   };
 
