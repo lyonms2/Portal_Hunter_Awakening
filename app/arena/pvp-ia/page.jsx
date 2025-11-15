@@ -36,31 +36,48 @@ export default function PvPIAPage() {
 
   const carregarAvatarAtivo = async (userId) => {
     try {
-      const response = await fetch(`/api/buscar-avatar?userId=${userId}`);
+      setLoading(true);
+      const response = await fetch(`/api/meus-avatares?userId=${userId}`);
       const data = await response.json();
 
-      if (response.ok && data.avatar) {
-        setAvatarAtivo(data.avatar);
-        // Buscar oponentes com poder similar
-        buscarOponentes(data.avatar);
+      if (response.ok) {
+        const ativo = data.avatares.find(av => av.ativo && av.vivo);
+        if (ativo) {
+          setAvatarAtivo(ativo);
+          // Buscar oponentes com poder similar, passando userId
+          buscarOponentes(ativo, userId);
+        } else {
+          setAvatarAtivo(null);
+        }
       }
-      setLoading(false);
     } catch (error) {
-      console.error("Erro ao buscar avatar:", error);
+      console.error("Erro ao carregar avatar ativo:", error);
+    } finally {
       setLoading(false);
     }
   };
 
-  const buscarOponentes = async (avatar) => {
+  const buscarOponentes = async (avatar, userId = null) => {
     setLoadingOponentes(true);
     try {
       const poderAtual = calcularPoderTotal(avatar);
+      const userIdFinal = userId || user?.id;
 
-      const response = await fetch(`/api/pvp/ia/oponentes?poder=${poderAtual}&userId=${user?.id || ''}`);
+      console.log('[FRONTEND] Buscando oponentes com userId:', userIdFinal);
+
+      if (!userIdFinal) {
+        console.error('[FRONTEND] userId não disponível!');
+        return;
+      }
+
+      const response = await fetch(`/api/pvp/ia/oponentes?poder=${poderAtual}&userId=${userIdFinal}`);
       const data = await response.json();
 
       if (response.ok) {
+        console.log('[FRONTEND] Oponentes recebidos:', data.oponentes?.length || 0);
         setOponentesDisponiveis(data.oponentes || []);
+      } else {
+        console.error('[FRONTEND] Erro ao buscar oponentes:', data);
       }
     } catch (error) {
       console.error("Erro ao buscar oponentes:", error);
@@ -78,23 +95,10 @@ export default function PvPIAPage() {
       return;
     }
 
-    if (avatarAtivo.exaustao >= 80) {
-      setModalAlerta({
-        titulo: '😰 Avatar Colapsado',
-        mensagem: 'Seu avatar está colapsado de exaustão! Deixe-o descansar.'
-      });
-      return;
-    }
-
     if (avatarAtivo.exaustao >= 60) {
-      setModalConfirmacao({
-        titulo: '⚠️ Avatar Exausto',
-        mensagem: 'Seu avatar está exausto! Isso causará penalidades severas. Continuar?',
-        onConfirm: () => {
-          setModalConfirmacao(null);
-          confirmarBatalha(oponente);
-        },
-        onCancel: () => setModalConfirmacao(null)
+      setModalAlerta({
+        titulo: '😰 Avatar Muito Exausto',
+        mensagem: 'Seu avatar está muito exausto! Deixe-o descansar antes de batalhar.'
       });
       return;
     }
@@ -205,12 +209,44 @@ export default function PvPIAPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => router.push('/arena')}
-            className="text-cyan-400 hover:text-cyan-300 mb-4 flex items-center gap-2"
-          >
-            ← Voltar para Arena
-          </button>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+            <button
+              onClick={() => router.push('/arena')}
+              className="text-cyan-400 hover:text-cyan-300 flex items-center gap-2"
+            >
+              ← Voltar para Arena
+            </button>
+
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={() => router.push('/arena/pvp-ia/leaderboard')}
+                className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                🏆 Ranking
+              </button>
+
+              <button
+                onClick={() => router.push('/recompensas')}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                🎁 Recompensas
+              </button>
+
+              <button
+                onClick={() => router.push('/titulos')}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                🏆 Títulos
+              </button>
+
+              <button
+                onClick={() => router.push('/historico-pvp')}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+              >
+                📜 Histórico
+              </button>
+            </div>
+          </div>
 
           <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 mb-2">
             ⚔️ ARENA PVP
@@ -222,37 +258,106 @@ export default function PvPIAPage() {
 
         {/* Seu Avatar */}
         <div className="bg-slate-900 border border-cyan-500 rounded-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-cyan-400 mb-4">Seu Avatar</h2>
-          <div className="flex items-center gap-6">
-            {/* Avatar Image */}
-            <div className="flex-shrink-0">
-              <div className="p-4 bg-gradient-to-b from-cyan-900/20 to-transparent rounded-lg">
-                <AvatarSVG avatar={avatarAtivo} tamanho={160} />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-cyan-400">Seu Avatar Ativo</h2>
+            <button
+              onClick={() => router.push('/painel/avatares')}
+              className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-bold text-sm"
+            >
+              🔄 Trocar Avatar
+            </button>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Lado Esquerdo - Avatar e Info */}
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                <div className="p-4 bg-gradient-to-b from-cyan-900/20 to-transparent rounded-lg">
+                  <AvatarSVG avatar={avatarAtivo} tamanho={140} />
+                </div>
+              </div>
+
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white mb-1">{avatarAtivo.nome}</h3>
+                <div className="flex gap-3 text-sm mb-2 flex-wrap">
+                  <span className={`font-semibold ${getElementoColor(avatarAtivo.elemento)}`}>
+                    {avatarAtivo.elemento}
+                  </span>
+                  <span className={getRaridadeColor(avatarAtivo.raridade)}>
+                    {avatarAtivo.raridade}
+                  </span>
+                  <span className="text-yellow-400">Nv. {avatarAtivo.nivel}</span>
+                </div>
+                <div className="text-sm">
+                  <div>⚔️ Poder: <span className="text-cyan-400 font-bold">{poderTotal}</span></div>
+                </div>
               </div>
             </div>
 
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-white mb-1">{avatarAtivo.nome}</h3>
-              <div className="flex gap-4 text-sm mb-2">
-                <span className={`font-semibold ${getElementoColor(avatarAtivo.elemento)}`}>
-                  {avatarAtivo.elemento}
-                </span>
-                <span className={getRaridadeColor(avatarAtivo.raridade)}>
-                  {avatarAtivo.raridade}
-                </span>
-                <span className="text-yellow-400">Nível {avatarAtivo.nivel}</span>
+            {/* Lado Direito - Barras de Progresso */}
+            <div className="space-y-3">
+              {/* HP Bar */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-400">HP</span>
+                  <span className="text-white font-bold">
+                    {avatarAtivo.hp_atual || calcularHPMaximoCompleto(avatarAtivo)} / {calcularHPMaximoCompleto(avatarAtivo)}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      ((avatarAtivo.hp_atual || calcularHPMaximoCompleto(avatarAtivo)) / calcularHPMaximoCompleto(avatarAtivo) * 100) > 50 ? 'bg-green-500' :
+                      ((avatarAtivo.hp_atual || calcularHPMaximoCompleto(avatarAtivo)) / calcularHPMaximoCompleto(avatarAtivo) * 100) > 25 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${((avatarAtivo.hp_atual || calcularHPMaximoCompleto(avatarAtivo)) / calcularHPMaximoCompleto(avatarAtivo)) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>⚔️ Poder Total: <span className="text-cyan-400 font-bold">{poderTotal}</span></div>
-                <div>😰 Exaustão: <span className={nivelExaustao.cor}>{avatarAtivo.exaustao}%</span></div>
-              </div>
-            </div>
 
-            {nivelExaustao.penalidades.stats > 0 && (
-              <div className="bg-red-950 border border-red-500 rounded p-3 text-sm">
-                <span className="text-red-400">⚠️ Penalidade de Exaustão: -{nivelExaustao.penalidades.stats}% Stats</span>
+              {/* Exaustão Bar */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-400">Exaustão</span>
+                  <span className={`font-bold ${
+                    (avatarAtivo.exaustao || 0) >= 80 ? 'text-red-500' :
+                    (avatarAtivo.exaustao || 0) >= 60 ? 'text-orange-500' :
+                    (avatarAtivo.exaustao || 0) >= 40 ? 'text-yellow-500' : 'text-gray-400'
+                  }`}>{avatarAtivo.exaustao || 0}%</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      (avatarAtivo.exaustao || 0) >= 80 ? 'bg-red-500' :
+                      (avatarAtivo.exaustao || 0) >= 60 ? 'bg-orange-500' :
+                      (avatarAtivo.exaustao || 0) >= 40 ? 'bg-yellow-500' : 'bg-gray-600'
+                    }`}
+                    style={{ width: `${avatarAtivo.exaustao || 0}%` }}
+                  />
+                </div>
               </div>
-            )}
+
+              {/* Vínculo Bar */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-400">Vínculo</span>
+                  <span className="text-pink-400 font-bold">{avatarAtivo.vinculo || 0}</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-pink-500 h-full transition-all"
+                    style={{ width: `${avatarAtivo.vinculo || 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Alertas */}
+              {(avatarAtivo.exaustao || 0) >= 60 && (
+                <div className="bg-orange-950 border border-orange-500 rounded p-2 text-xs">
+                  <span className="text-orange-400">⚠️ Avatar muito exausto! Não pode batalhar.</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -261,7 +366,7 @@ export default function PvPIAPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-3xl font-black text-white">Oponentes Disponíveis</h2>
             <button
-              onClick={() => buscarOponentes(avatarAtivo)}
+              onClick={() => buscarOponentes(avatarAtivo, user?.id)}
               disabled={loadingOponentes}
               className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 text-white px-6 py-2 rounded font-bold"
             >
@@ -312,20 +417,6 @@ export default function PvPIAPage() {
                     </div>
                     <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
                       <div className="bg-green-500 h-full w-full" />
-                    </div>
-                  </div>
-
-                  {/* EXP Bar */}
-                  <div className="mb-3">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-400">Experiência</span>
-                      <span className="text-purple-400 font-bold">Nv. {oponente.avatar.nivel}</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-purple-500 h-full transition-all"
-                        style={{ width: `${((oponente.avatar.experiencia || 0) / 100) * 100}%` }}
-                      />
                     </div>
                   </div>
 

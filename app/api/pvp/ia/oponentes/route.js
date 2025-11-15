@@ -18,8 +18,15 @@ export async function GET(request) {
     const poder = parseInt(searchParams.get('poder'));
     const userId = searchParams.get('userId');
 
+    console.log('[OPONENTES IA] Parâmetros recebidos:', { poder, userId });
+
     if (!poder) {
       return NextResponse.json({ error: 'Poder é obrigatório' }, { status: 400 });
+    }
+
+    if (!userId) {
+      console.error('[OPONENTES IA] userId não fornecido!');
+      return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
     // Calcular range de poder (±30%)
@@ -27,16 +34,27 @@ export async function GET(request) {
     const poderMax = Math.ceil(poder * 1.3);
 
     console.log(`[OPONENTES IA] Buscando avatares com poder entre ${poderMin} e ${poderMax}`);
+    console.log(`[OPONENTES IA] EXCLUINDO avatares do userId: ${userId}`);
 
     // Buscar avatares de outros usuários
     // Calculamos poder total = forca + agilidade + resistencia + foco
     const { data: avatares, error } = await supabase
       .from('avatares')
       .select('id, user_id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, habilidades, vivo, experiencia')
-      .neq('user_id', userId || '00000000-0000-0000-0000-000000000000') // Excluir próprio usuário
+      .neq('user_id', userId) // EXCLUIR PRÓPRIO USUÁRIO
       .eq('vivo', true) // Apenas avatares vivos
       .gte('nivel', 1) // Apenas avatares com nível
       .limit(50); // Pegar 50 para filtrar depois
+
+    console.log(`[OPONENTES IA] Avatares encontrados no banco: ${avatares?.length || 0}`);
+
+    if (avatares && avatares.length > 0) {
+      console.log('[OPONENTES IA] Primeiros 3 avatares:', avatares.slice(0, 3).map(a => ({
+        nome: a.nome,
+        user_id: a.user_id,
+        userId_eh_igual: a.user_id === userId
+      })));
+    }
 
     if (error) {
       console.error('[OPONENTES IA] Erro ao buscar avatares:', error);
@@ -49,47 +67,61 @@ export async function GET(request) {
         const poderTotal = avatar.forca + avatar.agilidade + avatar.resistencia + avatar.foco;
         return { ...avatar, poderTotal };
       })
-      .filter(avatar => avatar.poderTotal >= poderMin && avatar.poderTotal <= poderMax)
+      .filter(avatar => {
+        // DUPLA VERIFICAÇÃO: Garantir que não é do próprio usuário
+        if (avatar.user_id === userId) {
+          console.warn('[OPONENTES IA] AVISO: Avatar do próprio usuário quase passou!', avatar.nome);
+          return false;
+        }
+        return avatar.poderTotal >= poderMin && avatar.poderTotal <= poderMax;
+      })
       .sort(() => Math.random() - 0.5) // Randomizar ordem
       .slice(0, 12); // Pegar apenas 12
 
-    console.log(`[OPONENTES IA] Encontrados ${avataresFiltrados.length} oponentes`);
+    console.log(`[OPONENTES IA] Encontrados ${avataresFiltrados.length} oponentes após filtro`);
 
-    // Buscar nomes dos caçadores (donos dos avatares)
+    // Buscar nomes dos caçadores da tabela player_stats (coluna nome_operacao)
     const userIds = [...new Set(avataresFiltrados.map(a => a.user_id))];
 
-    // Buscar usuários reais do banco
-    const { data: usuarios } = await supabase
-      .from('users')
-      .select('id, nome')
-      .in('id', userIds);
+    const { data: playerStats } = await supabase
+      .from('player_stats')
+      .select('user_id, nome_operacao')
+      .in('user_id', userIds);
+
+    console.log('[OPONENTES IA] Player stats encontrados:', playerStats?.length || 0);
 
     // Criar mapa de userId -> nome
     const nomesMap = {};
-    if (usuarios && usuarios.length > 0) {
-      usuarios.forEach(user => {
-        nomesMap[user.id] = user.nome || 'Caçador Misterioso';
+    if (playerStats && playerStats.length > 0) {
+      playerStats.forEach(stats => {
+        nomesMap[stats.user_id] = stats.nome_operacao || 'Caçador Misterioso';
       });
     }
 
-    const oponentesFormatados = avataresFiltrados.map((avatar, index) => ({
-      avatar: {
-        id: avatar.id,
-        nome: avatar.nome,
-        nivel: avatar.nivel,
-        elemento: avatar.elemento,
-        raridade: avatar.raridade,
-        forca: avatar.forca,
-        agilidade: avatar.agilidade,
-        resistencia: avatar.resistencia,
-        foco: avatar.foco,
-        habilidades: avatar.habilidades || [],
-        experiencia: avatar.experiencia || 0
-      },
-      poderTotal: avatar.poderTotal,
-      cacadorNome: nomesMap[avatar.user_id] || 'Caçador Misterioso',
-      userId: avatar.user_id
-    }));
+    console.log('[OPONENTES IA] Nomes mapeados:', Object.keys(nomesMap).length);
+
+    const oponentesFormatados = avataresFiltrados
+      .filter(avatar => avatar.user_id !== userId) // VERIFICAÇÃO TRIPLA
+      .map((avatar, index) => ({
+        avatar: {
+          id: avatar.id,
+          nome: avatar.nome,
+          nivel: avatar.nivel,
+          elemento: avatar.elemento,
+          raridade: avatar.raridade,
+          forca: avatar.forca,
+          agilidade: avatar.agilidade,
+          resistencia: avatar.resistencia,
+          foco: avatar.foco,
+          habilidades: avatar.habilidades || [],
+          experiencia: avatar.experiencia || 0
+        },
+        poderTotal: avatar.poderTotal,
+        cacadorNome: nomesMap[avatar.user_id] || 'Caçador Misterioso',
+        userId: avatar.user_id
+      }));
+
+    console.log(`[OPONENTES IA] Retornando ${oponentesFormatados.length} oponentes finais`);
 
     return NextResponse.json({
       success: true,
@@ -97,7 +129,8 @@ export async function GET(request) {
       filtros: {
         poderMin,
         poderMax,
-        encontrados: oponentesFormatados.length
+        encontrados: oponentesFormatados.length,
+        seuUserId: userId // Para debug
       }
     });
 

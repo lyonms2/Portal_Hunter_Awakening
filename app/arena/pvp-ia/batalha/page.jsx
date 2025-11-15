@@ -51,6 +51,7 @@ export default function BatalhaIAPage() {
   const [personalidadeIA, setPersonalidadeIA] = useState(null);
   const [iaPensando, setIaPensando] = useState(false);
   const [iaFugiu, setIaFugiu] = useState(false);
+  const [iaRendeu, setIaRendeu] = useState(false);
 
   // Log de batalha
   const [logBatalha, setLogBatalha] = useState([]);
@@ -103,10 +104,10 @@ export default function BatalhaIAPage() {
     setLoading(false);
   }, [router]);
 
-  // Auto-scroll do log
+  // Auto-scroll do log (scroll para o topo pois está reverso)
   useEffect(() => {
     if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
+      logRef.current.scrollTop = 0;
     }
   }, [logBatalha]);
 
@@ -200,6 +201,7 @@ export default function BatalhaIAPage() {
 
       addLog(`${dadosPartida.nomeOponente} se rende!`, 'ia');
       addLog(`🏳️ ${dadosPartida.nomeOponente} admitiu derrota!`, 'vitoria');
+      setIaRendeu(true); // Marcar que rendeu
       finalizarBatalha('render_ia');
       return;
     }
@@ -777,20 +779,6 @@ export default function BatalhaIAPage() {
                   </div>
                 </div>
 
-                {/* Experiência Bar */}
-                <div className="mb-3">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-400">Experiência</span>
-                    <span className="text-purple-400 font-bold">{dadosPartida?.avatarJogador?.experiencia || 0} XP</span>
-                  </div>
-                  <div className="w-full bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-purple-500 h-full transition-all duration-300"
-                      style={{ width: `${((dadosPartida?.avatarJogador?.experiencia || 0) / 100) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
                 {/* Status */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-slate-800 rounded p-2 text-center">
@@ -818,7 +806,7 @@ export default function BatalhaIAPage() {
                 {/* Avatar Visual */}
                 <div className="bg-gradient-to-b from-slate-950/50 to-slate-800 rounded-lg p-6 mb-4 flex justify-center relative">
                   <AvatarSVG avatar={dadosPartida.avatarOponente} tamanho={220} />
-                  {iaPensando && !iaFugiu && (
+                  {iaPensando && !iaFugiu && !iaRendeu && (
                     <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
                       <div className="text-orange-400 animate-pulse text-lg font-bold">⚡ Pensando...</div>
                     </div>
@@ -826,6 +814,11 @@ export default function BatalhaIAPage() {
                   {iaFugiu && (
                     <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center">
                       <div className="text-yellow-400 text-2xl font-bold">🏃 FUGIU!</div>
+                    </div>
+                  )}
+                  {iaRendeu && (
+                    <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center">
+                      <div className="text-white text-2xl font-bold">🏳️ RENDEU!</div>
                     </div>
                   )}
                 </div>
