@@ -261,7 +261,7 @@ export default function PvPIAPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-cyan-400">Seu Avatar Ativo</h2>
             <button
-              onClick={() => router.push('/painel/avatares')}
+              onClick={() => router.push('/avatares')}
               className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-bold text-sm"
             >
               🔄 Trocar Avatar
