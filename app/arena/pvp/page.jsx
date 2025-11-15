@@ -170,69 +170,120 @@ export default function ArenaPvPPage() {
   const buscarOponenteReal = async () => {
     setEstadoMatchmaking('procurando');
 
-    // Função para tentar buscar oponente
-    const tentarBuscar = async () => {
-      try {
-        const response = await fetch(
-          `/api/pvp/matchmaking?userId=${user.id}&nivel=${avatarAtivo.nivel}&fama=${fama}`,
-          {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
+    try {
+      // Calcular poder total do avatar
+      const poderTotal = avatarAtivo.forca + avatarAtivo.agilidade + avatarAtivo.resistencia + avatarAtivo.foco;
 
-        const data = await response.json();
+      // Entrar na fila de matchmaking
+      const joinResponse = await fetch('/api/pvp/queue/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          avatarId: avatarAtivo.id,
+          nivel: avatarAtivo.nivel,
+          poderTotal: poderTotal,
+          fama: fama
+        })
+      });
 
-        if (response.ok && data.success && data.oponente) {
-          // Oponente real encontrado!
-          const oponente = data.oponente;
+      const joinData = await joinResponse.json();
 
-          // Limpar timers
-          if (timeoutBusca) clearTimeout(timeoutBusca);
-          if (intervalBusca) clearInterval(intervalBusca);
-
-          setOponenteEncontrado(oponente);
-          setEstadoMatchmaking('encontrado');
-
-          // Auto-iniciar após 3 segundos
-          setTimeout(() => {
-            iniciarBatalhaComOponente(oponente);
-          }, 3000);
-
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('Erro ao buscar oponente:', error);
-        return false;
+      if (!joinResponse.ok || !joinData.success) {
+        throw new Error(joinData.error || 'Erro ao entrar na fila');
       }
-    };
 
-    // Primeira tentativa imediata
-    const encontrado = await tentarBuscar();
-    if (encontrado) return;
+      // Se já encontrou match imediatamente
+      if (joinData.matched) {
+        await processarMatch(joinData);
+        return;
+      }
 
-    // Buscar a cada 5 segundos
-    const interval = setInterval(async () => {
-      await tentarBuscar();
-    }, 5000);
-    setIntervalBusca(interval);
+      // Polling para verificar se encontrou match
+      const verificarMatch = async () => {
+        try {
+          const checkResponse = await fetch(
+            `/api/pvp/queue/check?userId=${user.id}`,
+            {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
 
-    // Timeout de 60 segundos (1 minuto)
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
+          const checkData = await checkResponse.json();
 
-      // Se ainda estiver procurando, mostrar mensagem e voltar ao lobby
+          if (checkResponse.ok && checkData.success && checkData.matched) {
+            // Match encontrado!
+            if (timeoutBusca) clearTimeout(timeoutBusca);
+            if (intervalBusca) clearInterval(intervalBusca);
+
+            await processarMatch(checkData);
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error('Erro ao verificar match:', error);
+          return false;
+        }
+      };
+
+      // Verificar a cada 2 segundos
+      const interval = setInterval(async () => {
+        await verificarMatch();
+      }, 2000);
+      setIntervalBusca(interval);
+
+      // Timeout de 60 segundos (1 minuto)
+      const timeout = setTimeout(async () => {
+        clearInterval(interval);
+
+        // Sair da fila
+        await fetch('/api/pvp/queue/leave', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id })
+        });
+
+        setEstadoMatchmaking('lobby');
+        setModalAlerta({
+          titulo: '⏱️ Tempo Esgotado',
+          mensagem: 'Nenhum oponente disponível no momento. Tente novamente mais tarde!'
+        });
+      }, 60000);
+      setTimeoutBusca(timeout);
+
+    } catch (error) {
+      console.error('Erro ao buscar oponente:', error);
       setEstadoMatchmaking('lobby');
       setModalAlerta({
-        titulo: '⏱️ Tempo Esgotado',
-        mensagem: 'Nenhum oponente disponível no momento. Tente novamente mais tarde!'
+        titulo: '⚠️ Erro',
+        mensagem: 'Erro ao procurar oponente. Tente novamente.'
       });
-    }, 60000);
-    setTimeoutBusca(timeout);
+    }
   };
 
-  const cancelarMatchmaking = () => {
+  const processarMatch = async (matchData) => {
+    console.log('Match encontrado!', matchData);
+
+    // Montar objeto do oponente
+    const oponente = {
+      id: matchData.opponent.userId,
+      nome: matchData.opponent.nome,
+      fama: matchData.opponent.avatar?.fama || 1000,
+      avatar: matchData.opponent.avatar,
+      matchId: matchData.matchId
+    };
+
+    setOponenteEncontrado(oponente);
+    setEstadoMatchmaking('encontrado');
+
+    // Auto-iniciar após 3 segundos
+    setTimeout(() => {
+      iniciarBatalhaComOponente(oponente);
+    }, 3000);
+  };
+
+  const cancelarMatchmaking = async () => {
     // Limpar timers
     if (timeoutBusca) {
       clearTimeout(timeoutBusca);
@@ -241,6 +292,17 @@ export default function ArenaPvPPage() {
     if (intervalBusca) {
       clearInterval(intervalBusca);
       setIntervalBusca(null);
+    }
+
+    // Sair da fila no banco de dados
+    try {
+      await fetch('/api/pvp/queue/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+    } catch (error) {
+      console.error('Erro ao sair da fila:', error);
     }
 
     setEstadoMatchmaking('lobby');
@@ -293,6 +355,8 @@ export default function ArenaPvPPage() {
     // Armazenar dados da partida PvP no sessionStorage
     const dadosPartida = {
       tipo: 'pvp',
+      pvpAoVivo: true, // Flag para indicar PvP em tempo real
+      matchId: oponente.matchId, // ID da sala de batalha
       avatarJogador: avatarComPenalidades,
       avatarOponente: oponente.avatar,
       nomeOponente: oponente.nome,
@@ -707,18 +771,21 @@ export default function ArenaPvPPage() {
                       Enfrente outros jogadores em batalhas táticas! Suba de tier, ganhe fama e conquiste recompensas incríveis!
                     </p>
                     <div className="text-xs text-slate-400 space-y-1 mb-3">
-                      <div>✅ Batalhas em tempo real (30s por turno)</div>
+                      <div>✅ Batalhas AO VIVO contra jogadores reais</div>
+                      <div>✅ Ambos jogadores controlam seus avatares simultaneamente</div>
                       <div>✅ Sistema de ranking com 6 tiers</div>
-                      <div>✅ Recompensas escalonadas (1.0x → 3.0x)</div>
+                      <div>✅ Matchmaking por poder total do avatar (balanceado)</div>
                       <div>✅ Ganha Fama, XP, Moedas, Vínculo e Fragmentos</div>
-                      <div>✅ Matchmaking balanceado por nível e fama</div>
                     </div>
                     <div className="bg-green-950/50 border border-green-500/50 rounded-lg p-3">
                       <p className="text-xs text-green-300 font-bold flex items-center gap-2">
                         <span>🌐</span>
-                        <span>MATCHMAKING REAL: Apenas jogadores reais! Tempo máximo de espera: 1 minuto</span>
+                        <span>PVP AO VIVO: Batalhas em tempo real contra jogadores online!</span>
                       </p>
                       <p className="text-[10px] text-slate-400 mt-1">
+                        * Matchmaking por poder do avatar (±50 pontos). Tempo máximo: 1 minuto
+                      </p>
+                      <p className="text-[10px] text-slate-400">
                         * Para treinar contra IA, use o modo Treinamento na Arena
                       </p>
                     </div>
