@@ -83,6 +83,23 @@ export async function POST(request) {
 
     console.log('🎮 Desafio aceito! Match ID:', result.match_id);
 
+    // IMPORTANTE: Fazer UPDATE manual do desafio para garantir que status seja atualizado
+    console.log('🔄 Atualizando status do desafio manualmente...');
+    const { error: updateError } = await supabase
+      .from('pvp_challenges')
+      .update({
+        status: 'accepted',
+        match_id: result.match_id,
+        responded_at: new Date().toISOString()
+      })
+      .eq('id', challengeId);
+
+    if (updateError) {
+      console.error('⚠️ Erro ao atualizar desafio:', updateError);
+    } else {
+      console.log('✅ Desafio atualizado com sucesso!');
+    }
+
     // Aguardar 500ms para garantir que o INSERT foi commitado
     await new Promise(resolve => setTimeout(resolve, 500));
 
