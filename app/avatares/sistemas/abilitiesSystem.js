@@ -782,18 +782,23 @@ export function podeEvoluirHabilidade(habilidade, nivel) {
  * @returns {number} Dano calculado
  */
 export function calcularDanoHabilidade(habilidade, stats, nivel, vinculo = 0) {
-  const statValue = stats[habilidade.stat_primario] || 10;
-  
+  // Valores padrão caso a habilidade não tenha esses campos
+  const statPrimario = habilidade.stat_primario || 'forca';
+  const danoBase = habilidade.dano_base || 0;
+  const multiplicadorStat = habilidade.multiplicador_stat || 1.0;
+
+  const statValue = stats[statPrimario] || 10;
+
   // Dano base + (stat × multiplicador)
-  let dano = habilidade.dano_base + (statValue * habilidade.multiplicador_stat);
-  
+  let dano = danoBase + (statValue * multiplicadorStat);
+
   // Bônus de nível (1% por nível)
   dano *= (1 + (nivel * 0.01));
-  
+
   // Bônus de vínculo (até 20% em Alma Gêmea)
   const bonusVinculo = vinculo >= 80 ? 0.20 : vinculo >= 60 ? 0.15 : vinculo >= 40 ? 0.10 : 0;
   dano *= (1 + bonusVinculo);
-  
+
   return Math.floor(dano);
 }
 

@@ -257,7 +257,20 @@ export default function BatalhaIAPage() {
 
     // Processar habilidade
     if (habilidade.tipo === 'Ofensiva') {
-      const dano = calcularDanoHabilidade(habilidade, dadosPartida.avatarOponente, dadosPartida.avatarJogador);
+      // Calcular dano: calcularDanoHabilidade(habilidade, stats, nivel, vinculo)
+      const stats = {
+        forca: dadosPartida.avatarOponente.forca,
+        agilidade: dadosPartida.avatarOponente.agilidade,
+        resistencia: dadosPartida.avatarOponente.resistencia,
+        foco: dadosPartida.avatarOponente.foco,
+        [habilidade.stat_primario]: dadosPartida.avatarOponente[habilidade.stat_primario]
+      };
+      const dano = calcularDanoHabilidade(
+        habilidade,
+        stats,
+        dadosPartida.avatarOponente.nivel,
+        dadosPartida.avatarOponente.vinculo || 0
+      );
       const danoFinal = Math.max(1, dano - jogadorDefesa);
 
       setJogadorHP(prev => {
@@ -366,7 +379,20 @@ export default function BatalhaIAPage() {
     addLog(`Você usa ${habilidade.nome}!`, 'jogador');
 
     if (habilidade.tipo === 'Ofensiva') {
-      const dano = calcularDanoHabilidade(habilidade, dadosPartida.avatarJogador, dadosPartida.avatarOponente);
+      // Calcular dano: calcularDanoHabilidade(habilidade, stats, nivel, vinculo)
+      const stats = {
+        forca: dadosPartida.avatarJogador.forca,
+        agilidade: dadosPartida.avatarJogador.agilidade,
+        resistencia: dadosPartida.avatarJogador.resistencia,
+        foco: dadosPartida.avatarJogador.foco,
+        [habilidade.stat_primario]: dadosPartida.avatarJogador[habilidade.stat_primario]
+      };
+      const dano = calcularDanoHabilidade(
+        habilidade,
+        stats,
+        dadosPartida.avatarJogador.nivel,
+        dadosPartida.avatarJogador.vinculo || 0
+      );
       const danoFinal = Math.max(1, dano - iaDefesa);
 
       setIaHP(prev => {
@@ -689,7 +715,7 @@ export default function BatalhaIAPage() {
 
                 {/* Avatar Visual */}
                 <div className="bg-gradient-to-b from-slate-950/50 to-slate-800 rounded-lg p-6 mb-4 flex justify-center relative">
-                  <AvatarSVG avatar={dadosPartida.avatarOponente} tamanho={220} isEnemy={true} />
+                  <AvatarSVG avatar={dadosPartida.avatarOponente} tamanho={220} />
                   {iaPensando && (
                     <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
                       <div className="text-orange-400 animate-pulse text-lg font-bold">⚡ Pensando...</div>
@@ -862,12 +888,12 @@ export default function BatalhaIAPage() {
 
         {/* Log de Batalha */}
         <div className="mt-6 bg-slate-900 border border-slate-700 rounded-lg p-4">
-          <h3 className="text-lg font-bold text-cyan-400 mb-3">📜 Log de Batalha</h3>
+          <h3 className="text-lg font-bold text-cyan-400 mb-3">📜 Log de Batalha (Última ação em cima)</h3>
           <div
             ref={logRef}
             className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-sm space-y-1"
           >
-            {logBatalha.map((log, idx) => (
+            {[...logBatalha].reverse().map((log, idx) => (
               <div key={idx} className={log.cor}>
                 {log.mensagem}
               </div>

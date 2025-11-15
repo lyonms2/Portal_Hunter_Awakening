@@ -301,7 +301,7 @@ export default function PvPIAPage() {
 
                   {/* Avatar Image */}
                   <div className="flex justify-center mb-4 p-3 bg-gradient-to-b from-slate-950/50 to-transparent rounded-lg">
-                    <AvatarSVG avatar={oponente.avatar} tamanho={140} isEnemy={true} />
+                    <AvatarSVG avatar={oponente.avatar} tamanho={140} />
                   </div>
 
                   <div className="space-y-2 text-sm mb-4">
