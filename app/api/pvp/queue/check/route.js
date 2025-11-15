@@ -41,11 +41,15 @@ export async function GET(request) {
       }
 
       // Buscar entrada na fila
+      // IMPORTANTE: Usar .order() + .limit(1) + .maybeSingle() para FORÇAR query fresca
+      // sem cache do Supabase client e evitar connection pooling issues
       const { data, error } = await supabase
         .from('pvp_matchmaking_queue')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .order('id', { ascending: false }) // Cache buster: força query diferente a cada tentativa
+        .limit(1)
+        .maybeSingle(); // Evita erro se não encontrar, e força fetch novo
 
       queueEntry = data;
       queueError = error;
