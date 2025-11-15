@@ -27,6 +27,27 @@ export async function POST(request) {
 
     console.log('✅ Aceitando desafio PvP:', { challengeId, userId });
 
+    // Primeiro, verificar se o desafio existe e está válido
+    const { data: challenge, error: challengeError } = await supabase
+      .from('pvp_challenges')
+      .select('*')
+      .eq('id', challengeId)
+      .single();
+
+    if (challengeError || !challenge) {
+      console.error('❌ Desafio não encontrado:', challengeError);
+      return NextResponse.json({ error: 'Desafio não encontrado' }, { status: 404 });
+    }
+
+    console.log('📋 Desafio encontrado:', {
+      id: challenge.id,
+      status: challenge.status,
+      challenger: challenge.challenger_user_id,
+      challenged: challenge.challenged_user_id,
+      expires_at: challenge.expires_at,
+      now: new Date().toISOString()
+    });
+
     // Chamar função do banco para aceitar desafio
     const { data, error } = await supabase
       .rpc('accept_pvp_challenge', {
@@ -34,14 +55,26 @@ export async function POST(request) {
         p_user_id: userId
       });
 
+    console.log('📡 RPC result:', { data, error });
+
     if (error) {
-      console.error('Erro ao aceitar desafio:', error);
-      return NextResponse.json({ error: 'Erro ao aceitar desafio' }, { status: 500 });
+      console.error('❌ Erro ao chamar accept_pvp_challenge:', error);
+      return NextResponse.json({
+        error: 'Erro ao aceitar desafio',
+        details: error.message
+      }, { status: 500 });
+    }
+
+    if (!data || data.length === 0) {
+      console.error('❌ Função não retornou dados');
+      return NextResponse.json({ error: 'Função não retornou resultado' }, { status: 500 });
     }
 
     const result = data[0];
+    console.log('📊 Result from function:', result);
 
     if (!result.success) {
+      console.log('⚠️ Função retornou sucesso=false:', result.message);
       return NextResponse.json({
         success: false,
         message: result.message
@@ -50,16 +83,36 @@ export async function POST(request) {
 
     console.log('🎮 Desafio aceito! Match ID:', result.match_id);
 
+    // Aguardar 500ms para garantir que o INSERT foi commitado
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     // Buscar dados da sala de batalha criada
+    console.log('🔍 Buscando sala de batalha:', result.match_id);
     const { data: battleRoom, error: roomError } = await supabase
       .from('pvp_battle_rooms')
       .select('*')
       .eq('id', result.match_id)
       .single();
 
+    console.log('📡 Sala encontrada?', { found: !!battleRoom, error: roomError });
+
     if (roomError || !battleRoom) {
-      console.error('Erro ao buscar sala de batalha:', roomError);
-      return NextResponse.json({ error: 'Erro ao buscar sala de batalha' }, { status: 500 });
+      console.error('❌ Erro ao buscar sala de batalha:', roomError);
+
+      // Tentar buscar todas as salas para debug
+      const { data: allRooms } = await supabase
+        .from('pvp_battle_rooms')
+        .select('id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      console.error('🔍 Últimas 5 salas criadas:', allRooms);
+
+      return NextResponse.json({
+        error: 'Erro ao buscar sala de batalha',
+        matchId: result.match_id,
+        roomError: roomError?.message
+      }, { status: 500 });
     }
 
     // Buscar dados dos avatares
