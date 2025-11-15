@@ -43,6 +43,9 @@ export default function ArenaPvPPage() {
   // Heartbeat interval
   const [heartbeatInterval, setHeartbeatInterval] = useState(null);
 
+  // Controle para evitar múltiplas entradas na mesma batalha
+  const [batalhaEmAndamento, setBatalhaEmAndamento] = useState(false);
+
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -103,6 +106,42 @@ export default function ArenaPvPPage() {
       clearInterval(interval);
     };
   }, [user, avatarAtivo, abaAtiva]);
+
+  // Polling GLOBAL para verificar se desafios foram aceitos (independente da aba)
+  useEffect(() => {
+    if (!user || !avatarAtivo) return;
+
+    // Verificar imediatamente
+    verificarEEntrarEmDesafiosAceitos();
+
+    // Polling a cada 2 segundos
+    const interval = setInterval(verificarEEntrarEmDesafiosAceitos, 2000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user, avatarAtivo]);
+
+  const verificarEEntrarEmDesafiosAceitos = async () => {
+    if (!user || batalhaEmAndamento) return;
+
+    try {
+      const desafiosAceitos = await verificarDesafiosAceitos(user.id);
+
+      if (desafiosAceitos && desafiosAceitos.length > 0) {
+        const desafioAceito = desafiosAceitos[0];
+        console.log('🎉 Seu desafio foi aceito! Entrando na batalha...', desafioAceito);
+
+        // Marcar que está entrando na batalha
+        setBatalhaEmAndamento(true);
+
+        await entrarNaBatalhaComoDesafiante(desafioAceito);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar desafios aceitos:', error);
+      setBatalhaEmAndamento(false);
+    }
+  };
 
   const carregarRankingData = async (userId) => {
     try {
@@ -242,9 +281,15 @@ export default function ArenaPvPPage() {
         }
       }
 
+      // Deletar o desafio aceito para não tentar entrar novamente
+      await fetch(`/api/pvp/challenge/processed?challengeId=${desafioAceito.id}`, {
+        method: 'DELETE'
+      });
+
       iniciarBatalhaComOponente(oponente);
     } catch (error) {
       console.error('Erro ao entrar na batalha como desafiante:', error);
+      setBatalhaEmAndamento(false);
     }
   };
 
@@ -267,21 +312,7 @@ export default function ArenaPvPPage() {
       }
 
       if (sentResponse.ok && sentData.success) {
-        const desafiosEnviadosData = sentData.challenges || [];
-        setDesafiosEnviados(desafiosEnviadosData);
-
-        // VERIFICAR SE ALGUM DESAFIO ENVIADO FOI ACEITO
-        // Buscar desafios aceitos (status mudou de pending para accepted)
-        const desafiosAceitos = await verificarDesafiosAceitos(user.id);
-
-        if (desafiosAceitos && desafiosAceitos.length > 0) {
-          // Pegar o primeiro desafio aceito
-          const desafioAceito = desafiosAceitos[0];
-          console.log('🎉 Seu desafio foi aceito! Entrando na batalha...', desafioAceito);
-
-          // Buscar dados completos da batalha
-          await entrarNaBatalhaComoDesafiante(desafioAceito);
-        }
+        setDesafiosEnviados(sentData.challenges || []);
       }
     } catch (error) {
       console.error('Erro ao carregar desafios:', error);
