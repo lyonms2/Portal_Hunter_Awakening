@@ -266,8 +266,17 @@ export default function ArenaPvPPage() {
     console.log('Match encontrado!', matchData);
 
     try {
+      // Extrair IDs - suporta ambas estruturas (flat e nested)
+      const opponentUserId = matchData.opponentUserId || matchData.opponent?.userId;
+      const opponentAvatarId = matchData.opponentAvatarId || matchData.opponent?.avatarId;
+
+      if (!opponentUserId || !opponentAvatarId) {
+        console.error('IDs do oponente não encontrados:', matchData);
+        throw new Error('Dados do oponente incompletos');
+      }
+
       // Buscar dados completos do avatar do oponente
-      const avatarResponse = await fetch(`/api/buscar-avatar?avatarId=${matchData.opponentAvatarId}`);
+      const avatarResponse = await fetch(`/api/buscar-avatar?avatarId=${opponentAvatarId}`);
 
       if (!avatarResponse.ok) {
         throw new Error('Erro ao buscar dados do oponente');
@@ -277,7 +286,7 @@ export default function ArenaPvPPage() {
       const avatarOponente = avatarData.avatar;
 
       // Buscar dados de ranking do oponente
-      const rankingResponse = await fetch(`/api/pvp/ranking?userId=${matchData.opponentUserId}`);
+      const rankingResponse = await fetch(`/api/pvp/ranking?userId=${opponentUserId}`);
       let famaOponente = 1000;
 
       if (rankingResponse.ok) {
@@ -289,8 +298,8 @@ export default function ArenaPvPPage() {
 
       // Montar objeto do oponente
       const oponente = {
-        userId: matchData.opponentUserId,
-        avatarId: matchData.opponentAvatarId,
+        userId: opponentUserId,
+        avatarId: opponentAvatarId,
         fama: famaOponente,
         avatar: avatarOponente,
         matchId: matchData.matchId

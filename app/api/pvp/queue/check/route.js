@@ -52,10 +52,10 @@ export async function GET(request) {
 
       // Se encontrou match agora
       if (matchResult && matchResult.length > 0 && matchResult[0].matched) {
-        // Buscar dados do oponente
+        // Buscar dados do avatar do oponente
         const { data: opponentAvatar, error: avatarError } = await supabase
           .from('avatares')
-          .select('*, usuarios!inner(id, nome_usuario)')
+          .select('*')
           .eq('id', matchResult[0].opponent_avatar_id)
           .single();
 
@@ -64,10 +64,12 @@ export async function GET(request) {
           inQueue: true,
           matched: true,
           matchId: matchResult[0].match_id,
+          opponentUserId: matchResult[0].opponent_user_id,
+          opponentAvatarId: matchResult[0].opponent_avatar_id,
           opponent: {
             userId: matchResult[0].opponent_user_id,
             avatarId: matchResult[0].opponent_avatar_id,
-            nome: opponentAvatar?.usuarios?.nome_usuario || 'Oponente',
+            nome: opponentAvatar?.nome || 'Oponente',
             avatar: opponentAvatar
           }
         });
@@ -84,15 +86,26 @@ export async function GET(request) {
 
     // Se já encontrou match
     if (queueEntry.status === 'matched') {
-      // Buscar dados do oponente
+      // Buscar avatar_id do oponente na fila
+      const { data: opponentQueue, error: oppQueueError } = await supabase
+        .from('pvp_matchmaking_queue')
+        .select('avatar_id')
+        .eq('user_id', queueEntry.opponent_user_id)
+        .single();
+
+      if (!opponentQueue || oppQueueError) {
+        console.error('Erro ao buscar avatar do oponente:', oppQueueError);
+        return NextResponse.json({
+          success: false,
+          error: 'Dados do oponente não encontrados'
+        }, { status: 404 });
+      }
+
+      // Buscar dados do avatar do oponente
       const { data: opponentAvatar, error: avatarError } = await supabase
         .from('avatares')
-        .select('*, usuarios!inner(id, nome_usuario)')
-        .eq('id', (await supabase
-          .from('pvp_matchmaking_queue')
-          .select('avatar_id')
-          .eq('user_id', queueEntry.opponent_user_id)
-          .single()).data?.avatar_id)
+        .select('*')
+        .eq('id', opponentQueue.avatar_id)
         .single();
 
       return NextResponse.json({
@@ -100,9 +113,12 @@ export async function GET(request) {
         inQueue: true,
         matched: true,
         matchId: queueEntry.match_id,
+        opponentUserId: queueEntry.opponent_user_id,
+        opponentAvatarId: opponentQueue.avatar_id,
         opponent: {
           userId: queueEntry.opponent_user_id,
-          nome: opponentAvatar?.usuarios?.nome_usuario || 'Oponente',
+          avatarId: opponentQueue.avatar_id,
+          nome: opponentAvatar?.nome || 'Oponente',
           avatar: opponentAvatar
         }
       });
