@@ -195,9 +195,12 @@ export default function ArenaPvPPage() {
 
       // Se já encontrou match imediatamente
       if (joinData.matched) {
+        console.log('✅ Match encontrado IMEDIATAMENTE via /join! Processando...');
         await processarMatch(joinData);
-        return;
+        return; // Não inicia polling!
       }
+
+      console.log('⏳ Match não encontrado imediatamente, iniciando polling...');
 
       // Polling para verificar se encontrou match
       const verificarMatch = async () => {
@@ -213,7 +216,8 @@ export default function ArenaPvPPage() {
           const checkData = await checkResponse.json();
 
           if (checkResponse.ok && checkData.success && checkData.matched) {
-            // Match encontrado!
+            // Match encontrado via polling!
+            console.log('✅ Match encontrado via POLLING! Limpando timers...');
             if (timeoutBusca) clearTimeout(timeoutBusca);
             if (intervalBusca) clearInterval(intervalBusca);
 
@@ -226,6 +230,17 @@ export default function ArenaPvPPage() {
           return false;
         }
       };
+
+      // DELAY INICIAL: Aguardar 500ms antes do primeiro check
+      // Isso dá tempo para o UPDATE se propagar no Supabase
+      console.log('⏱️ Aguardando 500ms antes do primeiro check (replicação do DB)...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Fazer o primeiro check imediatamente após o delay
+      const matchEncontrado = await verificarMatch();
+      if (matchEncontrado) {
+        return; // Match encontrado, não precisa continuar
+      }
 
       // Verificar a cada 2 segundos
       const interval = setInterval(async () => {
@@ -263,10 +278,13 @@ export default function ArenaPvPPage() {
   };
 
   const processarMatch = async (matchData) => {
-    console.log('🎯 Match encontrado! matchData completo:', JSON.stringify(matchData, null, 2));
-    console.log('🔍 matchData.opponentUserId:', matchData.opponentUserId);
-    console.log('🔍 matchData.opponentAvatarId:', matchData.opponentAvatarId);
-    console.log('🔍 matchData.opponent:', matchData.opponent);
+    const timestamp = new Date().toISOString();
+    console.log(`🎯 [${timestamp}] ============ PROCESSAR MATCH INICIADO ============`);
+    console.log(`🎯 [${timestamp}] matchData completo:`, JSON.stringify(matchData, null, 2));
+    console.log(`🔍 [${timestamp}] matchData.opponentUserId:`, matchData.opponentUserId);
+    console.log(`🔍 [${timestamp}] matchData.opponentAvatarId:`, matchData.opponentAvatarId);
+    console.log(`🔍 [${timestamp}] matchData.opponent:`, matchData.opponent);
+    console.log(`🔍 [${timestamp}] matchData.matchId:`, matchData.matchId);
 
     try {
       // Extrair IDs - suporta ambas estruturas (flat e nested)
