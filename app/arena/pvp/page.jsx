@@ -18,6 +18,8 @@ export default function ArenaPvPPage() {
   const [estadoMatchmaking, setEstadoMatchmaking] = useState('lobby'); // lobby, procurando, encontrado
   const [tempoEspera, setTempoEspera] = useState(0);
   const [oponenteEncontrado, setOponenteEncontrado] = useState(null);
+  const [timeoutBusca, setTimeoutBusca] = useState(null);
+  const [intervalBusca, setIntervalBusca] = useState(null);
 
   // Sistema de Ranking (Fama)
   const [fama, setFama] = useState(1000); // Começa em Bronze (1000 fama)
@@ -124,7 +126,7 @@ export default function ArenaPvPPage() {
     }
   };
 
-  const iniciarMatchmaking = () => {
+  const iniciarMatchmaking = async () => {
     if (!avatarAtivo) {
       setModalAlerta({
         titulo: '⚠️ Sem Avatar Ativo',
@@ -155,59 +157,183 @@ export default function ArenaPvPPage() {
         mensagem: 'Seu avatar está exausto! Isso causará penalidades severas em combate. Deseja continuar mesmo assim?',
         onConfirm: () => {
           setModalConfirmacao(null);
-          setEstadoMatchmaking('procurando');
+          buscarOponenteReal();
         },
         onCancel: () => setModalConfirmacao(null)
       });
       return;
     }
 
-    setEstadoMatchmaking('procurando');
-
-    // Simulação de matchmaking (substituir por WebSocket/API real)
-    setTimeout(() => {
-      // Gerar oponente simulado
-      const oponente = {
-        id: 'oponente_' + Date.now(),
-        nome: 'Jogador Adversário',
-        nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1, // ±1 nivel
-        avatar: gerarAvatarOponente(avatarAtivo.nivel)
-      };
-
-      setOponenteEncontrado(oponente);
-      setEstadoMatchmaking('encontrado');
-
-      // Auto-iniciar após 3 segundos
-      setTimeout(() => {
-        iniciarBatalha();
-      }, 3000);
-    }, Math.random() * 3000 + 2000); // 2-5 segundos
+    buscarOponenteReal();
   };
 
-  const cancelarMatchmaking = () => {
+  const buscarOponenteReal = async () => {
+    setEstadoMatchmaking('procurando');
+
+    try {
+      // Calcular poder total do avatar
+      const poderTotal = avatarAtivo.forca + avatarAtivo.agilidade + avatarAtivo.resistencia + avatarAtivo.foco;
+
+      // Entrar na fila de matchmaking
+      const joinResponse = await fetch('/api/pvp/queue/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          avatarId: avatarAtivo.id,
+          nivel: avatarAtivo.nivel,
+          poderTotal: poderTotal,
+          fama: fama
+        })
+      });
+
+      const joinData = await joinResponse.json();
+
+      if (!joinResponse.ok || !joinData.success) {
+        throw new Error(joinData.error || 'Erro ao entrar na fila');
+      }
+
+      // Se já encontrou match imediatamente
+      if (joinData.matched) {
+        await processarMatch(joinData);
+        return;
+      }
+
+      // Polling para verificar se encontrou match
+      const verificarMatch = async () => {
+        try {
+          const checkResponse = await fetch(
+            `/api/pvp/queue/check?userId=${user.id}`,
+            {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
+
+          const checkData = await checkResponse.json();
+
+          if (checkResponse.ok && checkData.success && checkData.matched) {
+            // Match encontrado!
+            if (timeoutBusca) clearTimeout(timeoutBusca);
+            if (intervalBusca) clearInterval(intervalBusca);
+
+            await processarMatch(checkData);
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error('Erro ao verificar match:', error);
+          return false;
+        }
+      };
+
+      // Verificar a cada 2 segundos
+      const interval = setInterval(async () => {
+        await verificarMatch();
+      }, 2000);
+      setIntervalBusca(interval);
+
+      // Timeout de 60 segundos (1 minuto)
+      const timeout = setTimeout(async () => {
+        clearInterval(interval);
+
+        // Sair da fila
+        await fetch('/api/pvp/queue/leave', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id })
+        });
+
+        setEstadoMatchmaking('lobby');
+        setModalAlerta({
+          titulo: '⏱️ Tempo Esgotado',
+          mensagem: 'Nenhum oponente disponível no momento. Tente novamente mais tarde!'
+        });
+      }, 60000);
+      setTimeoutBusca(timeout);
+
+    } catch (error) {
+      console.error('Erro ao buscar oponente:', error);
+      setEstadoMatchmaking('lobby');
+      setModalAlerta({
+        titulo: '⚠️ Erro',
+        mensagem: 'Erro ao procurar oponente. Tente novamente.'
+      });
+    }
+  };
+
+  const processarMatch = async (matchData) => {
+    console.log('Match encontrado!', matchData);
+
+    // Montar objeto do oponente
+    const oponente = {
+      id: matchData.opponent.userId,
+      nome: matchData.opponent.nome,
+      fama: matchData.opponent.avatar?.fama || 1000,
+      avatar: matchData.opponent.avatar,
+      matchId: matchData.matchId
+    };
+
+    setOponenteEncontrado(oponente);
+    setEstadoMatchmaking('encontrado');
+
+    // Auto-iniciar após 3 segundos
+    setTimeout(() => {
+      iniciarBatalhaComOponente(oponente);
+    }, 3000);
+  };
+
+  const cancelarMatchmaking = async () => {
+    // Limpar timers
+    if (timeoutBusca) {
+      clearTimeout(timeoutBusca);
+      setTimeoutBusca(null);
+    }
+    if (intervalBusca) {
+      clearInterval(intervalBusca);
+      setIntervalBusca(null);
+    }
+
+    // Sair da fila no banco de dados
+    try {
+      await fetch('/api/pvp/queue/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+    } catch (error) {
+      console.error('Erro ao sair da fila:', error);
+    }
+
     setEstadoMatchmaking('lobby');
     setOponenteEncontrado(null);
     setTempoEspera(0);
   };
 
-  const gerarAvatarOponente = (nivelBase) => {
-    const elementos = ['Fogo', 'Água', 'Terra', 'Vento', 'Eletricidade', 'Sombra', 'Luz'];
-    const raridades = ['Comum', 'Raro', 'Lendário'];
 
-    return {
-      id: 'oponente_avatar_' + Date.now(),
-      nome: 'Avatar do Oponente',
-      elemento: elementos[Math.floor(Math.random() * elementos.length)],
-      raridade: raridades[Math.floor(Math.random() * raridades.length)],
-      nivel: nivelBase,
-      forca: 15 + nivelBase * 2,
-      agilidade: 15 + nivelBase * 2,
-      resistencia: 15 + nivelBase * 2,
-      foco: 15 + nivelBase * 2,
-    };
-  };
+  const iniciarBatalhaComOponente = (oponente) => {
+    // Validação de segurança
+    if (!oponente || !oponente.avatar) {
+      console.error('Erro: Oponente não encontrado ou dados incompletos', oponente);
+      setModalAlerta({
+        titulo: '⚠️ Erro no Matchmaking',
+        mensagem: 'Houve um erro ao iniciar a batalha. Tente novamente.'
+      });
+      setEstadoMatchmaking('lobby');
+      setOponenteEncontrado(null);
+      return;
+    }
 
-  const iniciarBatalha = () => {
+    if (!avatarAtivo) {
+      console.error('Erro: Avatar ativo não encontrado');
+      setModalAlerta({
+        titulo: '⚠️ Erro',
+        mensagem: 'Avatar ativo não encontrado. Recarregue a página.'
+      });
+      setEstadoMatchmaking('lobby');
+      return;
+    }
+
     // Aplicar penalidades de exaustão aos stats do avatar ANTES de entrar em batalha
     const statsBase = {
       forca: avatarAtivo.forca,
@@ -229,13 +355,17 @@ export default function ArenaPvPPage() {
     // Armazenar dados da partida PvP no sessionStorage
     const dadosPartida = {
       tipo: 'pvp',
+      pvpAoVivo: true, // Flag para indicar PvP em tempo real
+      matchId: oponente.matchId, // ID da sala de batalha
       avatarJogador: avatarComPenalidades,
-      avatarOponente: oponenteEncontrado.avatar,
-      nomeOponente: oponenteEncontrado.nome,
+      avatarOponente: oponente.avatar,
+      nomeOponente: oponente.nome,
       famaJogador: fama,
-      famaOponente: oponenteEncontrado.avatar.nivel * 200 + 1000, // Simular fama do oponente
+      famaOponente: oponente.fama || 1000,
       tierJogador: getTierPorFama(fama),
-      streakJogador: streak
+      streakJogador: streak,
+      oponenteReal: true, // Sempre jogador real
+      oponenteId: oponente.id // ID do oponente real
     };
 
     sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));
@@ -640,12 +770,24 @@ export default function ArenaPvPPage() {
                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
                       Enfrente outros jogadores em batalhas táticas! Suba de tier, ganhe fama e conquiste recompensas incríveis!
                     </p>
-                    <div className="text-xs text-slate-400 space-y-1">
-                      <div>✅ Batalhas em tempo real (30s por turno)</div>
+                    <div className="text-xs text-slate-400 space-y-1 mb-3">
+                      <div>✅ Batalhas AO VIVO contra jogadores reais</div>
+                      <div>✅ Ambos jogadores controlam seus avatares simultaneamente</div>
                       <div>✅ Sistema de ranking com 6 tiers</div>
-                      <div>✅ Recompensas escalonadas (1.0x → 3.0x)</div>
+                      <div>✅ Matchmaking por poder total do avatar (balanceado)</div>
                       <div>✅ Ganha Fama, XP, Moedas, Vínculo e Fragmentos</div>
-                      <div>✅ Matchmaking balanceado por nível</div>
+                    </div>
+                    <div className="bg-green-950/50 border border-green-500/50 rounded-lg p-3">
+                      <p className="text-xs text-green-300 font-bold flex items-center gap-2">
+                        <span>🌐</span>
+                        <span>PVP AO VIVO: Batalhas em tempo real contra jogadores online!</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        * Matchmaking por poder do avatar (±50 pontos). Tempo máximo: 1 minuto
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        * Para treinar contra IA, use o modo Treinamento na Arena
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -791,9 +933,17 @@ export default function ArenaPvPPage() {
           <div className="max-w-4xl mx-auto">
             <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-green-500/50">
               <div className="text-center space-y-8">
-                <h2 className="text-4xl font-black text-green-400 mb-4">
-                  🎯 OPONENTE ENCONTRADO!
-                </h2>
+                <div>
+                  <h2 className="text-4xl font-black text-green-400 mb-4">
+                    🎯 OPONENTE ENCONTRADO!
+                  </h2>
+                  <div className="inline-block bg-green-950/50 border border-green-500/50 rounded-full px-4 py-2">
+                    <p className="text-xs text-green-300 font-bold flex items-center gap-2">
+                      <span>🌐</span>
+                      <span>JOGADOR REAL</span>
+                    </p>
+                  </div>
+                </div>
 
                 {/* Versus */}
                 <div className="grid md:grid-cols-3 gap-6 items-center">
