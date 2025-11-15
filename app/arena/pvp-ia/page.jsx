@@ -304,15 +304,35 @@ export default function PvPIAPage() {
                     <AvatarSVG avatar={oponente.avatar} tamanho={140} />
                   </div>
 
-                  <div className="space-y-2 text-sm mb-4">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Elemento:</span>
-                      <span className={getElementoColor(oponente.avatar.elemento)}>{oponente.avatar.elemento}</span>
+                  {/* HP Bar */}
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-400">HP</span>
+                      <span className="text-white font-bold">{calcularHPMaximoCompleto(oponente.avatar)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Poder:</span>
-                      <span className="text-cyan-400 font-bold">{oponente.poderTotal}</span>
+                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                      <div className="bg-green-500 h-full w-full" />
                     </div>
+                  </div>
+
+                  {/* EXP Bar */}
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-400">Experiência</span>
+                      <span className="text-purple-400 font-bold">Nv. {oponente.avatar.nivel}</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-purple-500 h-full transition-all"
+                        style={{ width: `${((oponente.avatar.experiencia || 0) / 100) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Poder Total */}
+                  <div className="mb-4 text-center">
+                    <div className="text-xs text-gray-400">Poder Total</div>
+                    <div className="text-cyan-400 font-bold text-lg">{oponente.poderTotal}</div>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2 text-xs text-center mb-4">

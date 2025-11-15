@@ -20,11 +20,13 @@ export async function POST(request) {
     console.log('[PVP IA FINALIZAR]', { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu });
 
     // 1. Atualizar ranking PVP (fama)
-    const { data: rankingAtual } = await supabase
+    const { data: rankingAtual, error: rankingError } = await supabase
       .from('pvp_rankings')
       .select('*')
       .eq('user_id', userId)
       .single();
+
+    console.log('[RANKING ATUAL]', rankingAtual, rankingError);
 
     if (rankingAtual) {
       // Atualizar existente
@@ -33,7 +35,9 @@ export async function POST(request) {
       const novasDerrotas = !vitoria ? rankingAtual.derrotas + 1 : rankingAtual.derrotas;
       const novoStreak = vitoria ? (rankingAtual.streak || 0) + 1 : 0;
 
-      await supabase
+      console.log('[ATUALIZANDO RANKING]', { novaFama, novasVitorias, novasDerrotas, novoStreak });
+
+      const { error: updateError } = await supabase
         .from('pvp_rankings')
         .update({
           fama: novaFama,
@@ -43,6 +47,12 @@ export async function POST(request) {
           updated_at: new Date().toISOString()
         })
         .eq('user_id', userId);
+
+      if (updateError) {
+        console.error('[ERRO UPDATE RANKING]', updateError);
+      } else {
+        console.log('[RANKING ATUALIZADO COM SUCESSO]');
+      }
     } else {
       // Criar novo
       await supabase
@@ -57,11 +67,13 @@ export async function POST(request) {
     }
 
     // 2. Atualizar avatar
-    const { data: avatar } = await supabase
+    const { data: avatar, error: avatarError } = await supabase
       .from('avatares')
       .select('vinculo, exaustao')
       .eq('id', avatarId)
       .single();
+
+    console.log('[AVATAR ATUAL]', avatar, avatarError);
 
     if (avatar) {
       const novoVinculo = Math.min(100, (avatar.vinculo || 0) + vinculoGanho);
@@ -80,10 +92,18 @@ export async function POST(request) {
         updates.hp_atual = 0;
       }
 
-      await supabase
+      console.log('[ATUALIZANDO AVATAR]', updates);
+
+      const { error: updateAvatarError } = await supabase
         .from('avatares')
         .update(updates)
         .eq('id', avatarId);
+
+      if (updateAvatarError) {
+        console.error('[ERRO UPDATE AVATAR]', updateAvatarError);
+      } else {
+        console.log('[AVATAR ATUALIZADO COM SUCESSO]');
+      }
     }
 
     return NextResponse.json({

@@ -50,6 +50,7 @@ export default function BatalhaIAPage() {
   // IA
   const [personalidadeIA, setPersonalidadeIA] = useState(null);
   const [iaPensando, setIaPensando] = useState(false);
+  const [iaFugiu, setIaFugiu] = useState(false);
 
   // Log de batalha
   const [logBatalha, setLogBatalha] = useState([]);
@@ -153,6 +154,7 @@ export default function BatalhaIAPage() {
       if (fugiu) {
         addLog(`${dadosPartida.nomeOponente} tenta fugir da batalha!`, 'ia');
         addLog(`✅ ${dadosPartida.nomeOponente} conseguiu fugir!`, 'aviso');
+        setIaFugiu(true); // Marcar que fugiu
         finalizarBatalha('fuga_ia');
         return;
       } else {
@@ -581,6 +583,16 @@ export default function BatalhaIAPage() {
 
   const salvarResultadoBatalha = async (vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu) => {
     try {
+      console.log('[SALVANDO RESULTADO]', {
+        userId: user.id,
+        avatarId: dadosPartida.avatarJogador.id,
+        vitoria,
+        famaGanha,
+        vinculoGanho,
+        exaustaoGanha,
+        avatarMorreu
+      });
+
       const response = await fetch('/api/pvp/ia/finalizar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -595,11 +607,19 @@ export default function BatalhaIAPage() {
         })
       });
 
+      const data = await response.json();
+      console.log('[RESPOSTA API]', data);
+
       if (!response.ok) {
-        console.error('Erro ao salvar resultado');
+        console.error('Erro ao salvar resultado:', data);
+        addLog('⚠️ Erro ao salvar resultado da batalha!', 'aviso');
+      } else {
+        console.log('✅ Resultado salvo com sucesso!');
+        addLog('💾 Resultado da batalha salvo!', 'info');
       }
     } catch (error) {
       console.error('Erro ao salvar resultado:', error);
+      addLog('⚠️ Erro ao salvar resultado da batalha!', 'aviso');
     }
   };
 
@@ -716,9 +736,14 @@ export default function BatalhaIAPage() {
                 {/* Avatar Visual */}
                 <div className="bg-gradient-to-b from-slate-950/50 to-slate-800 rounded-lg p-6 mb-4 flex justify-center relative">
                   <AvatarSVG avatar={dadosPartida.avatarOponente} tamanho={220} />
-                  {iaPensando && (
+                  {iaPensando && !iaFugiu && (
                     <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
                       <div className="text-orange-400 animate-pulse text-lg font-bold">⚡ Pensando...</div>
+                    </div>
+                  )}
+                  {iaFugiu && (
+                    <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center">
+                      <div className="text-yellow-400 text-2xl font-bold">🏃 FUGIU!</div>
                     </div>
                   )}
                 </div>
