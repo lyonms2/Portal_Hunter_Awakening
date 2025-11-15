@@ -4,8 +4,8 @@ import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/buscar-avatar?avatarId=...
- * Busca dados de um avatar específico pelo ID
+ * GET /api/buscar-avatar?avatarId=... OU ?userId=...
+ * Busca dados de um avatar específico pelo ID ou busca avatar ativo do usuário
  */
 export async function GET(request) {
   try {
@@ -16,24 +16,46 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const avatarId = searchParams.get('avatarId');
+    const userId = searchParams.get('userId');
 
-    if (!avatarId) {
+    if (!avatarId && !userId) {
       return NextResponse.json(
-        { error: 'avatarId é obrigatório' },
+        { error: 'avatarId ou userId é obrigatório' },
         { status: 400 }
       );
     }
 
-    // Buscar avatar no banco
-    const { data: avatar, error } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .single();
+    let avatar;
 
-    if (error) {
-      console.error('Erro ao buscar avatar:', error);
-      return NextResponse.json({ error: 'Avatar não encontrado' }, { status: 404 });
+    if (avatarId) {
+      // Buscar por ID do avatar
+      const { data, error } = await supabase
+        .from('avatares')
+        .select('*')
+        .eq('id', avatarId)
+        .single();
+
+      if (error) {
+        console.error('Erro ao buscar avatar por ID:', error);
+        return NextResponse.json({ error: 'Avatar não encontrado' }, { status: 404 });
+      }
+
+      avatar = data;
+    } else {
+      // Buscar avatar ativo do usuário
+      const { data, error } = await supabase
+        .from('avatares')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('ativo', true)
+        .single();
+
+      if (error) {
+        console.error('Erro ao buscar avatar ativo:', error);
+        return NextResponse.json({ error: 'Avatar ativo não encontrado' }, { status: 404 });
+      }
+
+      avatar = data;
     }
 
     return NextResponse.json({
