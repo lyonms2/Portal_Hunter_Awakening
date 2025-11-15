@@ -37,9 +37,17 @@ export async function POST(request) {
       .eq('user_id', userId)
       .single();
 
+    console.log(`📋 [${requestId}] Existing entry check:`, {
+      found: !!existingEntry,
+      status: existingEntry?.status,
+      matchId: existingEntry?.match_id,
+      timestamp: new Date().toISOString()
+    });
+
     if (existingEntry) {
       // Se já está na fila e aguardando, retornar sucesso
       if (existingEntry.status === 'waiting') {
+        console.log(`♻️ [${requestId}] Jogador já está na fila com status=waiting, retornando entry existente`);
         return NextResponse.json({
           success: true,
           message: 'Já está na fila',
@@ -49,7 +57,9 @@ export async function POST(request) {
 
       // Se já encontrou match, retornar o match
       if (existingEntry.status === 'matched') {
-        console.log('♻️ Jogador já estava matched, retornando match existente');
+        console.log(`🚨 [${requestId}] ⚠️ CHAMADA DUPLICADA! Jogador já estava matched!`);
+        console.log(`🚨 [${requestId}] Match ID existente: ${existingEntry.match_id}`);
+        console.log(`🚨 [${requestId}] Opponent User ID existente: ${existingEntry.opponent_user_id}`);
 
         // Buscar avatar_id do oponente
         const { data: opponentQueue } = await supabase
@@ -72,13 +82,14 @@ export async function POST(request) {
     if (existingEntry) {
       if (existingEntry.status === 'matched') {
         // Não deve chegar aqui (já retornou acima), mas por segurança
-        console.error('⚠️ Tentativa de recriar entrada matched - abortando');
+        console.error(`🚨🚨🚨 [${requestId}] ERRO CRÍTICO: Tentativa de recriar entrada matched - abortando!`);
+        console.error(`🚨 [${requestId}] Este código NÃO deveria ser executado! Status: ${existingEntry.status}`);
         return NextResponse.json({
           error: 'Jogador já está em uma partida matched'
         }, { status: 400 });
       }
 
-      console.log('🗑️ Removendo entrada antiga com status:', existingEntry.status);
+      console.log(`🗑️ [${requestId}] Removendo entrada antiga com status: ${existingEntry.status}`);
       await supabase
         .from('pvp_matchmaking_queue')
         .delete()
@@ -86,6 +97,9 @@ export async function POST(request) {
     }
 
     // Adicionar à fila
+    console.log(`➕ [${requestId}] Inserindo nova entrada na fila com status=waiting`);
+    console.log(`➕ [${requestId}] Timestamp do INSERT: ${new Date().toISOString()}`);
+
     const { data: queueEntry, error: insertError } = await supabase
       .from('pvp_matchmaking_queue')
       .insert({
@@ -100,9 +114,11 @@ export async function POST(request) {
       .single();
 
     if (insertError) {
-      console.error('Erro ao entrar na fila:', insertError);
+      console.error(`❌ [${requestId}] Erro ao entrar na fila:`, insertError);
       return NextResponse.json({ error: 'Erro ao entrar na fila' }, { status: 500 });
     }
+
+    console.log(`✅ [${requestId}] Entry criada com sucesso! ID da entry na queue:`, queueEntry.id);
 
     // Tentar encontrar match imediatamente
     console.log(`🔄 [${requestId}] ⚠️ CHAMANDO find_pvp_match() VIA /join para userId=${userId}`);
