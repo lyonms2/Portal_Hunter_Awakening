@@ -44,8 +44,8 @@ export default function PvPIAPage() {
         const ativo = data.avatares.find(av => av.ativo && av.vivo);
         if (ativo) {
           setAvatarAtivo(ativo);
-          // Buscar oponentes com poder similar
-          buscarOponentes(ativo);
+          // Buscar oponentes com poder similar, passando userId
+          buscarOponentes(ativo, userId);
         } else {
           setAvatarAtivo(null);
         }
@@ -57,16 +57,27 @@ export default function PvPIAPage() {
     }
   };
 
-  const buscarOponentes = async (avatar) => {
+  const buscarOponentes = async (avatar, userId = null) => {
     setLoadingOponentes(true);
     try {
       const poderAtual = calcularPoderTotal(avatar);
+      const userIdFinal = userId || user?.id;
 
-      const response = await fetch(`/api/pvp/ia/oponentes?poder=${poderAtual}&userId=${user?.id || ''}`);
+      console.log('[FRONTEND] Buscando oponentes com userId:', userIdFinal);
+
+      if (!userIdFinal) {
+        console.error('[FRONTEND] userId não disponível!');
+        return;
+      }
+
+      const response = await fetch(`/api/pvp/ia/oponentes?poder=${poderAtual}&userId=${userIdFinal}`);
       const data = await response.json();
 
       if (response.ok) {
+        console.log('[FRONTEND] Oponentes recebidos:', data.oponentes?.length || 0);
         setOponentesDisponiveis(data.oponentes || []);
+      } else {
+        console.error('[FRONTEND] Erro ao buscar oponentes:', data);
       }
     } catch (error) {
       console.error("Erro ao buscar oponentes:", error);
@@ -332,7 +343,7 @@ export default function PvPIAPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-3xl font-black text-white">Oponentes Disponíveis</h2>
             <button
-              onClick={() => buscarOponentes(avatarAtivo)}
+              onClick={() => buscarOponentes(avatarAtivo, user?.id)}
               disabled={loadingOponentes}
               className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 text-white px-6 py-2 rounded font-bold"
             >
