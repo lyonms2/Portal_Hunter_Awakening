@@ -80,30 +80,21 @@ export async function GET(request) {
 
     console.log(`[OPONENTES IA] Encontrados ${avataresFiltrados.length} oponentes após filtro`);
 
-    // Buscar nomes dos caçadores (donos dos avatares) da coluna nome_operacao
+    // Buscar nomes dos caçadores da tabela player_stats (coluna nome_operacao)
     const userIds = [...new Set(avataresFiltrados.map(a => a.user_id))];
 
-    // Buscar usuários do Supabase Auth para pegar nome_operacao
-    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    const { data: playerStats } = await supabase
+      .from('player_stats')
+      .select('user_id, nome_operacao')
+      .in('user_id', userIds);
 
-    console.log('[OPONENTES IA] Usuários auth encontrados:', authUsers?.users?.length || 0);
+    console.log('[OPONENTES IA] Player stats encontrados:', playerStats?.length || 0);
 
-    // Criar mapa de userId -> nome (da coluna nome_operacao)
+    // Criar mapa de userId -> nome
     const nomesMap = {};
-    if (authUsers && authUsers.users && authUsers.users.length > 0) {
-      authUsers.users.forEach(authUser => {
-        if (userIds.includes(authUser.id)) {
-          // Tentar pegar nome_operacao dos metadados ou usar email
-          const nomeOperacao = authUser.user_metadata?.nome_operacao;
-          if (nomeOperacao) {
-            nomesMap[authUser.id] = nomeOperacao;
-          } else {
-            // Fallback: extrair do email
-            const email = authUser.email;
-            const username = email ? email.split('@')[0] : 'Misterioso';
-            nomesMap[authUser.id] = username.charAt(0).toUpperCase() + username.slice(1);
-          }
-        }
+    if (playerStats && playerStats.length > 0) {
+      playerStats.forEach(stats => {
+        nomesMap[stats.user_id] = stats.nome_operacao || 'Caçador Misterioso';
       });
     }
 
