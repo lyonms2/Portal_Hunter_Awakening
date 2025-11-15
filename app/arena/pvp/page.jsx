@@ -18,6 +18,8 @@ export default function ArenaPvPPage() {
   const [estadoMatchmaking, setEstadoMatchmaking] = useState('lobby'); // lobby, procurando, encontrado
   const [tempoEspera, setTempoEspera] = useState(0);
   const [oponenteEncontrado, setOponenteEncontrado] = useState(null);
+  const [timeoutBusca, setTimeoutBusca] = useState(null);
+  const [intervalBusca, setIntervalBusca] = useState(null);
 
   // Sistema de Ranking (Fama)
   const [fama, setFama] = useState(1000); // Começa em Bronze (1000 fama)
@@ -168,111 +170,84 @@ export default function ArenaPvPPage() {
   const buscarOponenteReal = async () => {
     setEstadoMatchmaking('procurando');
 
-    try {
-      // Buscar oponente real via API
-      const response = await fetch(
-        `/api/pvp/matchmaking?userId=${user.id}&nivel=${avatarAtivo.nivel}&fama=${fama}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+    // Função para tentar buscar oponente
+    const tentarBuscar = async () => {
+      try {
+        const response = await fetch(
+          `/api/pvp/matchmaking?userId=${user.id}&nivel=${avatarAtivo.nivel}&fama=${fama}`,
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (response.ok && data.success) {
-        if (data.oponente) {
+        if (response.ok && data.success && data.oponente) {
           // Oponente real encontrado!
           const oponente = data.oponente;
+
+          // Limpar timers
+          if (timeoutBusca) clearTimeout(timeoutBusca);
+          if (intervalBusca) clearInterval(intervalBusca);
+
           setOponenteEncontrado(oponente);
           setEstadoMatchmaking('encontrado');
 
-          // Auto-iniciar após 3 segundos, passando o oponente para evitar closure issues
+          // Auto-iniciar após 3 segundos
           setTimeout(() => {
             iniciarBatalhaComOponente(oponente);
           }, 3000);
-        } else {
-          // Nenhum oponente disponível, usar fallback de oponente simulado
-          console.log('Nenhum oponente real disponível, usando simulação');
-          const oponenteSimulado = {
-            id: 'oponente_simulado_' + Date.now(),
-            nome: 'Guerreiro Simulado',
-            nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1,
-            fama: fama + Math.floor(Math.random() * 400) - 200,
-            avatar: gerarAvatarOponente(avatarAtivo.nivel),
-            isSimulado: true
-          };
 
-          setOponenteEncontrado(oponenteSimulado);
-          setEstadoMatchmaking('encontrado');
-
-          setTimeout(() => {
-            iniciarBatalhaComOponente(oponenteSimulado);
-          }, 3000);
+          return true;
         }
-      } else {
-        // Erro na API, usar fallback
-        console.error('Erro ao buscar oponente:', data.error);
-        const oponenteSimulado = {
-          id: 'oponente_simulado_' + Date.now(),
-          nome: 'Guerreiro Simulado',
-          nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1,
-          fama: fama + Math.floor(Math.random() * 400) - 200,
-          avatar: gerarAvatarOponente(avatarAtivo.nivel),
-          isSimulado: true
-        };
-
-        setOponenteEncontrado(oponenteSimulado);
-        setEstadoMatchmaking('encontrado');
-
-        setTimeout(() => {
-          iniciarBatalhaComOponente(oponenteSimulado);
-        }, 3000);
+        return false;
+      } catch (error) {
+        console.error('Erro ao buscar oponente:', error);
+        return false;
       }
-    } catch (error) {
-      console.error('Erro ao buscar oponente:', error);
+    };
 
-      // Fallback para oponente simulado em caso de erro
-      const oponenteSimulado = {
-        id: 'oponente_simulado_' + Date.now(),
-        nome: 'Guerreiro Simulado',
-        nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1,
-        fama: fama + Math.floor(Math.random() * 400) - 200,
-        avatar: gerarAvatarOponente(avatarAtivo.nivel),
-        isSimulado: true
-      };
+    // Primeira tentativa imediata
+    const encontrado = await tentarBuscar();
+    if (encontrado) return;
 
-      setOponenteEncontrado(oponenteSimulado);
-      setEstadoMatchmaking('encontrado');
+    // Buscar a cada 5 segundos
+    const interval = setInterval(async () => {
+      await tentarBuscar();
+    }, 5000);
+    setIntervalBusca(interval);
 
-      setTimeout(() => {
-        iniciarBatalhaComOponente(oponenteSimulado);
-      }, 3000);
-    }
+    // Timeout de 60 segundos (1 minuto)
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+
+      // Se ainda estiver procurando, mostrar mensagem e voltar ao lobby
+      setEstadoMatchmaking('lobby');
+      setModalAlerta({
+        titulo: '⏱️ Tempo Esgotado',
+        mensagem: 'Nenhum oponente disponível no momento. Tente novamente mais tarde!'
+      });
+    }, 60000);
+    setTimeoutBusca(timeout);
   };
 
   const cancelarMatchmaking = () => {
+    // Limpar timers
+    if (timeoutBusca) {
+      clearTimeout(timeoutBusca);
+      setTimeoutBusca(null);
+    }
+    if (intervalBusca) {
+      clearInterval(intervalBusca);
+      setIntervalBusca(null);
+    }
+
     setEstadoMatchmaking('lobby');
     setOponenteEncontrado(null);
     setTempoEspera(0);
   };
 
-  const gerarAvatarOponente = (nivelBase) => {
-    const elementos = ['Fogo', 'Água', 'Terra', 'Vento', 'Eletricidade', 'Sombra', 'Luz'];
-    const raridades = ['Comum', 'Raro', 'Lendário'];
-
-    return {
-      id: 'oponente_avatar_' + Date.now(),
-      nome: 'Avatar do Oponente',
-      elemento: elementos[Math.floor(Math.random() * elementos.length)],
-      raridade: raridades[Math.floor(Math.random() * raridades.length)],
-      nivel: nivelBase,
-      forca: 15 + nivelBase * 2,
-      agilidade: 15 + nivelBase * 2,
-      resistencia: 15 + nivelBase * 2,
-      foco: 15 + nivelBase * 2,
-    };
-  };
 
   const iniciarBatalhaComOponente = (oponente) => {
     // Validação de segurança
@@ -322,11 +297,11 @@ export default function ArenaPvPPage() {
       avatarOponente: oponente.avatar,
       nomeOponente: oponente.nome,
       famaJogador: fama,
-      famaOponente: oponente.fama || (oponente.avatar.nivel * 200 + 1000), // Usar fama real ou simular
+      famaOponente: oponente.fama || 1000,
       tierJogador: getTierPorFama(fama),
       streakJogador: streak,
-      oponenteReal: !oponente.isSimulado, // Flag para saber se é oponente real
-      oponenteId: oponente.isSimulado ? null : oponente.id // ID do oponente real
+      oponenteReal: true, // Sempre jogador real
+      oponenteId: oponente.id // ID do oponente real
     };
 
     sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));
@@ -741,10 +716,10 @@ export default function ArenaPvPPage() {
                     <div className="bg-green-950/50 border border-green-500/50 rounded-lg p-3">
                       <p className="text-xs text-green-300 font-bold flex items-center gap-2">
                         <span>🌐</span>
-                        <span>MATCHMAKING REAL ATIVO: Agora você enfrenta avatares de jogadores reais!</span>
+                        <span>MATCHMAKING REAL: Apenas jogadores reais! Tempo máximo de espera: 1 minuto</span>
                       </p>
                       <p className="text-[10px] text-slate-400 mt-1">
-                        * Se não houver oponentes disponíveis, um adversário simulado será criado
+                        * Para treinar contra IA, use o modo Treinamento na Arena
                       </p>
                     </div>
                   </div>
@@ -895,21 +870,12 @@ export default function ArenaPvPPage() {
                   <h2 className="text-4xl font-black text-green-400 mb-4">
                     🎯 OPONENTE ENCONTRADO!
                   </h2>
-                  {!oponenteEncontrado.isSimulado ? (
-                    <div className="inline-block bg-green-950/50 border border-green-500/50 rounded-full px-4 py-2">
-                      <p className="text-xs text-green-300 font-bold flex items-center gap-2">
-                        <span>🌐</span>
-                        <span>JOGADOR REAL</span>
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="inline-block bg-blue-950/50 border border-blue-500/50 rounded-full px-4 py-2">
-                      <p className="text-xs text-blue-300 font-bold flex items-center gap-2">
-                        <span>🤖</span>
-                        <span>OPONENTE SIMULADO</span>
-                      </p>
-                    </div>
-                  )}
+                  <div className="inline-block bg-green-950/50 border border-green-500/50 rounded-full px-4 py-2">
+                    <p className="text-xs text-green-300 font-bold flex items-center gap-2">
+                      <span>🌐</span>
+                      <span>JOGADOR REAL</span>
+                    </p>
+                  </div>
                 </div>
 
                 {/* Versus */}
