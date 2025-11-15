@@ -80,22 +80,28 @@ export async function GET(request) {
 
     console.log(`[OPONENTES IA] Encontrados ${avataresFiltrados.length} oponentes após filtro`);
 
-    // Buscar nomes dos caçadores (donos dos avatares)
+    // Buscar emails dos caçadores (donos dos avatares) do Supabase Auth
     const userIds = [...new Set(avataresFiltrados.map(a => a.user_id))];
 
-    // Buscar usuários reais do banco
-    const { data: usuarios } = await supabase
-      .from('users')
-      .select('id, nome')
-      .in('id', userIds);
+    // Buscar usuários do Supabase Auth
+    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
 
-    // Criar mapa de userId -> nome
+    console.log('[OPONENTES IA] Usuários auth encontrados:', authUsers?.users?.length || 0);
+
+    // Criar mapa de userId -> nome (extraído do email)
     const nomesMap = {};
-    if (usuarios && usuarios.length > 0) {
-      usuarios.forEach(user => {
-        nomesMap[user.id] = user.nome || 'Caçador Misterioso';
+    if (authUsers && authUsers.users && authUsers.users.length > 0) {
+      authUsers.users.forEach(authUser => {
+        if (userIds.includes(authUser.id)) {
+          const email = authUser.email;
+          const username = email ? email.split('@')[0] : 'Misterioso';
+          const nomeFormatado = username.charAt(0).toUpperCase() + username.slice(1);
+          nomesMap[authUser.id] = nomeFormatado;
+        }
       });
     }
+
+    console.log('[OPONENTES IA] Nomes mapeados:', Object.keys(nomesMap).length);
 
     const oponentesFormatados = avataresFiltrados
       .filter(avatar => avatar.user_id !== userId) // VERIFICAÇÃO TRIPLA

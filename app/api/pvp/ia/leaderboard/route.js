@@ -26,18 +26,22 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Erro ao buscar rankings' }, { status: 500 });
     }
 
-    // Buscar nomes dos usuários
+    // Buscar emails dos usuários do Supabase Auth
     const userIds = rankings.map(r => r.user_id);
-    const { data: usuarios } = await supabase
-      .from('users')
-      .select('id, nome')
-      .in('id', userIds);
 
-    // Criar mapa de userId -> nome
+    // Buscar usuários do Supabase Auth
+    const { data: authUsers } = await supabase.auth.admin.listUsers();
+
+    // Criar mapa de userId -> nome (extraído do email)
     const nomesMap = {};
-    if (usuarios && usuarios.length > 0) {
-      usuarios.forEach(user => {
-        nomesMap[user.id] = user.nome || 'Caçador Misterioso';
+    if (authUsers && authUsers.users && authUsers.users.length > 0) {
+      authUsers.users.forEach(authUser => {
+        if (userIds.includes(authUser.id)) {
+          const email = authUser.email;
+          const username = email ? email.split('@')[0] : 'Misterioso';
+          const nomeFormatado = username.charAt(0).toUpperCase() + username.slice(1);
+          nomesMap[authUser.id] = nomeFormatado;
+        }
       });
     }
 
