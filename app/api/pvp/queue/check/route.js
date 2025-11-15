@@ -40,6 +40,14 @@ export async function GET(request) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
+      // FORCE PRIMARY READ: Fazer uma operação RPC primeiro para forçar conexão ao PRIMARY
+      // RPCs sempre vão para o primary database, não para read replicas
+      if (attempt > 0) {
+        // Só faz isso nos retries, para não atrasar o primeiro check
+        console.log(`🔧 [${requestId}] Forçando conexão ao PRIMARY via RPC cleanup...`);
+        await supabase.rpc('cleanup_expired_queue_entries');
+      }
+
       // Buscar entrada na fila
       // IMPORTANTE: Usar .order() + .limit(1) + .maybeSingle() para FORÇAR query fresca
       // sem cache do Supabase client e evitar connection pooling issues
