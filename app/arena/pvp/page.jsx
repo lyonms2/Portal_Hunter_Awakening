@@ -124,7 +124,7 @@ export default function ArenaPvPPage() {
     }
   };
 
-  const iniciarMatchmaking = () => {
+  const iniciarMatchmaking = async () => {
     if (!avatarAtivo) {
       setModalAlerta({
         titulo: '⚠️ Sem Avatar Ativo',
@@ -155,33 +155,99 @@ export default function ArenaPvPPage() {
         mensagem: 'Seu avatar está exausto! Isso causará penalidades severas em combate. Deseja continuar mesmo assim?',
         onConfirm: () => {
           setModalConfirmacao(null);
-          setEstadoMatchmaking('procurando');
+          buscarOponenteReal();
         },
         onCancel: () => setModalConfirmacao(null)
       });
       return;
     }
 
+    buscarOponenteReal();
+  };
+
+  const buscarOponenteReal = async () => {
     setEstadoMatchmaking('procurando');
 
-    // Simulação de matchmaking (substituir por WebSocket/API real)
-    setTimeout(() => {
-      // Gerar oponente simulado
-      const oponente = {
-        id: 'oponente_' + Date.now(),
-        nome: 'Jogador Adversário',
-        nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1, // ±1 nivel
-        avatar: gerarAvatarOponente(avatarAtivo.nivel)
+    try {
+      // Buscar oponente real via API
+      const response = await fetch(
+        `/api/pvp/matchmaking?userId=${user.id}&nivel=${avatarAtivo.nivel}&fama=${fama}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        if (data.oponente) {
+          // Oponente real encontrado!
+          setOponenteEncontrado(data.oponente);
+          setEstadoMatchmaking('encontrado');
+
+          // Auto-iniciar após 3 segundos
+          setTimeout(() => {
+            iniciarBatalha();
+          }, 3000);
+        } else {
+          // Nenhum oponente disponível, usar fallback de oponente simulado
+          console.log('Nenhum oponente real disponível, usando simulação');
+          const oponenteSimulado = {
+            id: 'oponente_simulado_' + Date.now(),
+            nome: 'Guerreiro Simulado',
+            nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1,
+            fama: fama + Math.floor(Math.random() * 400) - 200,
+            avatar: gerarAvatarOponente(avatarAtivo.nivel),
+            isSimulado: true
+          };
+
+          setOponenteEncontrado(oponenteSimulado);
+          setEstadoMatchmaking('encontrado');
+
+          setTimeout(() => {
+            iniciarBatalha();
+          }, 3000);
+        }
+      } else {
+        // Erro na API, usar fallback
+        console.error('Erro ao buscar oponente:', data.error);
+        const oponenteSimulado = {
+          id: 'oponente_simulado_' + Date.now(),
+          nome: 'Guerreiro Simulado',
+          nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1,
+          fama: fama + Math.floor(Math.random() * 400) - 200,
+          avatar: gerarAvatarOponente(avatarAtivo.nivel),
+          isSimulado: true
+        };
+
+        setOponenteEncontrado(oponenteSimulado);
+        setEstadoMatchmaking('encontrado');
+
+        setTimeout(() => {
+          iniciarBatalha();
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar oponente:', error);
+
+      // Fallback para oponente simulado em caso de erro
+      const oponenteSimulado = {
+        id: 'oponente_simulado_' + Date.now(),
+        nome: 'Guerreiro Simulado',
+        nivel: avatarAtivo.nivel + Math.floor(Math.random() * 3) - 1,
+        fama: fama + Math.floor(Math.random() * 400) - 200,
+        avatar: gerarAvatarOponente(avatarAtivo.nivel),
+        isSimulado: true
       };
 
-      setOponenteEncontrado(oponente);
+      setOponenteEncontrado(oponenteSimulado);
       setEstadoMatchmaking('encontrado');
 
-      // Auto-iniciar após 3 segundos
       setTimeout(() => {
         iniciarBatalha();
       }, 3000);
-    }, Math.random() * 3000 + 2000); // 2-5 segundos
+    }
   };
 
   const cancelarMatchmaking = () => {
@@ -233,9 +299,11 @@ export default function ArenaPvPPage() {
       avatarOponente: oponenteEncontrado.avatar,
       nomeOponente: oponenteEncontrado.nome,
       famaJogador: fama,
-      famaOponente: oponenteEncontrado.avatar.nivel * 200 + 1000, // Simular fama do oponente
+      famaOponente: oponenteEncontrado.fama || (oponenteEncontrado.avatar.nivel * 200 + 1000), // Usar fama real ou simular
       tierJogador: getTierPorFama(fama),
-      streakJogador: streak
+      streakJogador: streak,
+      oponenteReal: !oponenteEncontrado.isSimulado, // Flag para saber se é oponente real
+      oponenteId: oponenteEncontrado.isSimulado ? null : oponenteEncontrado.id // ID do oponente real
     };
 
     sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));
@@ -640,12 +708,21 @@ export default function ArenaPvPPage() {
                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
                       Enfrente outros jogadores em batalhas táticas! Suba de tier, ganhe fama e conquiste recompensas incríveis!
                     </p>
-                    <div className="text-xs text-slate-400 space-y-1">
+                    <div className="text-xs text-slate-400 space-y-1 mb-3">
                       <div>✅ Batalhas em tempo real (30s por turno)</div>
                       <div>✅ Sistema de ranking com 6 tiers</div>
                       <div>✅ Recompensas escalonadas (1.0x → 3.0x)</div>
                       <div>✅ Ganha Fama, XP, Moedas, Vínculo e Fragmentos</div>
-                      <div>✅ Matchmaking balanceado por nível</div>
+                      <div>✅ Matchmaking balanceado por nível e fama</div>
+                    </div>
+                    <div className="bg-green-950/50 border border-green-500/50 rounded-lg p-3">
+                      <p className="text-xs text-green-300 font-bold flex items-center gap-2">
+                        <span>🌐</span>
+                        <span>MATCHMAKING REAL ATIVO: Agora você enfrenta avatares de jogadores reais!</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        * Se não houver oponentes disponíveis, um adversário simulado será criado
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -791,9 +868,26 @@ export default function ArenaPvPPage() {
           <div className="max-w-4xl mx-auto">
             <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-xl rounded-2xl p-12 border-2 border-green-500/50">
               <div className="text-center space-y-8">
-                <h2 className="text-4xl font-black text-green-400 mb-4">
-                  🎯 OPONENTE ENCONTRADO!
-                </h2>
+                <div>
+                  <h2 className="text-4xl font-black text-green-400 mb-4">
+                    🎯 OPONENTE ENCONTRADO!
+                  </h2>
+                  {!oponenteEncontrado.isSimulado ? (
+                    <div className="inline-block bg-green-950/50 border border-green-500/50 rounded-full px-4 py-2">
+                      <p className="text-xs text-green-300 font-bold flex items-center gap-2">
+                        <span>🌐</span>
+                        <span>JOGADOR REAL</span>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="inline-block bg-blue-950/50 border border-blue-500/50 rounded-full px-4 py-2">
+                      <p className="text-xs text-blue-300 font-bold flex items-center gap-2">
+                        <span>🤖</span>
+                        <span>OPONENTE SIMULADO</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Versus */}
                 <div className="grid md:grid-cols-3 gap-6 items-center">
