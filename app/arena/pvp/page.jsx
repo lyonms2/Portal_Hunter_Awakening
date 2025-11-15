@@ -231,10 +231,10 @@ export default function ArenaPvPPage() {
         }
       };
 
-      // DELAY INICIAL: Aguardar 500ms antes do primeiro check
-      // Isso dá tempo para o UPDATE se propagar no Supabase
-      console.log('⏱️ Aguardando 500ms antes do primeiro check (replicação do DB)...');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // DELAY INICIAL REDUZIDO: Aguardar 200ms antes do primeiro check
+      // O endpoint /check agora tem retry logic inteligente que lida com replica lag
+      console.log('⏱️ Aguardando 200ms antes do primeiro check...');
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Fazer o primeiro check imediatamente após o delay
       const matchEncontrado = await verificarMatch();
