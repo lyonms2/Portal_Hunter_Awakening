@@ -62,7 +62,7 @@ export async function GET(request) {
 
     const { data: avatares } = await supabase
       .from('avatares')
-      .select('id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, aparencia')
+      .select('id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, aparencia, habilidades')
       .in('id', uniqueAvatarIds);
 
     // Combinar dados

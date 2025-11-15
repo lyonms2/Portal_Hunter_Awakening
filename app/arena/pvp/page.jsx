@@ -324,10 +324,11 @@ export default function ArenaPvPPage() {
 
       if (response.ok && data.success) {
         // Iniciar batalha imediatamente
+        // Quando você aceita, você é o player2, então o oponente é player1
         const oponente = {
-          userId: desafio.challengerUserId,
-          avatarId: desafio.challengerAvatarId,
-          avatar: desafio.challengerAvatar,
+          userId: data.battleRoom.player1UserId,
+          avatarId: data.battleRoom.player1AvatarId,
+          avatar: data.battleRoom.player1Avatar, // Dados completos do endpoint
           fama: desafio.challengerFama,
           matchId: data.matchId
         };
