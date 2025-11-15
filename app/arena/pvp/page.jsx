@@ -195,6 +195,59 @@ export default function ArenaPvPPage() {
     }
   };
 
+  const verificarDesafiosAceitos = async (userId) => {
+    try {
+      // Buscar desafios que você enviou e que foram aceitos
+      const response = await fetch(`/api/pvp/challenge/accepted?userId=${userId}`);
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        return data.challenges || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Erro ao verificar desafios aceitos:', error);
+      return [];
+    }
+  };
+
+  const entrarNaBatalhaComoDesafiante = async (desafioAceito) => {
+    try {
+      // Buscar dados completos da battle room
+      const response = await fetch(`/api/pvp/battle/room?matchId=${desafioAceito.matchId}&userId=${user.id}`);
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.error('Erro ao buscar dados da batalha:', data);
+        return;
+      }
+
+      const battleRoom = data.room;
+
+      // Você é o player1 (desafiante), então o oponente é player2
+      const oponente = {
+        userId: battleRoom.player2_user_id,
+        avatarId: battleRoom.player2_avatar_id,
+        avatar: desafioAceito.challengedAvatar, // Do cache do desafio
+        fama: desafioAceito.challengedFama,
+        matchId: desafioAceito.matchId
+      };
+
+      // Se o avatar do oponente não tiver habilidades, buscar completo
+      if (!oponente.avatar?.habilidades) {
+        const avatarResponse = await fetch(`/api/buscar-avatar?avatarId=${oponente.avatarId}`);
+        if (avatarResponse.ok) {
+          const avatarData = await avatarResponse.json();
+          oponente.avatar = avatarData.avatar;
+        }
+      }
+
+      iniciarBatalhaComOponente(oponente);
+    } catch (error) {
+      console.error('Erro ao entrar na batalha como desafiante:', error);
+    }
+  };
+
   const carregarDesafios = async () => {
     if (!user) return;
 
@@ -214,7 +267,21 @@ export default function ArenaPvPPage() {
       }
 
       if (sentResponse.ok && sentData.success) {
-        setDesafiosEnviados(sentData.challenges || []);
+        const desafiosEnviadosData = sentData.challenges || [];
+        setDesafiosEnviados(desafiosEnviadosData);
+
+        // VERIFICAR SE ALGUM DESAFIO ENVIADO FOI ACEITO
+        // Buscar desafios aceitos (status mudou de pending para accepted)
+        const desafiosAceitos = await verificarDesafiosAceitos(user.id);
+
+        if (desafiosAceitos && desafiosAceitos.length > 0) {
+          // Pegar o primeiro desafio aceito
+          const desafioAceito = desafiosAceitos[0];
+          console.log('🎉 Seu desafio foi aceito! Entrando na batalha...', desafioAceito);
+
+          // Buscar dados completos da batalha
+          await entrarNaBatalhaComoDesafiante(desafioAceito);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar desafios:', error);
