@@ -242,16 +242,32 @@ export default function ArenaPvPPage() {
 
   const verificarDesafiosAceitos = async (userId) => {
     try {
-      // Buscar desafios que você enviou e que foram aceitos
-      console.log('[POLLING] Verificando desafios aceitos para userId:', userId);
-      const response = await fetch(`/api/pvp/challenge/accepted?userId=${userId}`);
+      // Verificar se há um desafio pendente
+      const challengeId = sessionStorage.getItem('pending_challenge_id');
+      if (!challengeId) {
+        return [];
+      }
+
+      console.log('[POLLING] Verificando desafio:', challengeId);
+      const response = await fetch(`/api/pvp/challenge/check-accepted?challengeId=${challengeId}`);
       const data = await response.json();
 
       console.log('[POLLING] Response:', { status: response.status, data });
 
-      if (response.ok && data.success) {
-        console.log('[POLLING] Desafios retornados:', data.challenges?.length || 0);
-        return data.challenges || [];
+      if (response.ok && data.accepted) {
+        console.log('[POLLING] Desafio aceito! Match ID:', data.matchId);
+        // Limpar o pending
+        sessionStorage.removeItem('pending_challenge_id');
+
+        // Retornar no formato esperado
+        return [{
+          id: challengeId,
+          matchId: data.matchId,
+          challengedUserId: data.opponent.userId,
+          challengedAvatarId: data.opponent.avatarId,
+          challengedAvatar: data.opponent.avatar,
+          challengedFama: data.opponent.fama
+        }];
       }
       return [];
     } catch (error) {
@@ -395,6 +411,10 @@ export default function ArenaPvPPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // Salvar ID do desafio para polling
+        sessionStorage.setItem('pending_challenge_id', data.challengeId);
+        console.log('✅ Desafio criado:', data.challengeId);
+
         setModalAlerta({
           titulo: '✅ Desafio Enviado!',
           mensagem: `Desafio enviado para ${jogador.avatar?.nome || 'jogador'}! Aguardando resposta...`
