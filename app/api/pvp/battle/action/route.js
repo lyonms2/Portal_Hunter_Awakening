@@ -51,7 +51,13 @@ export async function POST(request) {
     }
 
     // Adicionar ação ao histórico
-    const battleData = room.battle_data || { rounds: [], actions: [] };
+    const battleData = room.battle_data || { rounds: [], actions: [], hp: { player1: 100, player2: 100 } };
+
+    // Inicializar HP se não existir
+    if (!battleData.hp) {
+      battleData.hp = { player1: 100, player2: 100 };
+    }
+
     const actionEntry = {
       player: playerNumber,
       userId: userId,
@@ -62,6 +68,17 @@ export async function POST(request) {
 
     battleData.actions = battleData.actions || [];
     battleData.actions.push(actionEntry);
+
+    // Processar dano se for ataque
+    if (action.type === 'attack' && action.damage) {
+      const targetPlayer = playerNumber === 1 ? 'player2' : 'player1';
+      battleData.hp[targetPlayer] = Math.max(0, battleData.hp[targetPlayer] - action.damage);
+
+      // Verificar se algum jogador foi derrotado
+      if (battleData.hp[targetPlayer] <= 0) {
+        action.resultado = 'vitoria';
+      }
+    }
 
     // Atualizar turno (alternar jogador)
     const nextPlayer = playerNumber === 1 ? 2 : 1;
