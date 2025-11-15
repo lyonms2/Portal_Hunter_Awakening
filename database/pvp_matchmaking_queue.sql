@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS pvp_matchmaking_queue (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID NOT NULL, -- Referência ao auth.users do Supabase
-  avatar_id BIGINT NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
+  avatar_id UUID NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
 
   -- Stats do avatar para matchmaking
   nivel INT NOT NULL,
@@ -44,13 +44,13 @@ CREATE TABLE IF NOT EXISTS pvp_battle_rooms (
 
   -- Jogadores
   player1_user_id UUID NOT NULL, -- Referência ao auth.users do Supabase
-  player1_avatar_id BIGINT NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
+  player1_avatar_id UUID NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
   player1_ready BOOLEAN DEFAULT FALSE,
   player1_connected BOOLEAN DEFAULT TRUE,
   player1_last_action TIMESTAMPTZ DEFAULT NOW(),
 
   player2_user_id UUID NOT NULL, -- Referência ao auth.users do Supabase
-  player2_avatar_id BIGINT NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
+  player2_avatar_id UUID NOT NULL REFERENCES avatares(id) ON DELETE CASCADE,
   player2_ready BOOLEAN DEFAULT FALSE,
   player2_connected BOOLEAN DEFAULT TRUE,
   player2_last_action TIMESTAMPTZ DEFAULT NOW(),
@@ -126,7 +126,7 @@ CREATE OR REPLACE FUNCTION find_pvp_match(
 RETURNS TABLE (
   matched BOOLEAN,
   opponent_user_id UUID,
-  opponent_avatar_id BIGINT,
+  opponent_avatar_id UUID,
   match_id UUID
 ) AS $$
 DECLARE
@@ -193,7 +193,7 @@ BEGIN
 
     RETURN QUERY SELECT TRUE, v_opponent.user_id, v_opponent.avatar_id, v_match_id;
   ELSE
-    RETURN QUERY SELECT FALSE, NULL::UUID, NULL::BIGINT, NULL::UUID;
+    RETURN QUERY SELECT FALSE, NULL::UUID, NULL::UUID, NULL::UUID;
   END IF;
 END;
 $$ LANGUAGE plpgsql;
