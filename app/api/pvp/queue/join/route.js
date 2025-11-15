@@ -97,11 +97,23 @@ export async function POST(request) {
 
     // Se encontrou match
     if (matchResult && matchResult.length > 0 && matchResult[0].matched) {
-      console.log('✅ Match encontrado:', {
-        matchId: matchResult[0].match_id,
-        opponentUserId: matchResult[0].opponent_user_id,
-        opponentAvatarId: matchResult[0].opponent_avatar_id
+      console.log('✅ ============ MATCH ENCONTRADO! ============');
+      console.log('   Player 1 (esperando):', matchResult[0].opponent_user_id);
+      console.log('   Player 2 (novo):', userId);
+      console.log('   Match ID:', matchResult[0].match_id);
+      console.log('   Avatar Oponente:', matchResult[0].opponent_avatar_id);
+
+      // Verificar se ambos foram atualizados na fila
+      const { data: queueCheck } = await supabase
+        .from('pvp_matchmaking_queue')
+        .select('user_id, status, match_id, opponent_user_id')
+        .in('user_id', [userId, matchResult[0].opponent_user_id]);
+
+      console.log('📋 Status dos jogadores na fila após match:');
+      queueCheck?.forEach(entry => {
+        console.log(`   User ${entry.user_id === userId ? '(novo)' : '(esperando)'}: status=${entry.status}, match_id=${entry.match_id}`);
       });
+      console.log('==========================================');
 
       return NextResponse.json({
         success: true,

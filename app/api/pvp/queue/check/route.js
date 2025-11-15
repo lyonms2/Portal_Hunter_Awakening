@@ -95,6 +95,10 @@ export async function GET(request) {
 
     // Se já encontrou match
     if (queueEntry.status === 'matched') {
+      console.log('🎯 Jogador JÁ está matched!');
+      console.log('   Match ID:', queueEntry.match_id);
+      console.log('   Opponent User ID:', queueEntry.opponent_user_id);
+
       // Buscar avatar_id do oponente na fila
       const { data: opponentQueue, error: oppQueueError } = await supabase
         .from('pvp_matchmaking_queue')
@@ -103,12 +107,14 @@ export async function GET(request) {
         .single();
 
       if (!opponentQueue || oppQueueError) {
-        console.error('Erro ao buscar avatar do oponente:', oppQueueError);
+        console.error('❌ Erro ao buscar avatar do oponente:', oppQueueError);
         return NextResponse.json({
           success: false,
           error: 'Dados do oponente não encontrados'
         }, { status: 404 });
       }
+
+      console.log('   Opponent Avatar ID:', opponentQueue.avatar_id);
 
       // Buscar dados do avatar do oponente
       const { data: opponentAvatar, error: avatarError } = await supabase
@@ -116,6 +122,8 @@ export async function GET(request) {
         .select('*')
         .eq('id', opponentQueue.avatar_id)
         .single();
+
+      console.log('✅ Retornando match para jogador que estava esperando');
 
       return NextResponse.json({
         success: true,
