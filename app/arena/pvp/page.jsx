@@ -263,15 +263,21 @@ export default function ArenaPvPPage() {
   };
 
   const processarMatch = async (matchData) => {
-    console.log('Match encontrado!', matchData);
+    console.log('🎯 Match encontrado! matchData completo:', JSON.stringify(matchData, null, 2));
+    console.log('🔍 matchData.opponentUserId:', matchData.opponentUserId);
+    console.log('🔍 matchData.opponentAvatarId:', matchData.opponentAvatarId);
+    console.log('🔍 matchData.opponent:', matchData.opponent);
 
     try {
       // Extrair IDs - suporta ambas estruturas (flat e nested)
       const opponentUserId = matchData.opponentUserId || matchData.opponent?.userId;
       const opponentAvatarId = matchData.opponentAvatarId || matchData.opponent?.avatarId;
 
+      console.log('📝 Extraído - opponentUserId:', opponentUserId);
+      console.log('📝 Extraído - opponentAvatarId:', opponentAvatarId);
+
       if (!opponentUserId || !opponentAvatarId) {
-        console.error('IDs do oponente não encontrados:', matchData);
+        console.error('❌ IDs do oponente não encontrados! matchData:', JSON.stringify(matchData, null, 2));
         throw new Error('Dados do oponente incompletos');
       }
 
