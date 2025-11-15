@@ -89,12 +89,20 @@ export async function POST(request) {
         p_fama: fama || 1000
       });
 
+    console.log('🔍 Match result:', JSON.stringify(matchResult, null, 2));
+
     if (matchError) {
       console.error('Erro ao buscar match:', matchError);
     }
 
     // Se encontrou match
     if (matchResult && matchResult.length > 0 && matchResult[0].matched) {
+      console.log('✅ Match encontrado:', {
+        matchId: matchResult[0].match_id,
+        opponentUserId: matchResult[0].opponent_user_id,
+        opponentAvatarId: matchResult[0].opponent_avatar_id
+      });
+
       return NextResponse.json({
         success: true,
         matched: true,
