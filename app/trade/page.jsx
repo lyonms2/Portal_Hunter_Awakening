@@ -39,7 +39,7 @@ export default function TradePage() {
 
   const carregarAvatares = async (userId) => {
     try {
-      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}&t=${Date.now()}`);
       const avataresData = await avataresRes.json();
       if (avataresRes.ok) {
         setAvataresVendiveis(avataresData.avatares || []);
@@ -62,7 +62,7 @@ export default function TradePage() {
       setStats(statsData.stats);
 
       // Avatares vendíveis
-      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}&t=${Date.now()}`);
       const avataresData = await avataresRes.json();
       if (avataresRes.ok) {
         setAvataresVendiveis(avataresData.avatares || []);
