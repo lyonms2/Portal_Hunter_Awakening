@@ -30,6 +30,17 @@ export async function GET(request) {
 
     // BUSCAR LISTINGS DO USUÁRIO
     debugInfo.step = 'fetching_listings';
+
+    // PRIMEIRO: Buscar TODOS os listings ativos para ver se o problema é no filtro
+    const { data: allActiveListings, error: allError } = await supabase
+      .from('trade_listings')
+      .select('id, seller_id, status')
+      .eq('status', 'active');
+
+    debugInfo.allActiveCount = allActiveListings?.length || 0;
+    debugInfo.allActiveListings = allActiveListings;
+
+    // SEGUNDO: Buscar com filtro de seller_id
     const { data: rawListings, error: listingsError } = await supabase
       .from('trade_listings')
       .select('*')
@@ -39,6 +50,8 @@ export async function GET(request) {
 
     debugInfo.rawCount = rawListings?.length || 0;
     debugInfo.listingsError = listingsError;
+    debugInfo.userIdSent = userId;
+    debugInfo.userIdType = typeof userId;
 
     if (listingsError) {
       return Response.json({
