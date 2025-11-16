@@ -1,5 +1,8 @@
 import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
+// Forçar rota dinâmica (não pode ser estaticamente renderizada)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const supabase = getSupabaseClientSafe(true);
@@ -46,6 +49,15 @@ export async function GET(request) {
         { message: "Erro ao buscar listings" },
         { status: 500 }
       );
+    }
+
+    console.log("[listings] Total de listings ativos:", listings?.length || 0);
+    if (listings && listings.length > 0) {
+      console.log("[listings] Primeiro listing:", {
+        id: listings[0].id,
+        seller_id: listings[0].seller_id,
+        avatar_id: listings[0].avatar_id
+      });
     }
 
     // Formatar dados

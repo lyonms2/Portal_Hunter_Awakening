@@ -71,11 +71,21 @@ export async function POST(request) {
       );
     }
 
+    // Buscar nome do vendedor
+    const { data: sellerStats, error: sellerError } = await supabase
+      .from('player_stats')
+      .select('nome_operacao')
+      .eq('user_id', userId)
+      .single();
+
+    const sellerUsername = sellerStats?.nome_operacao || 'Caçador Misterioso';
+
     // Criar o listing
     const { data: listing, error: listingError } = await supabase
       .from('trade_listings')
       .insert([{
         seller_id: userId,
+        seller_username: sellerUsername,
         listing_type: 'avatar',
         avatar_id: avatarId,
         price_moedas: priceMoedas || 0,

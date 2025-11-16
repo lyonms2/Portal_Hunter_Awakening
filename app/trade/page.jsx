@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import AvatarDetalhes from '../avatares/components/AvatarDetalhes';
 
 export default function TradePage() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function TradePage() {
   const [myAvatares, setMyAvatares] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalCompra, setModalCompra] = useState(null);
+  const [modalDetalhes, setModalDetalhes] = useState(null);
   const [comprando, setComprando] = useState(false);
   const [mensagem, setMensagem] = useState(null);
 
@@ -55,6 +57,9 @@ export default function TradePage() {
       // Carregar listings do mercado
       await carregarListings();
 
+      // Carregar meus listings
+      await carregarMeusListings();
+
       // Carregar meus avatares (para vender)
       const avataresRes = await fetch(`/api/meus-avatares?userId=${userId}`);
       const avataresData = await avataresRes.json();
@@ -72,24 +77,35 @@ export default function TradePage() {
     try {
       const res = await fetch('/api/trade/listings');
       const data = await res.json();
+      console.log("Resposta da API listings:", data);
       if (res.ok) {
         setListings(data.listings || []);
+      } else {
+        console.error("Erro na resposta:", data);
+        mostrarMensagem(data.message || 'Erro ao carregar anúncios', 'erro');
       }
     } catch (error) {
       console.error("Erro ao carregar listings:", error);
+      mostrarMensagem('Erro de conexão ao carregar anúncios', 'erro');
     }
   };
 
   const carregarMeusListings = async () => {
     if (!user) return;
+    console.log("[Frontend] Carregando meus listings para userId:", user.id);
     try {
       const res = await fetch(`/api/trade/my-listings?userId=${user.id}`);
       const data = await res.json();
+      console.log("Resposta da API my-listings:", data);
       if (res.ok) {
         setMyListings(data.listings || []);
+      } else {
+        console.error("Erro na resposta:", data);
+        mostrarMensagem(data.message || 'Erro ao carregar seus anúncios', 'erro');
       }
     } catch (error) {
       console.error("Erro ao carregar meus listings:", error);
+      mostrarMensagem('Erro de conexão ao carregar seus anúncios', 'erro');
     }
   };
 
@@ -196,6 +212,7 @@ export default function TradePage() {
         mostrarMensagem('Listing cancelado', 'sucesso');
         await carregarMeusListings();
         await carregarListings();
+        await carregarDados(user.id);
       } else {
         mostrarMensagem(data.message || 'Erro ao cancelar', 'erro');
       }
@@ -244,8 +261,19 @@ export default function TradePage() {
     }
   };
 
+  const getCorBorda = (raridade) => {
+    switch (raridade) {
+      case 'Lendário': return 'border-amber-500';
+      case 'Raro': return 'border-purple-500';
+      default: return 'border-slate-600';
+    }
+  };
+
   // Filtrar e ordenar listings
   let listingsFiltrados = [...listings];
+
+  console.log("[Trade Page] Total de listings no estado:", listings.length);
+  console.log("[Trade Page] Listings filtrados inicialmente:", listingsFiltrados.length);
 
   if (filtroTipo !== 'all') {
     listingsFiltrados = listingsFiltrados.filter(l => l.listing_type === filtroTipo);
@@ -276,9 +304,12 @@ export default function TradePage() {
     }
   });
 
-  // Avatares que podem ser vendidos
+  // IDs dos avatares que já estão em anúncios ativos
+  const avatarIdsEmAnuncios = new Set(myListings.map(l => l.avatar_id));
+
+  // Avatares que podem ser vendidos (excluindo os que já estão em anúncios)
   const avataresVendiveis = myAvatares.filter(av =>
-    av.vivo && !av.ativo && !(av.marca_morte && !av.vivo)
+    av.vivo && !av.ativo && !av.marca_morte && !avatarIdsEmAnuncios.has(av.id)
   );
 
   if (loading) {
@@ -427,6 +458,7 @@ export default function TradePage() {
                     key={listing.id}
                     listing={listing}
                     onComprar={() => setModalCompra(listing)}
+                    onVerDetalhes={() => setModalDetalhes(listing.avatar_data)}
                     isOwnListing={listing.seller_id === user?.id}
                     getCorRaridade={getCorRaridade}
                     getCorElemento={getCorElemento}
@@ -463,6 +495,7 @@ export default function TradePage() {
                     key={listing.id}
                     listing={listing}
                     onCancelar={() => cancelarListing(listing.id)}
+                    onVerDetalhes={() => setModalDetalhes(listing.avatar_data)}
                     getCorRaridade={getCorRaridade}
                     getCorElemento={getCorElemento}
                     getEmojiElemento={getEmojiElemento}
@@ -497,14 +530,14 @@ export default function TradePage() {
                         <button
                           key={avatar.id}
                           onClick={() => setSelectedAvatar(avatar)}
-                          className={`relative p-3 rounded-lg border-2 transition-all ${
+                          className={`relative p-3 rounded-lg border-2 transition-all flex flex-col items-center ${
                             selectedAvatar?.id === avatar.id
                               ? 'border-amber-500 bg-amber-500/20'
                               : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                           }`}
                         >
                           <AvatarSVG avatar={avatar} tamanho={80} />
-                          <div className="mt-2 text-xs font-bold text-white truncate">{avatar.nome}</div>
+                          <div className="mt-2 text-xs font-bold text-white truncate w-full text-center">{avatar.nome}</div>
                           <div className="text-xs text-slate-400">{avatar.raridade}</div>
                         </button>
                       ))}
@@ -515,10 +548,12 @@ export default function TradePage() {
                     <div className="space-y-4">
                       <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                         <div className="flex items-center gap-4">
-                          <AvatarSVG avatar={selectedAvatar} tamanho={100} />
+                          <div className="flex-shrink-0">
+                            <AvatarSVG avatar={selectedAvatar} tamanho={100} />
+                          </div>
                           <div className="flex-1">
                             <h3 className="text-xl font-bold text-white mb-1">{selectedAvatar.nome}</h3>
-                            <div className="flex items-center gap-2 text-sm">
+                            <div className="flex items-center gap-2 text-sm flex-wrap">
                               <span className={`px-2 py-0.5 rounded ${
                                 selectedAvatar.raridade === 'Lendário' ? 'bg-amber-500/20 text-amber-400' :
                                 selectedAvatar.raridade === 'Raro' ? 'bg-purple-500/20 text-purple-400' :
@@ -612,7 +647,9 @@ export default function TradePage() {
                 <div className="p-6">
                   {modalCompra.avatar_data && (
                     <div className="mb-4 text-center">
-                      <AvatarSVG avatar={modalCompra.avatar_data} tamanho={120} />
+                      <div className="flex items-center justify-center mb-2">
+                        <AvatarSVG avatar={modalCompra.avatar_data} tamanho={120} />
+                      </div>
                       <h3 className="text-xl font-bold text-white mt-2">{modalCompra.avatar_data.nome}</h3>
                       <div className="text-sm text-slate-400">
                         {modalCompra.avatar_data.raridade} • {modalCompra.avatar_data.elemento} • Nv.{modalCompra.avatar_data.nivel}
@@ -663,6 +700,18 @@ export default function TradePage() {
         </div>
       )}
 
+      {/* Modal de Detalhes */}
+      {modalDetalhes && (
+        <AvatarDetalhes
+          avatar={modalDetalhes}
+          onClose={() => setModalDetalhes(null)}
+          getCorRaridade={getCorRaridade}
+          getCorBorda={getCorBorda}
+          getCorElemento={getCorElemento}
+          getEmojiElemento={getEmojiElemento}
+        />
+      )}
+
       {/* Toast de Mensagem */}
       {mensagem && (
         <div className="fixed top-8 right-8 z-50 animate-fade-in">
@@ -701,9 +750,14 @@ export default function TradePage() {
 }
 
 // Componente de Card de Listing
-function ListingCard({ listing, onComprar, isOwnListing, getCorRaridade, getCorElemento, getEmojiElemento }) {
+function ListingCard({ listing, onComprar, onVerDetalhes, isOwnListing, getCorRaridade, getCorElemento, getEmojiElemento }) {
   const avatar = listing.avatar_data;
   if (!avatar) return null;
+
+  const poderTotal = (avatar.forca || 0) + (avatar.agilidade || 0) + (avatar.resistencia || 0) + (avatar.foco || 0);
+
+  // Garantir que habilidades seja um array
+  const habilidades = Array.isArray(avatar.habilidades) ? avatar.habilidades : [];
 
   return (
     <div className="group relative">
@@ -714,16 +768,35 @@ function ListingCard({ listing, onComprar, isOwnListing, getCorRaridade, getCorE
           {avatar.raridade.toUpperCase()}
         </div>
 
-        <div className="py-4">
+        <div className="py-4 flex items-center justify-center">
           <AvatarSVG avatar={avatar} tamanho={120} />
         </div>
 
         <div className="p-3">
           <h3 className="font-bold text-sm text-white mb-1 truncate">{avatar.nome}</h3>
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span className={getCorElemento(avatar.elemento)}>{getEmojiElemento(avatar.elemento)} {avatar.elemento}</span>
             <span>Nv.{avatar.nivel}</span>
           </div>
+
+          {/* Poder Total */}
+          <div className="bg-slate-950/50 rounded px-2 py-1 mb-2 text-center">
+            <div className="text-[10px] text-slate-500 uppercase">Poder Total</div>
+            <div className="text-lg font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+              {poderTotal}
+            </div>
+          </div>
+
+          {/* Habilidades (preview) */}
+          {habilidades.length > 0 && (
+            <div className="bg-slate-950/50 rounded px-2 py-1.5 mb-3">
+              <div className="text-[10px] text-purple-400 uppercase mb-1">Habilidades ({habilidades.length})</div>
+              <div className="text-[10px] text-slate-400 truncate">
+                {habilidades[0]?.nome}
+                {habilidades.length > 1 && ` +${habilidades.length - 1}`}
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-950/50 rounded p-2 mb-3">
             {listing.price_moedas > 0 && (
@@ -741,18 +814,30 @@ function ListingCard({ listing, onComprar, isOwnListing, getCorRaridade, getCorE
             </div>
           </div>
 
-          {isOwnListing ? (
-            <div className="px-3 py-2 bg-slate-800/50 text-slate-500 text-xs font-semibold text-center rounded">
-              Seu Anúncio
+          {/* Botões */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                onClick={onVerDetalhes}
+                className="flex-1 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs font-semibold text-slate-300 transition-all"
+              >
+                VER
+              </button>
+              {!isOwnListing && (
+                <button
+                  onClick={onComprar}
+                  className="flex-1 px-2 py-1.5 bg-gradient-to-r from-amber-600 to-yellow-600 text-white text-xs font-bold rounded hover:from-amber-500 hover:to-yellow-500 transition-all"
+                >
+                  COMPRAR
+                </button>
+              )}
             </div>
-          ) : (
-            <button
-              onClick={onComprar}
-              className="w-full px-3 py-2 bg-gradient-to-r from-amber-600 to-yellow-600 text-white text-xs font-bold rounded hover:from-amber-500 hover:to-yellow-500 transition-all"
-            >
-              COMPRAR
-            </button>
-          )}
+            {isOwnListing && (
+              <div className="px-3 py-2 bg-slate-800/50 text-slate-500 text-xs font-semibold text-center rounded">
+                Seu Anúncio
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -760,12 +845,16 @@ function ListingCard({ listing, onComprar, isOwnListing, getCorRaridade, getCorE
 }
 
 // Componente de Card de Meu Listing
-function MyListingCard({ listing, onCancelar, getCorRaridade, getCorElemento, getEmojiElemento }) {
+function MyListingCard({ listing, onCancelar, onVerDetalhes, getCorRaridade, getCorElemento, getEmojiElemento }) {
   const avatar = listing.avatar_data;
   if (!avatar) return null;
 
   const dataExpiracao = new Date(listing.expires_at);
   const diasRestantes = Math.ceil((dataExpiracao - new Date()) / (1000 * 60 * 60 * 24));
+  const poderTotal = (avatar.forca || 0) + (avatar.agilidade || 0) + (avatar.resistencia || 0) + (avatar.foco || 0);
+
+  // Garantir que habilidades seja um array
+  const habilidades = Array.isArray(avatar.habilidades) ? avatar.habilidades : [];
 
   return (
     <div className="group relative">
@@ -776,15 +865,23 @@ function MyListingCard({ listing, onCancelar, getCorRaridade, getCorElemento, ge
           {avatar.raridade.toUpperCase()}
         </div>
 
-        <div className="py-4">
+        <div className="py-4 flex items-center justify-center">
           <AvatarSVG avatar={avatar} tamanho={120} />
         </div>
 
         <div className="p-3">
           <h3 className="font-bold text-sm text-white mb-1 truncate">{avatar.nome}</h3>
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span className={getCorElemento(avatar.elemento)}>{getEmojiElemento(avatar.elemento)} {avatar.elemento}</span>
             <span>Nv.{avatar.nivel}</span>
+          </div>
+
+          {/* Poder Total */}
+          <div className="bg-slate-950/50 rounded px-2 py-1 mb-2 text-center">
+            <div className="text-[10px] text-slate-500 uppercase">Poder Total</div>
+            <div className="text-lg font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+              {poderTotal}
+            </div>
           </div>
 
           <div className="bg-slate-950/50 rounded p-2 mb-3">
@@ -803,12 +900,21 @@ function MyListingCard({ listing, onCancelar, getCorRaridade, getCorElemento, ge
             </div>
           </div>
 
-          <button
-            onClick={onCancelar}
-            className="w-full px-3 py-2 bg-red-900/30 hover:bg-red-800/40 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all"
-          >
-            CANCELAR ANÚNCIO
-          </button>
+          {/* Botões */}
+          <div className="space-y-2">
+            <button
+              onClick={onVerDetalhes}
+              className="w-full px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold rounded transition-all"
+            >
+              VER DETALHES
+            </button>
+            <button
+              onClick={onCancelar}
+              className="w-full px-3 py-2 bg-red-900/30 hover:bg-red-800/40 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all"
+            >
+              CANCELAR ANÚNCIO
+            </button>
+          </div>
         </div>
       </div>
     </div>

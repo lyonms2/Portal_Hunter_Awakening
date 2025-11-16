@@ -1,5 +1,8 @@
 import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
+// Forçar rota dinâmica (não pode ser estaticamente renderizada)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const supabase = getSupabaseClientSafe(true);
@@ -12,6 +15,8 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+
+    console.log("[my-listings] userId recebido:", userId);
 
     if (!userId) {
       return Response.json(
@@ -57,6 +62,25 @@ export async function GET(request) {
         { message: "Erro ao buscar listings" },
         { status: 500 }
       );
+    }
+
+    console.log("[my-listings] Listings encontrados:", listings?.length || 0);
+    if (listings && listings.length > 0) {
+      console.log("[my-listings] Primeiro listing:", {
+        id: listings[0].id,
+        seller_id: listings[0].seller_id,
+        userId_esperado: userId,
+        ids_batem: listings[0].seller_id === userId
+      });
+    } else {
+      console.log("[my-listings] Nenhum listing encontrado para userId:", userId);
+      // Debug: buscar TODOS os listings sem filtro de seller_id
+      const { data: allListings } = await supabase
+        .from('trade_listings')
+        .select('id, seller_id, status')
+        .eq('status', 'active')
+        .limit(5);
+      console.log("[my-listings] DEBUG - Primeiros 5 listings ativos (sem filtro):", allListings);
     }
 
     // Formatar dados
