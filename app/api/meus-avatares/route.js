@@ -174,7 +174,10 @@ export async function PUT(request) {
     console.log(`[ATIVAR AVATAR] 1️⃣ Desativando TODOS os avatares do usuário...`);
     const { data: desativados, error: deactivateError } = await supabase
       .from('avatares')
-      .update({ ativo: false })
+      .update({
+        ativo: false,
+        updated_at: new Date().toISOString()  // FORÇAR updated_at para invalidar cache
+      })
       .eq('user_id', userId)
       .select();
 
@@ -192,7 +195,10 @@ export async function PUT(request) {
     console.log(`[ATIVAR AVATAR] 2️⃣ Ativando avatar ${avatarToActivate.nome}...`);
     const { data: avatarAtivado, error: activateError } = await supabase
       .from('avatares')
-      .update({ ativo: true })
+      .update({
+        ativo: true,
+        updated_at: new Date().toISOString()  // FORÇAR updated_at para invalidar cache
+      })
       .eq('id', avatarId)
       .select()
       .single();
