@@ -31,24 +31,16 @@ export async function GET(request) {
     // BUSCAR LISTINGS DO USUÁRIO
     debugInfo.step = 'fetching_listings';
 
-    // PRIMEIRO: Buscar TODOS os listings ativos para ver se o problema é no filtro
-    const { data: allActiveListings, error: allError } = await supabase
-      .from('trade_listings')
-      .select('id, seller_id, status')
-      .eq('status', 'active');
-
-    debugInfo.allActiveCount = allActiveListings?.length || 0;
-    debugInfo.allActiveListings = allActiveListings;
-
-    // SEGUNDO: Buscar com filtro de seller_id
-    const { data: rawListings, error: listingsError } = await supabase
+    // WORKAROUND: Buscar TODOS os listings ativos e filtrar manualmente em JS
+    // Porque o .eq('seller_id', userId) do Supabase não está funcionando
+    const { data: allActiveListings, error: listingsError } = await supabase
       .from('trade_listings')
       .select('*')
-      .eq('seller_id', userId)
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
-    debugInfo.rawCount = rawListings?.length || 0;
+    debugInfo.allActiveCount = allActiveListings?.length || 0;
+    debugInfo.allActiveListings = allActiveListings?.map(l => ({ id: l.id, seller_id: l.seller_id, status: l.status }));
     debugInfo.listingsError = listingsError;
     debugInfo.userIdSent = userId;
     debugInfo.userIdType = typeof userId;
@@ -60,12 +52,18 @@ export async function GET(request) {
       });
     }
 
+    // FILTRO MANUAL EM JAVASCRIPT (workaround para bug do Supabase .eq())
+    const rawListings = (allActiveListings || []).filter(listing => listing.seller_id === userId);
+
+    debugInfo.rawCount = rawListings.length;
+    debugInfo.filterMethod = 'manual_javascript';
+
     if (!rawListings || rawListings.length === 0) {
       return Response.json({
         listings: [],
         debug: {
           ...debugInfo,
-          step: 'no_listings',
+          step: 'no_listings_after_manual_filter',
           rawCount: 0,
           joinCount: 0,
           finalCount: 0
