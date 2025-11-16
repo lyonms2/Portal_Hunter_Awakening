@@ -39,16 +39,13 @@ export default function TradePage() {
 
   const carregarAvatares = async (userId) => {
     try {
-      // Adicionar timestamp para evitar cache
-      const timestamp = new Date().getTime();
-      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}&t=${timestamp}`);
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
       const avataresData = await avataresRes.json();
-      console.log('[Trade] Avatares vendíveis carregados:', avataresData.count, avataresData.avatares);
       if (avataresRes.ok) {
         setAvataresVendiveis(avataresData.avatares || []);
       }
     } catch (error) {
-      console.error("Erro ao carregar avatares vendíveis:", error);
+      console.error("Erro ao carregar avatares:", error);
     }
   };
 
@@ -235,30 +232,19 @@ export default function TradePage() {
         {/* VENDER */}
         {activeTab === 'sell' && (
           <div className="max-w-4xl mx-auto bg-slate-900/50 border border-amber-500/30 rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-amber-400">Vender Avatar</h2>
-              <button
-                onClick={() => user && carregarAvatares(user.id)}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold transition-all"
-              >
-                🔄 Recarregar
-              </button>
-            </div>
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">Vender Avatar</h2>
 
             {avataresVendiveis.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4 opacity-20">😔</div>
-                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar disponível</h3>
-                <p className="text-slate-500 text-sm">
-                  Apenas avatares vivos, inativos, sem marca da morte e não listados podem ser vendidos.
-                </p>
+                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar encontrado</h3>
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Selecionar Avatar */}
                 <div>
                   <label className="block text-amber-400 font-bold mb-3">
-                    Selecione o Avatar ({avataresVendiveis.length} disponíveis)
+                    Selecione o Avatar ({avataresVendiveis.length} avatares)
                   </label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {avataresVendiveis.map((avatar) => (
