@@ -16,19 +16,18 @@ export async function GET(request) {
       return Response.json({ error: "userId obrigatório" }, { status: 400 });
     }
 
-    // BUSCAR TODOS os avatares do usuário - SEM FILTROS
+    // BUSCAR avatares do usuário com ativo = FALSE
     const { data: avatares, error } = await supabase
       .from('avatares')
       .select('*')
       .eq('user_id', userId)
+      .eq('ativo', false)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error("[available-avatares] Erro:", error);
       return Response.json({ error: "Erro ao buscar avatares" }, { status: 500 });
     }
-
-    console.log(`[available-avatares] Total de avatares: ${avatares?.length || 0}`);
 
     return Response.json({
       avatares: avatares || [],
