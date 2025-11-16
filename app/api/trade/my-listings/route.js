@@ -37,7 +37,8 @@ export async function GET(request) {
       .from('trade_listings')
       .select('*')
       .eq('status', 'active')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(1000); // Garantir que não está sendo limitado
 
     debugInfo.allActiveCount = allActiveListings?.length || 0;
     debugInfo.allActiveListings = allActiveListings?.map(l => ({ id: l.id, seller_id: l.seller_id, status: l.status }));

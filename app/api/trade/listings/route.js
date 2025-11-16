@@ -17,16 +17,17 @@ export async function GET(request) {
       });
     }
 
-    // BUSCAR LISTINGS
+    // Pegar userId pra EXCLUIR os do próprio usuário
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+
+    // BUSCAR TODOS OS LISTINGS ATIVOS
     debugInfo.step = 'fetching_listings';
-    const { data: rawListings, error: listingsError } = await supabase
+    const { data: allListings, error: listingsError } = await supabase
       .from('trade_listings')
       .select('*')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
-
-    debugInfo.rawCount = rawListings?.length || 0;
-    debugInfo.listingsError = listingsError;
 
     if (listingsError) {
       return Response.json({
@@ -34,6 +35,14 @@ export async function GET(request) {
         debug: { ...debugInfo, step: 'listings_query_failed', error: listingsError }
       });
     }
+
+    // FILTRAR: EXCLUIR os do próprio usuário
+    const rawListings = userId
+      ? (allListings || []).filter(l => l.seller_id !== userId)
+      : (allListings || []);
+
+    debugInfo.rawCount = rawListings.length;
+    debugInfo.userId = userId;
 
     if (!rawListings || rawListings.length === 0) {
       return Response.json({

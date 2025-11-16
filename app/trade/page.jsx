@@ -52,8 +52,8 @@ export default function TradePage() {
       const statsData = await statsRes.json();
       setStats(statsData.stats);
 
-      // Listings marketplace
-      const listingsRes = await fetch('/api/trade/listings');
+      // Listings marketplace (EXCLUIR os meus)
+      const listingsRes = await fetch(`/api/trade/listings?userId=${userId}`);
       const listingsData = await listingsRes.json();
       setDebugData(prev => ({ ...prev, listings: listingsData }));
       if (listingsRes.ok) {
@@ -100,6 +100,8 @@ export default function TradePage() {
       return;
     }
 
+    console.log('[VENDER] Criando listing...', { userId: user.id, avatarId: selectedAvatar.id, moedas, fragmentos });
+
     try {
       const res = await fetch('/api/trade/create', {
         method: 'POST',
@@ -113,18 +115,23 @@ export default function TradePage() {
       });
 
       const data = await res.json();
+      console.log('[VENDER] Resposta da API:', { status: res.status, ok: res.ok, data });
+
       if (res.ok) {
+        console.log('[VENDER] Sucesso! Recarregando dados...');
         mostrarMensagem(data.message, 'sucesso');
         setSelectedAvatar(null);
         setPrecoMoedas('');
         setPrecoFragmentos('');
         await carregarDados(user.id);
+        console.log('[VENDER] Dados recarregados, mudando para aba my-listings');
         setActiveTab('my-listings');
       } else {
+        console.log('[VENDER] Erro:', data.error);
         mostrarMensagem(data.error || 'Erro ao criar anúncio', 'erro');
       }
     } catch (error) {
-      console.error("Erro ao criar listing:", error);
+      console.error("[VENDER] Exception:", error);
       mostrarMensagem('Erro de conexão', 'erro');
     }
   };
