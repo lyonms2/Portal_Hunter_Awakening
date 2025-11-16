@@ -20,8 +20,21 @@ export async function GET(request) {
       return Response.json({ error: "Serviço indisponível" }, { status: 503 });
     }
 
+    // Debug: verificar configuração do Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    console.log(`[available-avatares] 🔧 Supabase URL: ${supabaseUrl?.substring(0, 30)}...`);
+    console.log(`[available-avatares] 🔧 Usando Service Role: true`);
+
     console.log(`[available-avatares] Fazendo query REAL no PostgreSQL para userId=${userId}`);
     console.log(`[available-avatares] Query SQL: SELECT * FROM avatares WHERE user_id = '${userId}' ORDER BY created_at DESC`);
+
+    // PRIMEIRO: Contar quantos avatares existem (sem paginação)
+    const { count: totalCount, error: countError } = await supabase
+      .from('avatares')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    console.log(`[available-avatares] 📊 COUNT direto do PostgreSQL: ${totalCount} avatares para este user`);
 
     // BUSCAR TODOS os avatares do usuário primeiro
     const { data: todosAvatares, error: erroTodos } = await supabase

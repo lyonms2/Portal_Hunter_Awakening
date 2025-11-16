@@ -128,6 +128,10 @@ export async function PUT(request) {
       );
     }
 
+    // Debug: verificar configuração do Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    console.log(`[ATIVAR AVATAR] 🔧 Supabase URL: ${supabaseUrl?.substring(0, 30)}...`);
+
     const body = await request.json();
     const { userId, avatarId } = body;
 
