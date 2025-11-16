@@ -1,5 +1,8 @@
 import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
+// Forçar rota dinâmica (não pode ser estaticamente renderizada)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const supabase = getSupabaseClientSafe(true);
