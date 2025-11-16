@@ -2,22 +2,41 @@ import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
 export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/trade/listings
- *
- * Retorna todos os anúncios ativos do marketplace
- */
 export async function GET(request) {
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    step: '',
+    data: null,
+    error: null
+  };
+
   try {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
-      return Response.json(
-        { error: "Serviço indisponível" },
-        { status: 503 }
-      );
+      return Response.json({
+        error: "Serviço indisponível",
+        debug: { ...debugInfo, step: 'supabase_client_failed' }
+      }, { status: 503 });
     }
 
-    // Buscar listings ativos com dados do avatar
+    debugInfo.step = 'querying_raw_listings';
+
+    // PRIMEIRO: Buscar listings SEM JOIN para ver se existem
+    const { data: rawListings, error: rawError } = await supabase
+      .from('trade_listings')
+      .select('*')
+      .eq('status', 'active');
+
+    console.log('[trade/listings] Raw listings (sem JOIN):', rawListings);
+    console.log('[trade/listings] Raw error:', rawError);
+
+    debugInfo.rawCount = rawListings?.length || 0;
+    debugInfo.rawListings = rawListings;
+    debugInfo.rawError = rawError;
+
+    // SEGUNDO: Buscar com JOIN (LEFT JOIN via sintaxe do Supabase)
+    debugInfo.step = 'querying_with_join';
+
     const { data: listings, error } = await supabase
       .from('trade_listings')
       .select(`
@@ -51,33 +70,55 @@ export async function GET(request) {
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
+    console.log('[trade/listings] Listings com JOIN:', listings);
+    console.log('[trade/listings] Join error:', error);
+
+    debugInfo.joinCount = listings?.length || 0;
+    debugInfo.joinListings = listings;
+    debugInfo.joinError = error;
+
     if (error) {
       console.error("[trade/listings] Erro ao buscar:", error);
-      return Response.json(
-        { error: "Erro ao carregar anúncios" },
-        { status: 500 }
-      );
+      return Response.json({
+        error: "Erro ao carregar anúncios",
+        debug: { ...debugInfo, step: 'join_query_failed' }
+      }, { status: 500 });
+    }
+
+    // Verificar se algum listing não tem avatar
+    const listingsWithoutAvatar = (listings || []).filter(l => !l.avatares);
+    if (listingsWithoutAvatar.length > 0) {
+      console.warn('[trade/listings] Listings SEM avatar:', listingsWithoutAvatar);
+      debugInfo.missingAvatars = listingsWithoutAvatar;
     }
 
     // Formatar response
-    const formattedListings = (listings || []).map(listing => ({
-      id: listing.id,
-      seller_id: listing.seller_id,
-      seller_username: listing.seller_username || "Caçador Anônimo",
-      avatar_id: listing.avatar_id,
-      price_moedas: listing.price_moedas,
-      price_fragmentos: listing.price_fragmentos,
-      created_at: listing.created_at,
-      avatar: listing.avatares
-    }));
+    const formattedListings = (listings || [])
+      .filter(listing => listing.avatares) // Filtrar apenas os que TEM avatar
+      .map(listing => ({
+        id: listing.id,
+        seller_id: listing.seller_id,
+        seller_username: listing.seller_username || "Caçador Anônimo",
+        avatar_id: listing.avatar_id,
+        price_moedas: listing.price_moedas,
+        price_fragmentos: listing.price_fragmentos,
+        created_at: listing.created_at,
+        avatar: listing.avatares
+      }));
 
-    return Response.json({ listings: formattedListings });
+    debugInfo.step = 'success';
+    debugInfo.finalCount = formattedListings.length;
+
+    return Response.json({
+      listings: formattedListings,
+      debug: debugInfo
+    });
 
   } catch (error) {
     console.error("[trade/listings] Erro:", error);
-    return Response.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
+    return Response.json({
+      error: "Erro interno do servidor",
+      debug: { ...debugInfo, step: 'exception', exception: error.message }
+    }, { status: 500 });
   }
 }

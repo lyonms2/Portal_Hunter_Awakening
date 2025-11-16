@@ -17,6 +17,13 @@ export default function TradePage() {
   const [modalDetalhes, setModalDetalhes] = useState(null);
   const [mensagem, setMensagem] = useState(null);
 
+  // DEBUG
+  const [debugData, setDebugData] = useState({
+    listings: null,
+    myListings: null,
+    avatares: null
+  });
+
   // Vender
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [precoMoedas, setPrecoMoedas] = useState('');
@@ -48,6 +55,7 @@ export default function TradePage() {
       // Listings marketplace
       const listingsRes = await fetch('/api/trade/listings');
       const listingsData = await listingsRes.json();
+      setDebugData(prev => ({ ...prev, listings: listingsData }));
       if (listingsRes.ok) {
         setListings(listingsData.listings || []);
       }
@@ -55,6 +63,7 @@ export default function TradePage() {
       // Meus listings
       const myListingsRes = await fetch(`/api/trade/my-listings?userId=${userId}`);
       const myListingsData = await myListingsRes.json();
+      setDebugData(prev => ({ ...prev, myListings: myListingsData }));
       if (myListingsRes.ok) {
         setMyListings(myListingsData.listings || []);
       }
@@ -62,6 +71,7 @@ export default function TradePage() {
       // Meus avatares
       const avataresRes = await fetch(`/api/meus-avatares?userId=${userId}`);
       const avataresData = await avataresRes.json();
+      setDebugData(prev => ({ ...prev, avatares: { count: avataresData.avatares?.length || 0, avatares: avataresData.avatares } }));
       if (avataresRes.ok) {
         setMyAvatares(avataresData.avatares || []);
       }
@@ -220,6 +230,67 @@ export default function TradePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-gray-100">
       <div className="container mx-auto px-4 py-8">
+        {/* DEBUG PANEL - BEM GRANDE E VISÍVEL */}
+        <div className="mb-6 bg-red-900/30 border-2 border-red-500 rounded-lg p-6">
+          <h2 className="text-2xl font-black text-red-400 mb-4">🐛 DEBUG INFO</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-black/50 p-4 rounded">
+              <div className="text-amber-400 font-bold mb-2">MARKETPLACE</div>
+              <div className="text-white text-sm space-y-1">
+                <div>Listings no estado: <span className="text-cyan-400">{listings.length}</span></div>
+                <div>Raw count (API): <span className="text-cyan-400">{debugData.listings?.debug?.rawCount || '?'}</span></div>
+                <div>Join count (API): <span className="text-cyan-400">{debugData.listings?.debug?.joinCount || '?'}</span></div>
+                <div>Final count (API): <span className="text-cyan-400">{debugData.listings?.debug?.finalCount || '?'}</span></div>
+                {debugData.listings?.debug?.missingAvatars && (
+                  <div className="text-red-400">⚠️ {debugData.listings.debug.missingAvatars.length} listings SEM avatar!</div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-black/50 p-4 rounded">
+              <div className="text-purple-400 font-bold mb-2">MEUS ANÚNCIOS</div>
+              <div className="text-white text-sm space-y-1">
+                <div>userId: <span className="text-cyan-400 text-[10px] break-all">{user?.id}</span></div>
+                <div>Listings no estado: <span className="text-cyan-400">{myListings.length}</span></div>
+                <div>Raw count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.rawCount || '?'}</span></div>
+                <div>Join count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.joinCount || '?'}</span></div>
+                <div>Final count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.finalCount || '?'}</span></div>
+                {debugData.myListings?.debug?.missingAvatars && (
+                  <div className="text-red-400">⚠️ {debugData.myListings.debug.missingAvatars.length} listings SEM avatar!</div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-black/50 p-4 rounded">
+              <div className="text-green-400 font-bold mb-2">MEUS AVATARES</div>
+              <div className="text-white text-sm space-y-1">
+                <div>Total: <span className="text-cyan-400">{myAvatares.length}</span></div>
+                <div>Vendíveis: <span className="text-cyan-400">{avataresVendiveis.length}</span></div>
+                <div>Em anúncios: <span className="text-cyan-400">{avatarIdsEmAnuncios.size}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <details className="bg-black/50 p-4 rounded">
+            <summary className="cursor-pointer text-yellow-400 font-bold mb-2">VER JSON COMPLETO DAS APIS</summary>
+            <div className="mt-4 space-y-4">
+              <div>
+                <div className="text-amber-400 font-bold mb-1">Listings API Response:</div>
+                <pre className="bg-black p-2 rounded text-xs overflow-auto max-h-60">{JSON.stringify(debugData.listings, null, 2)}</pre>
+              </div>
+              <div>
+                <div className="text-purple-400 font-bold mb-1">My Listings API Response:</div>
+                <pre className="bg-black p-2 rounded text-xs overflow-auto max-h-60">{JSON.stringify(debugData.myListings, null, 2)}</pre>
+              </div>
+              <div>
+                <div className="text-green-400 font-bold mb-1">Avatares:</div>
+                <pre className="bg-black p-2 rounded text-xs overflow-auto max-h-60">{JSON.stringify(debugData.avatares, null, 2)}</pre>
+              </div>
+            </div>
+          </details>
+        </div>
+
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
