@@ -108,14 +108,14 @@ export async function POST(request) {
       const updates = {
         vinculo: novoVinculo,
         exaustao: novaExaustao,
-        hp_atual: avatarMorreu ? 0 : Math.max(0, hpFinal || 0), // Salvar HP atual
+        hp_atual: avatarMorreu ? 0 : Math.max(1, hpFinal || 1), // Se não morreu, mínimo 1 HP
         updated_at: new Date().toISOString()
       };
 
-      // Se morreu, marcar como morto
+      // Se morreu, marcar como morto (sem marca_morte, pode ser ressuscitado)
       if (avatarMorreu) {
         updates.vivo = false;
-        updates.marca_morte = true;
+        // NÃO adicionar marca_morte - avatar pode ser ressuscitado pelo Necromante
       }
 
       console.log('[ATUALIZANDO AVATAR]', updates);

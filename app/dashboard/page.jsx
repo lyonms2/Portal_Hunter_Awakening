@@ -372,7 +372,7 @@ export default function DashboardPage() {
                   <div className="h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent mb-4"></div>
 
                   {/* Recursos */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="bg-slate-900/50 rounded p-3 border border-amber-500/20">
                       <div className="text-xs text-slate-500 uppercase font-mono mb-1">💰 Moedas</div>
                       <div className="text-xl font-bold text-amber-400">{stats?.moedas || 0}</div>
@@ -380,10 +380,6 @@ export default function DashboardPage() {
                     <div className="bg-slate-900/50 rounded p-3 border border-purple-500/20">
                       <div className="text-xs text-slate-500 uppercase font-mono mb-1">💎 Fragmentos</div>
                       <div className="text-xl font-bold text-purple-400">{stats?.fragmentos || 0}</div>
-                    </div>
-                    <div className="bg-slate-900/50 rounded p-3 border border-red-500/20">
-                      <div className="text-xs text-slate-500 uppercase font-mono mb-1">🔴 Dívida</div>
-                      <div className="text-xl font-bold text-red-400">{stats?.divida || 0}</div>
                     </div>
                   </div>
 
@@ -401,48 +397,77 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded blur"></div>
-              <div className="relative bg-slate-950/50 backdrop-blur border border-slate-800/50 rounded p-6">
-                <h3 className="text-cyan-400 font-bold mb-4 text-sm uppercase tracking-wider">Estatísticas de Campo</h3>
-                
-                {loadingAvatares ? (
-                  <div className="text-center py-8 text-slate-500 font-mono text-sm animate-pulse">
-                    Carregando estatísticas...
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-slate-500 text-xs mb-1">✅ Missões Completadas</div>
-                      <div className="text-xl font-bold text-slate-300">{stats?.missoes_completadas || 0}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500 text-xs mb-1">🔵 Total de Avatares</div>
-                      <div className="text-xl font-bold text-slate-300">{avatares.length}</div>
-                    </div>
-                    
-                    {avatares.length === 0 ? (
-                      <div className="col-span-2 text-center py-4 bg-slate-900/30 rounded border border-slate-800/50">
-                        <span className="text-slate-500 text-sm">
-                          🔮 Nenhum avatar invocado ainda
-                        </span>
+            {/* Botões de Modos de Jogo - Abaixo da Carteira */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Botão MODO HISTÓRIA */}
+              <button
+                onClick={() => router.push("/missoes")}
+                className="group relative"
+              >
+                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/30 via-blue-500/30 to-purple-500/30 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
+
+                <div className="relative bg-slate-950/90 backdrop-blur-xl border-2 border-cyan-900/40 rounded-lg p-6 group-hover:border-cyan-500/60 transition-all h-full">
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center border-2 border-cyan-500/30 group-hover:border-cyan-400/50 transition-all">
+                        <span className="text-4xl animate-spin-slow">🌀</span>
                       </div>
-                    ) : (
-                      <>
-                        <div>
-                          <div className="text-slate-500 text-xs mb-1">💚 Avatares Vivos</div>
-                          <div className="text-xl font-bold text-green-400">{avatares.filter(av => av.vivo).length}</div>
+                      <div className="flex-1 text-left">
+                        <div className="font-black text-2xl bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent mb-1 group-hover:from-cyan-200 group-hover:to-blue-200 transition-all">
+                          MODO HISTÓRIA
                         </div>
-                        <div>
-                          <div className="text-slate-500 text-xs mb-1">☠️ Avatares Mortos</div>
-                          <div className="text-xl font-bold text-red-400">{avatares.filter(av => !av.vivo).length}</div>
+                        <div className="text-xs text-slate-400 font-mono uppercase tracking-wider">
+                          Em Desenvolvimento
                         </div>
-                      </>
-                    )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                      Explore portais dimensionais, desvende a lore do jogo e complete missões épicas. O destino dos mundos está em suas mãos!
+                    </p>
+                    <div className="mt-auto pt-4 border-t border-cyan-500/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-cyan-400 font-mono">Portal temporário ativo</span>
+                        <span className="text-cyan-400 group-hover:translate-x-1 transition-transform text-2xl">→</span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              </button>
+
+              {/* Botão ARENA DE COMBATE */}
+              <button
+                onClick={() => router.push("/arena")}
+                className="group relative"
+              >
+                <div className="absolute -inset-1 bg-gradient-to-r from-red-500/30 via-orange-500/30 to-red-500/30 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
+
+                <div className="relative bg-slate-950/90 backdrop-blur-xl border-2 border-red-900/40 rounded-lg p-6 group-hover:border-red-500/60 transition-all h-full">
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-lg flex items-center justify-center border-2 border-red-500/30 group-hover:border-red-400/50 transition-all">
+                        <span className="text-4xl">⚔️</span>
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="font-black text-2xl bg-gradient-to-r from-red-300 to-orange-300 bg-clip-text text-transparent mb-1 group-hover:from-red-200 group-hover:to-orange-200 transition-all">
+                          ARENA DE COMBATE
+                        </div>
+                        <div className="text-xs text-slate-400 font-mono uppercase tracking-wider">
+                          3 Modos Disponíveis
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                      Treinamento contra IA, PvP competitivo e modo Sobrevivência. Teste suas habilidades e prove seu valor em combate!
+                    </p>
+                    <div className="mt-auto pt-4 border-t border-red-500/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-red-400 font-mono">Pronto para batalha</span>
+                        <span className="text-red-400 group-hover:translate-x-1 transition-transform text-2xl">→</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -501,7 +526,34 @@ export default function DashboardPage() {
                 </div>
               </div>
             </button>
-          
+
+            {/* Botão Purificador */}
+            <button
+              onClick={() => router.push("/purificador")}
+              className="w-full group relative"
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-cyan-500/20 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
+
+              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-cyan-900/30 rounded-lg p-5 group-hover:border-cyan-500/50 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center border border-cyan-500/30 group-hover:border-cyan-400/50 transition-all">
+                    <span className="text-2xl">✨</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-cyan-300 text-base mb-0.5 group-hover:text-cyan-200 transition-colors">
+                      O PURIFICADOR
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      Remover Marca da Morte
+                    </div>
+                  </div>
+                  <div className="text-cyan-400 group-hover:translate-x-1 group-hover:text-cyan-300 transition-all text-xl">
+                    →
+                  </div>
+                </div>
+              </div>
+            </button>
+
             {/* Botão Meus Avatares */}
             <button
               onClick={() => router.push("/avatares")}
@@ -576,36 +628,34 @@ export default function DashboardPage() {
 
             {/* Divisor */}
             <div className="h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent my-2"></div>
-          
-            {/* Botão Missões - ATIVADO */}
+
+            {/* Botão Trade - HABILITADO */}
             <button
-              onClick={() => router.push("/missoes")}
+              onClick={() => router.push("/trade")}
               className="w-full group relative"
             >
-              <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-purple-500/20 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
-              
-              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-cyan-900/30 rounded-lg p-5 group-hover:border-cyan-500/50 transition-all">
+              <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
+
+              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-amber-900/30 rounded-lg p-5 group-hover:border-amber-500/50 transition-all">
                 <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center border border-cyan-500/30 group-hover:border-cyan-400/50 transition-all relative">
-                    <span className="text-2xl animate-spin-slow">🌀</span>
-                    {/* Indicador de disponibilidade */}
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-slate-950 animate-pulse"></div>
+                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg flex items-center justify-center border border-amber-500/30 group-hover:border-amber-400/50 transition-all">
+                    <span className="text-2xl">💱</span>
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-bold text-cyan-300 text-base mb-0.5 group-hover:text-cyan-200 transition-colors">
-                      HUB DE PORTAIS
+                    <div className="font-bold text-amber-300 text-base mb-0.5 group-hover:text-amber-200 transition-colors">
+                      MERCADO DE TRADE
                     </div>
                     <div className="text-xs text-slate-400 font-mono">
-                      Explorar dimensões e ganhar recompensas
+                      Comprar e vender avatares e itens
                     </div>
                   </div>
-                  <div className="text-cyan-400 group-hover:translate-x-1 group-hover:text-cyan-300 transition-all text-xl">
+                  <div className="text-amber-400 group-hover:translate-x-1 group-hover:text-amber-300 transition-all text-xl">
                     →
                   </div>
                 </div>
               </div>
             </button>
-            
+
             <style jsx>{`
               @keyframes spin-slow {
                 from {
@@ -615,92 +665,11 @@ export default function DashboardPage() {
                   transform: rotate(360deg);
                 }
               }
-            
+
               .animate-spin-slow {
                 animation: spin-slow 8s linear infinite;
               }
             `}</style>
-
-            {/* Botão Arena (habilitado) */}
-            <button
-              onClick={() => router.push("/arena")}
-              className="w-full group relative"
-            >
-              <div className="absolute -inset-1 bg-gradient-to-r from-red-500/20 via-orange-500/20 to-red-500/20 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
-              
-              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-red-900/30 rounded-lg p-5 group-hover:border-red-500/50 transition-all">
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-lg flex items-center justify-center border border-red-500/30 group-hover:border-red-400/50 transition-all">
-                    <span className="text-2xl">⚔️</span>
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="font-bold text-red-300 text-base mb-0.5 group-hover:text-red-200 transition-colors">
-                      ARENA
-                    </div>
-                    <div className="text-xs text-slate-400 font-mono">
-                      Batalhas PvP e torneios
-                    </div>
-                  </div>
-                  <div className="text-red-400 group-hover:translate-x-1 group-hover:text-red-300 transition-all text-xl">
-                    →
-                  </div>
-                </div>
-              </div>
-            </button>
-          
-            {/* Botão Trade (em breve) */}
-            <button
-              disabled
-              className="w-full group relative opacity-60 cursor-not-allowed"
-            >
-              <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 rounded-lg blur opacity-30"></div>
-              
-              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-slate-800/30 rounded-lg p-5">
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-slate-900/50 rounded-lg flex items-center justify-center border border-slate-700/30">
-                    <span className="text-2xl opacity-50">💱</span>
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="font-bold text-slate-500 text-base mb-0.5">
-                      TRADE
-                    </div>
-                    <div className="text-xs text-slate-600 font-mono">
-                      Sistema de trocas em breve
-                    </div>
-                  </div>
-                  <div className="text-slate-600 text-xl">
-                    🔒
-                  </div>
-                </div>
-              </div>
-            </button>
-          
-            {/* Botão Ranking (em breve) */}
-            <button
-              disabled
-              className="w-full group relative opacity-60 cursor-not-allowed"
-            >
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-blue-500/10 rounded-lg blur opacity-30"></div>
-              
-              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-slate-800/30 rounded-lg p-5">
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-slate-900/50 rounded-lg flex items-center justify-center border border-slate-700/30">
-                    <span className="text-2xl opacity-50">🏆</span>
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="font-bold text-slate-500 text-base mb-0.5">
-                      RANKING
-                    </div>
-                    <div className="text-xs text-slate-600 font-mono">
-                      Tabela de classificação em breve
-                    </div>
-                  </div>
-                  <div className="text-slate-600 text-xl">
-                    🔒
-                  </div>
-                </div>
-              </div>
-            </button>
           </div>
         </div>
       </div>
