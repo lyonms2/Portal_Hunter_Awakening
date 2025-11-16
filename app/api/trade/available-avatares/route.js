@@ -27,6 +27,9 @@ export async function GET(request) {
     // - ativo = false
     // - marca_morte = false
     // - em_venda = false
+
+    console.log(`[available-avatares] Buscando avatares para user: ${userId}`);
+
     const { data: avatares, error } = await supabase
       .from('avatares')
       .select('*')
@@ -42,7 +45,11 @@ export async function GET(request) {
       return Response.json({ error: "Erro ao buscar avatares" }, { status: 500 });
     }
 
-    console.log(`[available-avatares] User ${userId}: encontrados ${avatares?.length || 0} avatares vendíveis`);
+    // LOG DETALHADO - ver o que está vindo
+    console.log(`[available-avatares] Encontrados ${avatares?.length || 0} avatares`);
+    avatares?.forEach(av => {
+      console.log(`[available-avatares] Avatar: ${av.nome} | vivo=${av.vivo} ativo=${av.ativo} marca_morte=${av.marca_morte} em_venda=${av.em_venda} | TIPOS: vivo=${typeof av.vivo} ativo=${typeof av.ativo}`);
+    });
 
     return Response.json({
       avatares: avatares || [],
