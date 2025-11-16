@@ -115,6 +115,9 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
+  const requestTime = new Date().toISOString();
+  console.log(`\n[ATIVAR AVATAR] ====== REQUISIÇÃO em ${requestTime} ======`);
+
   try {
     // Inicializar Supabase dentro da função
     const supabase = getSupabaseClientSafe(true);
@@ -127,6 +130,8 @@ export async function PUT(request) {
 
     const body = await request.json();
     const { userId, avatarId } = body;
+
+    console.log(`[ATIVAR AVATAR] userId=${userId?.substring(0, 8)}, avatarId=${avatarId?.substring(0, 8)}`);
 
     if (!userId || !avatarId) {
       return Response.json(
@@ -144,13 +149,17 @@ export async function PUT(request) {
       .single();
 
     if (checkError || !avatarToActivate) {
+      console.log(`[ATIVAR AVATAR] ❌ Avatar não encontrado`);
       return Response.json(
         { message: "Avatar não encontrado ou não pertence ao usuário" },
         { status: 404 }
       );
     }
 
+    console.log(`[ATIVAR AVATAR] Avatar encontrado: ${avatarToActivate.nome} (vivo=${avatarToActivate.vivo}, ativo atual=${avatarToActivate.ativo})`);
+
     if (!avatarToActivate.vivo) {
+      console.log(`[ATIVAR AVATAR] ❌ Avatar morto, não pode ativar`);
       return Response.json(
         { message: "Não é possível ativar um avatar destruído" },
         { status: 400 }
@@ -158,20 +167,25 @@ export async function PUT(request) {
     }
 
     // Desativar todos os avatares do usuário
-    const { error: deactivateError } = await supabase
+    console.log(`[ATIVAR AVATAR] 1️⃣ Desativando TODOS os avatares do usuário...`);
+    const { data: desativados, error: deactivateError } = await supabase
       .from('avatares')
       .update({ ativo: false })
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .select();
 
     if (deactivateError) {
-      console.error("Erro ao desativar avatares:", deactivateError);
+      console.error("[ATIVAR AVATAR] ❌ Erro ao desativar avatares:", deactivateError);
       return Response.json(
         { message: "Erro ao desativar avatares: " + deactivateError.message },
         { status: 500 }
       );
     }
 
+    console.log(`[ATIVAR AVATAR] ✅ ${desativados?.length || 0} avatares desativados`);
+
     // Ativar o avatar escolhido
+    console.log(`[ATIVAR AVATAR] 2️⃣ Ativando avatar ${avatarToActivate.nome}...`);
     const { data: avatarAtivado, error: activateError } = await supabase
       .from('avatares')
       .update({ ativo: true })
@@ -180,19 +194,29 @@ export async function PUT(request) {
       .single();
 
     if (activateError || !avatarAtivado) {
-      console.error("Erro ao ativar avatar:", activateError);
+      console.error("[ATIVAR AVATAR] ❌ Erro ao ativar avatar:", activateError);
       return Response.json(
         { message: "Erro ao ativar avatar" },
         { status: 500 }
       );
     }
 
+    console.log(`[ATIVAR AVATAR] ✅ Avatar ativado com sucesso! Novo ativo=${avatarAtivado.ativo}`);
+
     // Buscar todos os avatares atualizados
+    console.log(`[ATIVAR AVATAR] 3️⃣ Buscando todos os avatares atualizados...`);
     const { data: todosAvatares } = await supabase
       .from('avatares')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    console.log(`[ATIVAR AVATAR] Estado final dos avatares:`);
+    todosAvatares?.forEach(av => {
+      console.log(`  - ${av.nome}: ativo=${av.ativo} (${typeof av.ativo})`);
+    });
+
+    console.log(`[ATIVAR AVATAR] ====== FIM REQUISIÇÃO ======\n`);
 
     return Response.json({
       success: true,
@@ -202,7 +226,7 @@ export async function PUT(request) {
     });
 
   } catch (error) {
-    console.error("Erro crítico:", error);
+    console.error("[ATIVAR AVATAR] Erro crítico:", error);
     return Response.json(
       { message: "Erro ao processar requisição" },
       { status: 500 }
