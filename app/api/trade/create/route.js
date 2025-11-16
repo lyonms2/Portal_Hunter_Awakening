@@ -47,7 +47,7 @@ export async function POST(request) {
     // Verificar se avatar pertence ao usuário
     const { data: avatar, error: avatarError } = await supabase
       .from('avatares')
-      .select('id, user_id, nome, vivo, ativo, marca_morte')
+      .select('id, user_id, nome, vivo, ativo, marca_morte, em_venda')
       .eq('id', avatarId)
       .single();
 
@@ -87,17 +87,9 @@ export async function POST(request) {
       );
     }
 
-    // Verificar se já existe anúncio ativo para este avatar
-    const { data: existingListing } = await supabase
-      .from('trade_listings')
-      .select('id')
-      .eq('avatar_id', avatarId)
-      .eq('status', 'active')
-      .single();
-
-    if (existingListing) {
+    if (avatar.em_venda) {
       return Response.json(
-        { error: "Este avatar já possui um anúncio ativo" },
+        { error: "Este avatar já está à venda" },
         { status: 400 }
       );
     }
@@ -110,6 +102,20 @@ export async function POST(request) {
       .single();
 
     const sellerUsername = sellerStats?.nome_operacao || "Caçador Anônimo";
+
+    // Marcar avatar como em_venda
+    const { error: updateError } = await supabase
+      .from('avatares')
+      .update({ em_venda: true })
+      .eq('id', avatarId);
+
+    if (updateError) {
+      console.error("[trade/create] Erro ao marcar avatar em_venda:", updateError);
+      return Response.json(
+        { error: "Erro ao marcar avatar para venda" },
+        { status: 500 }
+      );
+    }
 
     // Criar o listing
     const { data: listing, error: createError } = await supabase
@@ -127,6 +133,12 @@ export async function POST(request) {
 
     if (createError) {
       console.error("[trade/create] Erro ao criar:", createError);
+      // Reverter em_venda se falhar
+      await supabase
+        .from('avatares')
+        .update({ em_venda: false })
+        .eq('id', avatarId);
+
       return Response.json(
         { error: "Erro ao criar anúncio" },
         { status: 500 }
