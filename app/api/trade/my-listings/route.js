@@ -1,26 +1,29 @@
 import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
-// Forçar rota dinâmica (não pode ser estaticamente renderizada)
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/trade/my-listings?userId=xxx
+ *
+ * Retorna anúncios do usuário logado
+ */
 export async function GET(request) {
   try {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
       return Response.json(
-        { message: "Serviço temporariamente indisponível" },
+        { error: "Serviço indisponível" },
         { status: 503 }
       );
     }
 
+    // Pegar userId da query
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
-    console.log("[my-listings] userId recebido:", userId);
-
     if (!userId) {
       return Response.json(
-        { message: "userId é obrigatório" },
+        { error: "userId é obrigatório" },
         { status: 400 }
       );
     }
@@ -29,74 +32,63 @@ export async function GET(request) {
     const { data: listings, error } = await supabase
       .from('trade_listings')
       .select(`
-        *,
-        avatares!inner (
+        id,
+        seller_id,
+        seller_username,
+        avatar_id,
+        price_moedas,
+        price_fragmentos,
+        status,
+        created_at,
+        avatares (
           id,
           nome,
           descricao,
           raridade,
           elemento,
           nivel,
-          experiencia,
-          vinculo,
           forca,
           agilidade,
           resistencia,
           foco,
+          experiencia,
+          vinculo,
           habilidades,
           vivo,
           ativo,
-          marca_morte,
-          exaustao,
-          hp_atual
+          marca_morte
         )
       `)
       .eq('seller_id', userId)
       .eq('status', 'active')
-      .eq('listing_type', 'avatar')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error("Erro ao buscar meus listings:", error);
+      console.error("[trade/my-listings] Erro ao buscar:", error);
       return Response.json(
-        { message: "Erro ao buscar listings" },
+        { error: "Erro ao carregar seus anúncios" },
         { status: 500 }
       );
     }
 
-    console.log("[my-listings] Listings encontrados:", listings?.length || 0);
-    if (listings && listings.length > 0) {
-      console.log("[my-listings] Primeiro listing:", {
-        id: listings[0].id,
-        seller_id: listings[0].seller_id,
-        userId_esperado: userId,
-        ids_batem: listings[0].seller_id === userId
-      });
-    } else {
-      console.log("[my-listings] Nenhum listing encontrado para userId:", userId);
-      // Debug: buscar TODOS os listings sem filtro de seller_id
-      const { data: allListings } = await supabase
-        .from('trade_listings')
-        .select('id, seller_id, status')
-        .eq('status', 'active')
-        .limit(5);
-      console.log("[my-listings] DEBUG - Primeiros 5 listings ativos (sem filtro):", allListings);
-    }
-
-    // Formatar dados
-    const formattedListings = listings.map(listing => ({
-      ...listing,
-      avatar_data: listing.avatares
+    // Formatar response
+    const formattedListings = (listings || []).map(listing => ({
+      id: listing.id,
+      seller_id: listing.seller_id,
+      seller_username: listing.seller_username || "Caçador Anônimo",
+      avatar_id: listing.avatar_id,
+      price_moedas: listing.price_moedas,
+      price_fragmentos: listing.price_fragmentos,
+      created_at: listing.created_at,
+      avatar: listing.avatares
     }));
 
-    return Response.json({
-      listings: formattedListings
-    });
+    return Response.json({ listings: formattedListings });
 
   } catch (error) {
-    console.error("Erro no servidor:", error);
+    console.error("[trade/my-listings] Erro:", error);
     return Response.json(
-      { message: "Erro ao processar: " + error.message },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

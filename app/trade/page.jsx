@@ -9,27 +9,18 @@ export default function TradePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
-  const [activeTab, setActiveTab] = useState('marketplace'); // marketplace, my-listings, sell
+  const [activeTab, setActiveTab] = useState('marketplace');
   const [listings, setListings] = useState([]);
   const [myListings, setMyListings] = useState([]);
   const [myAvatares, setMyAvatares] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modalCompra, setModalCompra] = useState(null);
   const [modalDetalhes, setModalDetalhes] = useState(null);
-  const [comprando, setComprando] = useState(false);
   const [mensagem, setMensagem] = useState(null);
 
-  // Filtros
-  const [filtroTipo, setFiltroTipo] = useState('all'); // all, avatar, item
-  const [filtroRaridade, setFiltroRaridade] = useState('all');
-  const [filtroElemento, setFiltroElemento] = useState('all');
-  const [ordenacao, setOrdenacao] = useState('recent'); // recent, price_asc, price_desc
-
-  // Criar listing
+  // Vender
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [precoMoedas, setPrecoMoedas] = useState('');
   const [precoFragmentos, setPrecoFragmentos] = useState('');
-  const [criandoListing, setCriandoListing] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -45,7 +36,7 @@ export default function TradePage() {
   const carregarDados = async (userId) => {
     setLoading(true);
     try {
-      // Carregar stats do jogador
+      // Stats
       const statsRes = await fetch(`/api/inicializar-jogador`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,13 +45,21 @@ export default function TradePage() {
       const statsData = await statsRes.json();
       setStats(statsData.stats);
 
-      // Carregar listings do mercado
-      await carregarListings();
+      // Listings marketplace
+      const listingsRes = await fetch('/api/trade/listings');
+      const listingsData = await listingsRes.json();
+      if (listingsRes.ok) {
+        setListings(listingsData.listings || []);
+      }
 
-      // Carregar meus listings
-      await carregarMeusListings();
+      // Meus listings
+      const myListingsRes = await fetch(`/api/trade/my-listings?userId=${userId}`);
+      const myListingsData = await myListingsRes.json();
+      if (myListingsRes.ok) {
+        setMyListings(myListingsData.listings || []);
+      }
 
-      // Carregar meus avatares (para vender)
+      // Meus avatares
       const avataresRes = await fetch(`/api/meus-avatares?userId=${userId}`);
       const avataresData = await avataresRes.json();
       if (avataresRes.ok) {
@@ -68,52 +67,11 @@ export default function TradePage() {
       }
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
+      mostrarMensagem('Erro ao carregar dados', 'erro');
     } finally {
       setLoading(false);
     }
   };
-
-  const carregarListings = async () => {
-    try {
-      const res = await fetch('/api/trade/listings');
-      const data = await res.json();
-      console.log("Resposta da API listings:", data);
-      if (res.ok) {
-        setListings(data.listings || []);
-      } else {
-        console.error("Erro na resposta:", data);
-        mostrarMensagem(data.message || 'Erro ao carregar anúncios', 'erro');
-      }
-    } catch (error) {
-      console.error("Erro ao carregar listings:", error);
-      mostrarMensagem('Erro de conexão ao carregar anúncios', 'erro');
-    }
-  };
-
-  const carregarMeusListings = async () => {
-    if (!user) return;
-    console.log("[Frontend] Carregando meus listings para userId:", user.id);
-    try {
-      const res = await fetch(`/api/trade/my-listings?userId=${user.id}`);
-      const data = await res.json();
-      console.log("Resposta da API my-listings:", data);
-      if (res.ok) {
-        setMyListings(data.listings || []);
-      } else {
-        console.error("Erro na resposta:", data);
-        mostrarMensagem(data.message || 'Erro ao carregar seus anúncios', 'erro');
-      }
-    } catch (error) {
-      console.error("Erro ao carregar meus listings:", error);
-      mostrarMensagem('Erro de conexão ao carregar seus anúncios', 'erro');
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'my-listings' && user) {
-      carregarMeusListings();
-    }
-  }, [activeTab, user]);
 
   const criarListing = async () => {
     if (!selectedAvatar || (!precoMoedas && !precoFragmentos)) {
@@ -124,19 +82,13 @@ export default function TradePage() {
     const moedas = parseInt(precoMoedas) || 0;
     const fragmentos = parseInt(precoFragmentos) || 0;
 
-    if (moedas < 0 || fragmentos < 0) {
-      mostrarMensagem('Preço não pode ser negativo', 'erro');
-      return;
-    }
-
     if (moedas === 0 && fragmentos === 0) {
-      mostrarMensagem('Defina pelo menos um preço (moedas ou fragmentos)', 'erro');
+      mostrarMensagem('Defina pelo menos um preço', 'erro');
       return;
     }
 
-    setCriandoListing(true);
     try {
-      const res = await fetch('/api/trade/create-listing', {
+      const res = await fetch('/api/trade/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,25 +101,26 @@ export default function TradePage() {
 
       const data = await res.json();
       if (res.ok) {
-        mostrarMensagem('Listing criado com sucesso!', 'sucesso');
+        mostrarMensagem(data.message, 'sucesso');
         setSelectedAvatar(null);
         setPrecoMoedas('');
         setPrecoFragmentos('');
         await carregarDados(user.id);
         setActiveTab('my-listings');
       } else {
-        mostrarMensagem(data.message || 'Erro ao criar listing', 'erro');
+        mostrarMensagem(data.error || 'Erro ao criar anúncio', 'erro');
       }
     } catch (error) {
       console.error("Erro ao criar listing:", error);
       mostrarMensagem('Erro de conexão', 'erro');
-    } finally {
-      setCriandoListing(false);
     }
   };
 
   const comprarListing = async (listing) => {
-    setComprando(true);
+    if (!window.confirm(`Comprar ${listing.avatar.nome} por ${listing.price_moedas} moedas + ${listing.price_fragmentos} fragmentos (+ 5% taxa)?`)) {
+      return;
+    }
+
     try {
       const res = await fetch('/api/trade/buy', {
         method: 'POST',
@@ -180,26 +133,25 @@ export default function TradePage() {
 
       const data = await res.json();
       if (res.ok) {
-        mostrarMensagem('Compra realizada com sucesso!', 'sucesso');
-        setModalCompra(null);
+        mostrarMensagem(data.message, 'sucesso');
         await carregarDados(user.id);
       } else {
-        mostrarMensagem(data.message || 'Erro ao comprar', 'erro');
-        setModalCompra(null);
+        mostrarMensagem(data.error || 'Erro ao comprar', 'erro');
       }
     } catch (error) {
       console.error("Erro ao comprar:", error);
       mostrarMensagem('Erro de conexão', 'erro');
-      setModalCompra(null);
-    } finally {
-      setComprando(false);
     }
   };
 
   const cancelarListing = async (listingId) => {
+    if (!window.confirm('Cancelar este anúncio?')) {
+      return;
+    }
+
     try {
       const res = await fetch('/api/trade/cancel', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
@@ -209,12 +161,10 @@ export default function TradePage() {
 
       const data = await res.json();
       if (res.ok) {
-        mostrarMensagem('Listing cancelado', 'sucesso');
-        await carregarMeusListings();
-        await carregarListings();
+        mostrarMensagem(data.message, 'sucesso');
         await carregarDados(user.id);
       } else {
-        mostrarMensagem(data.message || 'Erro ao cancelar', 'erro');
+        mostrarMensagem(data.error || 'Erro ao cancelar', 'erro');
       }
     } catch (error) {
       console.error("Erro ao cancelar:", error);
@@ -253,61 +203,8 @@ export default function TradePage() {
     return emojis[elemento] || '⭐';
   };
 
-  const getCorRaridade = (raridade) => {
-    switch (raridade) {
-      case 'Lendário': return 'from-amber-500 to-yellow-500';
-      case 'Raro': return 'from-purple-500 to-pink-500';
-      default: return 'from-slate-600 to-slate-700';
-    }
-  };
-
-  const getCorBorda = (raridade) => {
-    switch (raridade) {
-      case 'Lendário': return 'border-amber-500';
-      case 'Raro': return 'border-purple-500';
-      default: return 'border-slate-600';
-    }
-  };
-
-  // Filtrar e ordenar listings
-  let listingsFiltrados = [...listings];
-
-  console.log("[Trade Page] Total de listings no estado:", listings.length);
-  console.log("[Trade Page] Listings filtrados inicialmente:", listingsFiltrados.length);
-
-  if (filtroTipo !== 'all') {
-    listingsFiltrados = listingsFiltrados.filter(l => l.listing_type === filtroTipo);
-  }
-
-  if (filtroRaridade !== 'all') {
-    listingsFiltrados = listingsFiltrados.filter(l =>
-      l.avatar_data?.raridade === filtroRaridade
-    );
-  }
-
-  if (filtroElemento !== 'all') {
-    listingsFiltrados = listingsFiltrados.filter(l =>
-      l.avatar_data?.elemento === filtroElemento
-    );
-  }
-
-  // Ordenar
-  listingsFiltrados.sort((a, b) => {
-    switch (ordenacao) {
-      case 'price_asc':
-        return (a.price_moedas + a.price_fragmentos * 10) - (b.price_moedas + b.price_fragmentos * 10);
-      case 'price_desc':
-        return (b.price_moedas + b.price_fragmentos * 10) - (a.price_moedas + a.price_fragmentos * 10);
-      case 'recent':
-      default:
-        return new Date(b.created_at) - new Date(a.created_at);
-    }
-  });
-
-  // IDs dos avatares que já estão em anúncios ativos
+  // Avatares disponíveis para venda
   const avatarIdsEmAnuncios = new Set(myListings.map(l => l.avatar_id));
-
-  // Avatares que podem ser vendidos (excluindo os que já estão em anúncios)
   const avataresVendiveis = myAvatares.filter(av =>
     av.vivo && !av.ativo && !av.marca_morte && !avatarIdsEmAnuncios.has(av.id)
   );
@@ -321,23 +218,13 @@ export default function TradePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-gray-100 relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute w-96 h-96 bg-amber-500/5 rounded-full blur-3xl top-20 -left-48 animate-pulse"></div>
-        <div className="absolute w-96 h-96 bg-yellow-500/5 rounded-full blur-3xl bottom-20 -right-48 animate-pulse" style={{animationDelay: '2s'}}></div>
-      </div>
-
-      <div className="absolute inset-0 opacity-[0.03] bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iMTAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yOCAwTDAgMTVWMzVMMjggNTBMNTYgMzVWMTVaTTI4IDUwTDAgNjVWODVMMjggMTAwTDU2IDg1VjY1WiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYW1iZXIiIHN0cm9rZS13aWR0aD0iMC41Ii8+PC9zdmc+')] pointer-events-none"></div>
-      <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.9)] pointer-events-none"></div>
-
-      <div className="relative z-10 container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-gray-100">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-4xl font-black bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-300 bg-clip-text text-transparent mb-2 flex items-center gap-3">
-              <span className="text-5xl">💱</span>
-              MERCADO DE TRADE
+            <h1 className="text-4xl font-black bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-300 bg-clip-text text-transparent mb-2">
+              💱 MERCADO DE TRADE
             </h1>
             <p className="text-slate-400 font-mono text-sm">
               💰 {stats?.moedas || 0} Moedas • 💎 {stats?.fragmentos || 0} Fragmentos
@@ -346,11 +233,22 @@ export default function TradePage() {
 
           <button
             onClick={() => router.push("/dashboard")}
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-all"
+            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all"
           >
             ← Voltar
           </button>
         </div>
+
+        {/* Mensagem */}
+        {mensagem && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            mensagem.tipo === 'sucesso'
+              ? 'bg-green-500/20 border-green-500 text-green-300'
+              : 'bg-red-500/20 border-red-500 text-red-300'
+          }`}>
+            {mensagem.texto}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
@@ -372,7 +270,7 @@ export default function TradePage() {
                 : 'bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
             }`}
           >
-            📋 Meus Anúncios
+            📋 Meus Anúncios ({myListings.length})
           </button>
           <button
             onClick={() => setActiveTab('sell')}
@@ -382,85 +280,28 @@ export default function TradePage() {
                 : 'bg-slate-900/50 text-slate-400 hover:bg-slate-800/50'
             }`}
           >
-            💰 Vender Avatar
+            💰 Vender
           </button>
         </div>
 
-        {/* Conteúdo das Tabs */}
+        {/* MERCADO */}
         {activeTab === 'marketplace' && (
           <div>
-            {/* Filtros */}
-            <div className="mb-6 bg-slate-900/50 border border-slate-700/50 rounded-lg p-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <select
-                  value={filtroTipo}
-                  onChange={(e) => setFiltroTipo(e.target.value)}
-                  className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-                >
-                  <option value="all">Todos os Tipos</option>
-                  <option value="avatar">Avatares</option>
-                  <option value="item">Itens</option>
-                </select>
-
-                <select
-                  value={filtroRaridade}
-                  onChange={(e) => setFiltroRaridade(e.target.value)}
-                  className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-                >
-                  <option value="all">Todas Raridades</option>
-                  <option value="Comum">Comum</option>
-                  <option value="Raro">Raro</option>
-                  <option value="Lendário">Lendário</option>
-                </select>
-
-                <select
-                  value={filtroElemento}
-                  onChange={(e) => setFiltroElemento(e.target.value)}
-                  className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-                >
-                  <option value="all">Todos Elementos</option>
-                  <option value="Fogo">🔥 Fogo</option>
-                  <option value="Água">💧 Água</option>
-                  <option value="Terra">🪨 Terra</option>
-                  <option value="Vento">💨 Vento</option>
-                  <option value="Eletricidade">⚡ Eletricidade</option>
-                  <option value="Sombra">🌑 Sombra</option>
-                  <option value="Luz">✨ Luz</option>
-                </select>
-
-                <select
-                  value={ordenacao}
-                  onChange={(e) => setOrdenacao(e.target.value)}
-                  className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-                >
-                  <option value="recent">Mais Recentes</option>
-                  <option value="price_asc">Menor Preço</option>
-                  <option value="price_desc">Maior Preço</option>
-                </select>
-              </div>
-
-              <div className="mt-3 text-xs text-slate-500 font-mono">
-                {listingsFiltrados.length} {listingsFiltrados.length === 1 ? 'anúncio encontrado' : 'anúncios encontrados'}
-              </div>
-            </div>
-
-            {/* Listings Grid */}
-            {listingsFiltrados.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-6xl mb-4 opacity-20">🔍</div>
-                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum anúncio encontrado</h3>
-                <p className="text-slate-500 text-sm">Tente ajustar os filtros ou seja o primeiro a vender!</p>
+            {listings.length === 0 ? (
+              <div className="text-center py-20 bg-slate-900/30 rounded-lg border border-slate-800">
+                <div className="text-6xl mb-4 opacity-20">🛒</div>
+                <h3 className="text-xl font-bold text-slate-400">Marketplace vazio</h3>
+                <p className="text-slate-500 text-sm">Seja o primeiro a vender!</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {listingsFiltrados.map((listing) => (
+                {listings.map((listing) => (
                   <ListingCard
                     key={listing.id}
                     listing={listing}
-                    onComprar={() => setModalCompra(listing)}
-                    onVerDetalhes={() => setModalDetalhes(listing.avatar_data)}
-                    isOwnListing={listing.seller_id === user?.id}
-                    getCorRaridade={getCorRaridade}
+                    onComprar={() => comprarListing(listing)}
+                    onVer={() => setModalDetalhes(listing.avatar)}
+                    isOwn={listing.seller_id === user?.id}
                     getCorElemento={getCorElemento}
                     getEmojiElemento={getEmojiElemento}
                   />
@@ -470,20 +311,17 @@ export default function TradePage() {
           </div>
         )}
 
+        {/* MEUS ANÚNCIOS */}
         {activeTab === 'my-listings' && (
           <div>
-            <div className="mb-4 text-sm text-slate-400">
-              Seus anúncios ativos no marketplace
-            </div>
-
             {myListings.length === 0 ? (
               <div className="text-center py-20 bg-slate-900/30 rounded-lg border border-slate-800">
                 <div className="text-6xl mb-4 opacity-20">📋</div>
-                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum anúncio ativo</h3>
+                <h3 className="text-xl font-bold text-slate-400">Nenhum anúncio ativo</h3>
                 <p className="text-slate-500 text-sm mb-4">Venda seus avatares extras!</p>
                 <button
                   onClick={() => setActiveTab('sell')}
-                  className="px-6 py-3 bg-gradient-to-r from-amber-600 to-yellow-600 text-white font-bold rounded-lg hover:from-amber-500 hover:to-yellow-500 transition-all"
+                  className="px-6 py-3 bg-gradient-to-r from-amber-600 to-yellow-600 text-white font-bold rounded-lg"
                 >
                   Criar Anúncio
                 </button>
@@ -495,8 +333,7 @@ export default function TradePage() {
                     key={listing.id}
                     listing={listing}
                     onCancelar={() => cancelarListing(listing.id)}
-                    onVerDetalhes={() => setModalDetalhes(listing.avatar_data)}
-                    getCorRaridade={getCorRaridade}
+                    onVer={() => setModalDetalhes(listing.avatar)}
                     getCorElemento={getCorElemento}
                     getEmojiElemento={getEmojiElemento}
                   />
@@ -506,416 +343,219 @@ export default function TradePage() {
           </div>
         )}
 
+        {/* VENDER */}
         {activeTab === 'sell' && (
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-slate-900/50 border border-amber-500/30 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-amber-400 mb-4">Vender Avatar</h2>
+          <div className="max-w-4xl mx-auto bg-slate-900/50 border border-amber-500/30 rounded-lg p-6">
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">Vender Avatar</h2>
 
-              {avataresVendiveis.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4 opacity-20">😔</div>
-                  <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar disponível para venda</h3>
-                  <p className="text-slate-500 text-sm">
-                    Apenas avatares vivos, inativos e sem marca da morte podem ser vendidos.
-                  </p>
-                </div>
-              ) : (
+            {avataresVendiveis.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4 opacity-20">😔</div>
+                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar disponível</h3>
+                <p className="text-slate-500 text-sm">
+                  Apenas avatares vivos, inativos e sem marca da morte podem ser vendidos.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Selecionar Avatar */}
                 <div>
-                  <div className="mb-6">
-                    <label className="block text-amber-400 text-sm font-bold mb-3">
-                      Selecione o Avatar
-                    </label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {avataresVendiveis.map((avatar) => (
-                        <button
-                          key={avatar.id}
-                          onClick={() => setSelectedAvatar(avatar)}
-                          className={`relative p-3 rounded-lg border-2 transition-all flex flex-col items-center ${
-                            selectedAvatar?.id === avatar.id
-                              ? 'border-amber-500 bg-amber-500/20'
-                              : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                          }`}
-                        >
-                          <AvatarSVG avatar={avatar} tamanho={80} />
-                          <div className="mt-2 text-xs font-bold text-white truncate w-full text-center">{avatar.nome}</div>
-                          <div className="text-xs text-slate-400">{avatar.raridade}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {selectedAvatar && (
-                    <div className="space-y-4">
-                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                        <div className="flex items-center gap-4">
-                          <div className="flex-shrink-0">
-                            <AvatarSVG avatar={selectedAvatar} tamanho={100} />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-xl font-bold text-white mb-1">{selectedAvatar.nome}</h3>
-                            <div className="flex items-center gap-2 text-sm flex-wrap">
-                              <span className={`px-2 py-0.5 rounded ${
-                                selectedAvatar.raridade === 'Lendário' ? 'bg-amber-500/20 text-amber-400' :
-                                selectedAvatar.raridade === 'Raro' ? 'bg-purple-500/20 text-purple-400' :
-                                'bg-slate-600/20 text-slate-400'
-                              } font-bold`}>
-                                {selectedAvatar.raridade}
-                              </span>
-                              <span className={getCorElemento(selectedAvatar.elemento)}>
-                                {getEmojiElemento(selectedAvatar.elemento)} {selectedAvatar.elemento}
-                              </span>
-                              <span className="text-slate-400">• Nv.{selectedAvatar.nivel}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-amber-400 text-sm font-bold mb-2">
-                            💰 Preço em Moedas
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={precoMoedas}
-                            onChange={(e) => setPrecoMoedas(e.target.value)}
-                            placeholder="0"
-                            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-amber-400 text-sm font-bold mb-2">
-                            💎 Preço em Fragmentos
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={precoFragmentos}
-                            onChange={(e) => setPrecoFragmentos(e.target.value)}
-                            placeholder="0"
-                            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                        <div className="text-sm text-slate-400 mb-2">ℹ️ Informações Importantes:</div>
-                        <ul className="text-xs text-slate-500 space-y-1">
-                          <li>• Taxa do sistema: 5% (você receberá 95% do valor)</li>
-                          <li>• O anúncio expira automaticamente em 30 dias</li>
-                          <li>• Você pode cancelar o anúncio a qualquer momento</li>
-                          <li>• Defina pelo menos um preço (moedas ou fragmentos)</li>
-                        </ul>
-                      </div>
-
+                  <label className="block text-amber-400 font-bold mb-3">Selecione o Avatar</label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {avataresVendiveis.map((avatar) => (
                       <button
-                        onClick={criarListing}
-                        disabled={criandoListing || (!precoMoedas && !precoFragmentos)}
-                        className="w-full py-4 bg-gradient-to-r from-amber-600 to-yellow-600 text-white font-bold rounded-lg hover:from-amber-500 hover:to-yellow-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        key={avatar.id}
+                        onClick={() => setSelectedAvatar(avatar)}
+                        className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center ${
+                          selectedAvatar?.id === avatar.id
+                            ? 'border-amber-500 bg-amber-500/20'
+                            : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                        }`}
                       >
-                        {criandoListing ? 'Criando Anúncio...' : '✅ Criar Anúncio de Venda'}
+                        <AvatarSVG avatar={avatar} tamanho={80} />
+                        <div className="mt-2 text-xs font-bold truncate w-full text-center">{avatar.nome}</div>
+                        <div className="text-xs text-slate-400">{avatar.raridade}</div>
                       </button>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* Definir Preço */}
+                {selectedAvatar && (
+                  <div className="space-y-4">
+                    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 flex items-center gap-4">
+                      <AvatarSVG avatar={selectedAvatar} tamanho={80} />
+                      <div>
+                        <h3 className="font-bold text-lg">{selectedAvatar.nome}</h3>
+                        <p className="text-sm text-slate-400">
+                          {selectedAvatar.raridade} • {getEmojiElemento(selectedAvatar.elemento)} {selectedAvatar.elemento} • Nv.{selectedAvatar.nivel}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-amber-400 font-bold mb-2">💰 Moedas</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={precoMoedas}
+                          onChange={(e) => setPrecoMoedas(e.target.value)}
+                          placeholder="0"
+                          className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-amber-400 font-bold mb-2">💎 Fragmentos</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={precoFragmentos}
+                          onChange={(e) => setPrecoFragmentos(e.target.value)}
+                          placeholder="0"
+                          className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-200">
+                      <strong>Nota:</strong> Uma taxa de 5% será deduzida do valor de venda.
+                    </div>
+
+                    <button
+                      onClick={criarListing}
+                      className="w-full py-4 bg-gradient-to-r from-amber-600 to-yellow-600 text-white font-bold rounded-lg hover:from-amber-500 hover:to-yellow-500 transition-all"
+                    >
+                      CRIAR ANÚNCIO
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Modal de Compra */}
-      {modalCompra && (
-        <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => !comprando && setModalCompra(null)}
-        >
-          <div
-            className="max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/30 to-yellow-500/30 rounded-lg blur opacity-75"></div>
-
-              <div className="relative bg-slate-950/95 backdrop-blur-xl border border-amber-900/30 rounded-lg overflow-hidden">
-                <div className="p-4 text-center font-bold text-lg bg-gradient-to-r from-amber-600 to-yellow-600">
-                  🛒 Confirmar Compra
-                </div>
-
-                <div className="p-6">
-                  {modalCompra.avatar_data && (
-                    <div className="mb-4 text-center">
-                      <div className="flex items-center justify-center mb-2">
-                        <AvatarSVG avatar={modalCompra.avatar_data} tamanho={120} />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mt-2">{modalCompra.avatar_data.nome}</h3>
-                      <div className="text-sm text-slate-400">
-                        {modalCompra.avatar_data.raridade} • {modalCompra.avatar_data.elemento} • Nv.{modalCompra.avatar_data.nivel}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700 mb-4">
-                    <div className="text-sm text-slate-400 mb-2">Preço Total (com taxa de 5%):</div>
-                    {modalCompra.price_moedas > 0 && (
-                      <div className="text-2xl font-bold text-amber-400">
-                        💰 {Math.ceil(modalCompra.price_moedas * 1.05)} Moedas
-                      </div>
-                    )}
-                    {modalCompra.price_fragmentos > 0 && (
-                      <div className="text-2xl font-bold text-purple-400">
-                        💎 {Math.ceil(modalCompra.price_fragmentos * 1.05)} Fragmentos
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-3 mb-4">
-                    <div className="text-xs text-amber-400">
-                      ⚠️ Seu saldo atual: 💰 {stats?.moedas || 0} • 💎 {stats?.fragmentos || 0}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setModalCompra(null)}
-                      disabled={comprando}
-                      className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-colors disabled:opacity-50"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={() => comprarListing(modalCompra)}
-                      disabled={comprando}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-600 to-yellow-600 text-white font-bold rounded hover:from-amber-500 hover:to-yellow-500 transition-all disabled:opacity-50"
-                    >
-                      {comprando ? 'Comprando...' : 'Confirmar'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Detalhes */}
+      {/* Modal Detalhes */}
       {modalDetalhes && (
-        <AvatarDetalhes
-          avatar={modalDetalhes}
-          onClose={() => setModalDetalhes(null)}
-          getCorRaridade={getCorRaridade}
-          getCorBorda={getCorBorda}
-          getCorElemento={getCorElemento}
-          getEmojiElemento={getEmojiElemento}
-        />
-      )}
-
-      {/* Toast de Mensagem */}
-      {mensagem && (
-        <div className="fixed top-8 right-8 z-50 animate-fade-in">
-          <div className={`px-6 py-4 rounded-lg border-2 ${
-            mensagem.tipo === 'sucesso'
-              ? 'bg-green-900/90 border-green-500'
-              : 'bg-red-900/90 border-red-500'
-          } backdrop-blur-xl`}>
-            <p className={`font-semibold ${
-              mensagem.tipo === 'sucesso' ? 'text-green-200' : 'text-red-200'
-            }`}>
-              {mensagem.texto}
-            </p>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setModalDetalhes(null)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <AvatarDetalhes
+              avatar={modalDetalhes}
+              onClose={() => setModalDetalhes(null)}
+            />
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fade-in 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
 
-// Componente de Card de Listing
-function ListingCard({ listing, onComprar, onVerDetalhes, isOwnListing, getCorRaridade, getCorElemento, getEmojiElemento }) {
-  const avatar = listing.avatar_data;
-  if (!avatar) return null;
-
+// Card de Listing no Marketplace
+function ListingCard({ listing, onComprar, onVer, isOwn, getCorElemento, getEmojiElemento }) {
+  const avatar = listing.avatar;
   const poderTotal = (avatar.forca || 0) + (avatar.agilidade || 0) + (avatar.resistencia || 0) + (avatar.foco || 0);
-
-  // Garantir que habilidades seja um array
   const habilidades = Array.isArray(avatar.habilidades) ? avatar.habilidades : [];
 
   return (
-    <div className="group relative">
-      <div className={`absolute -inset-0.5 bg-gradient-to-r ${getCorRaridade(avatar.raridade)} rounded-lg blur opacity-20 group-hover:opacity-40 transition-all`}></div>
+    <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-amber-500/50 transition-all">
+      <div className="flex justify-between items-start mb-2">
+        <div className="text-xs text-slate-500">por {listing.seller_username}</div>
+        {isOwn && <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">SEU</span>}
+      </div>
 
-      <div className="relative bg-slate-900/80 backdrop-blur-xl border border-amber-500/30 rounded-lg overflow-hidden group-hover:border-amber-400/50 transition-all">
-        <div className={`px-3 py-1.5 text-center font-bold text-xs bg-gradient-to-r ${getCorRaridade(avatar.raridade)}`}>
-          {avatar.raridade.toUpperCase()}
+      <div className="flex justify-center mb-3">
+        <AvatarSVG avatar={avatar} tamanho={100} />
+      </div>
+
+      <h3 className="font-bold text-center mb-1">{avatar.nome}</h3>
+      <p className="text-xs text-center text-slate-400 mb-3">
+        {avatar.raridade} • {getEmojiElemento(avatar.elemento)} {avatar.elemento} • Nv.{avatar.nivel}
+      </p>
+
+      <div className="bg-slate-950/50 rounded px-2 py-1 mb-2 text-center">
+        <div className="text-[10px] text-slate-500">Poder Total</div>
+        <div className="text-lg font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+          {poderTotal}
         </div>
+      </div>
 
-        <div className="py-4 flex items-center justify-center">
-          <AvatarSVG avatar={avatar} tamanho={120} />
-        </div>
-
-        <div className="p-3">
-          <h3 className="font-bold text-sm text-white mb-1 truncate">{avatar.nome}</h3>
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span className={getCorElemento(avatar.elemento)}>{getEmojiElemento(avatar.elemento)} {avatar.elemento}</span>
-            <span>Nv.{avatar.nivel}</span>
-          </div>
-
-          {/* Poder Total */}
-          <div className="bg-slate-950/50 rounded px-2 py-1 mb-2 text-center">
-            <div className="text-[10px] text-slate-500 uppercase">Poder Total</div>
-            <div className="text-lg font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              {poderTotal}
-            </div>
-          </div>
-
-          {/* Habilidades (preview) */}
-          {habilidades.length > 0 && (
-            <div className="bg-slate-950/50 rounded px-2 py-1.5 mb-3">
-              <div className="text-[10px] text-purple-400 uppercase mb-1">Habilidades ({habilidades.length})</div>
-              <div className="text-[10px] text-slate-400 truncate">
-                {habilidades[0]?.nome}
-                {habilidades.length > 1 && ` +${habilidades.length - 1}`}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-slate-950/50 rounded p-2 mb-3">
-            {listing.price_moedas > 0 && (
-              <div className="text-sm font-bold text-amber-400">
-                💰 {listing.price_moedas} moedas
-              </div>
-            )}
-            {listing.price_fragmentos > 0 && (
-              <div className="text-sm font-bold text-purple-400">
-                💎 {listing.price_fragmentos} frag.
-              </div>
-            )}
-            <div className="text-xs text-slate-500 mt-1">
-              + 5% taxa
-            </div>
-          </div>
-
-          {/* Botões */}
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <button
-                onClick={onVerDetalhes}
-                className="flex-1 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs font-semibold text-slate-300 transition-all"
-              >
-                VER
-              </button>
-              {!isOwnListing && (
-                <button
-                  onClick={onComprar}
-                  className="flex-1 px-2 py-1.5 bg-gradient-to-r from-amber-600 to-yellow-600 text-white text-xs font-bold rounded hover:from-amber-500 hover:to-yellow-500 transition-all"
-                >
-                  COMPRAR
-                </button>
-              )}
-            </div>
-            {isOwnListing && (
-              <div className="px-3 py-2 bg-slate-800/50 text-slate-500 text-xs font-semibold text-center rounded">
-                Seu Anúncio
-              </div>
-            )}
+      {habilidades.length > 0 && (
+        <div className="bg-slate-950/50 rounded px-2 py-1.5 mb-3">
+          <div className="text-[10px] text-purple-400 uppercase mb-1">Habilidades ({habilidades.length})</div>
+          <div className="text-[10px] text-slate-400 truncate">
+            {habilidades[0]?.nome}
+            {habilidades.length > 1 && ` +${habilidades.length - 1}`}
           </div>
         </div>
+      )}
+
+      <div className="bg-amber-500/10 rounded p-2 mb-3 text-center">
+        <div className="font-bold text-amber-300">
+          {listing.price_moedas > 0 && `💰 ${listing.price_moedas}`}
+          {listing.price_moedas > 0 && listing.price_fragmentos > 0 && ' + '}
+          {listing.price_fragmentos > 0 && `💎 ${listing.price_fragmentos}`}
+        </div>
+        <div className="text-[10px] text-slate-500">+ taxa 5%</div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onVer}
+          className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded transition-all text-sm font-bold"
+        >
+          VER
+        </button>
+        {!isOwn && (
+          <button
+            onClick={onComprar}
+            className="flex-1 py-2 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white rounded transition-all text-sm font-bold"
+          >
+            COMPRAR
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-// Componente de Card de Meu Listing
-function MyListingCard({ listing, onCancelar, onVerDetalhes, getCorRaridade, getCorElemento, getEmojiElemento }) {
-  const avatar = listing.avatar_data;
-  if (!avatar) return null;
-
-  const dataExpiracao = new Date(listing.expires_at);
-  const diasRestantes = Math.ceil((dataExpiracao - new Date()) / (1000 * 60 * 60 * 24));
-  const poderTotal = (avatar.forca || 0) + (avatar.agilidade || 0) + (avatar.resistencia || 0) + (avatar.foco || 0);
-
-  // Garantir que habilidades seja um array
-  const habilidades = Array.isArray(avatar.habilidades) ? avatar.habilidades : [];
+// Card de Meus Anúncios
+function MyListingCard({ listing, onCancelar, onVer, getCorElemento, getEmojiElemento }) {
+  const avatar = listing.avatar;
 
   return (
-    <div className="group relative">
-      <div className={`absolute -inset-0.5 bg-gradient-to-r ${getCorRaridade(avatar.raridade)} rounded-lg blur opacity-20 group-hover:opacity-40 transition-all`}></div>
+    <div className="bg-slate-900/50 border border-purple-500/50 rounded-lg p-4">
+      <div className="flex justify-center mb-3">
+        <AvatarSVG avatar={avatar} tamanho={100} />
+      </div>
 
-      <div className="relative bg-slate-900/80 backdrop-blur-xl border border-cyan-500/30 rounded-lg overflow-hidden">
-        <div className={`px-3 py-1.5 text-center font-bold text-xs bg-gradient-to-r ${getCorRaridade(avatar.raridade)}`}>
-          {avatar.raridade.toUpperCase()}
+      <h3 className="font-bold text-center mb-1">{avatar.nome}</h3>
+      <p className="text-xs text-center text-slate-400 mb-3">
+        {avatar.raridade} • {getEmojiElemento(avatar.elemento)} {avatar.elemento} • Nv.{avatar.nivel}
+      </p>
+
+      <div className="bg-amber-500/10 rounded p-2 mb-3 text-center">
+        <div className="font-bold text-amber-300">
+          {listing.price_moedas > 0 && `💰 ${listing.price_moedas}`}
+          {listing.price_moedas > 0 && listing.price_fragmentos > 0 && ' + '}
+          {listing.price_fragmentos > 0 && `💎 ${listing.price_fragmentos}`}
         </div>
+      </div>
 
-        <div className="py-4 flex items-center justify-center">
-          <AvatarSVG avatar={avatar} tamanho={120} />
-        </div>
-
-        <div className="p-3">
-          <h3 className="font-bold text-sm text-white mb-1 truncate">{avatar.nome}</h3>
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span className={getCorElemento(avatar.elemento)}>{getEmojiElemento(avatar.elemento)} {avatar.elemento}</span>
-            <span>Nv.{avatar.nivel}</span>
-          </div>
-
-          {/* Poder Total */}
-          <div className="bg-slate-950/50 rounded px-2 py-1 mb-2 text-center">
-            <div className="text-[10px] text-slate-500 uppercase">Poder Total</div>
-            <div className="text-lg font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              {poderTotal}
-            </div>
-          </div>
-
-          <div className="bg-slate-950/50 rounded p-2 mb-3">
-            {listing.price_moedas > 0 && (
-              <div className="text-sm font-bold text-amber-400">
-                💰 {listing.price_moedas} moedas
-              </div>
-            )}
-            {listing.price_fragmentos > 0 && (
-              <div className="text-sm font-bold text-purple-400">
-                💎 {listing.price_fragmentos} frag.
-              </div>
-            )}
-            <div className="text-xs text-slate-500 mt-1">
-              Expira em {diasRestantes} {diasRestantes === 1 ? 'dia' : 'dias'}
-            </div>
-          </div>
-
-          {/* Botões */}
-          <div className="space-y-2">
-            <button
-              onClick={onVerDetalhes}
-              className="w-full px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold rounded transition-all"
-            >
-              VER DETALHES
-            </button>
-            <button
-              onClick={onCancelar}
-              className="w-full px-3 py-2 bg-red-900/30 hover:bg-red-800/40 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all"
-            >
-              CANCELAR ANÚNCIO
-            </button>
-          </div>
-        </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onVer}
+          className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded transition-all text-sm font-bold"
+        >
+          VER
+        </button>
+        <button
+          onClick={onCancelar}
+          className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-all text-sm font-bold"
+        >
+          CANCELAR
+        </button>
       </div>
     </div>
   );
