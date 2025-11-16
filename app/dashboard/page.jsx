@@ -501,7 +501,34 @@ export default function DashboardPage() {
                 </div>
               </div>
             </button>
-          
+
+            {/* Botão Purificador */}
+            <button
+              onClick={() => router.push("/purificador")}
+              className="w-full group relative"
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-cyan-500/20 rounded-lg blur opacity-50 group-hover:opacity-75 transition-all duration-300"></div>
+
+              <div className="relative bg-slate-950/80 backdrop-blur-xl border border-cyan-900/30 rounded-lg p-5 group-hover:border-cyan-500/50 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center border border-cyan-500/30 group-hover:border-cyan-400/50 transition-all">
+                    <span className="text-2xl">✨</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-cyan-300 text-base mb-0.5 group-hover:text-cyan-200 transition-colors">
+                      O PURIFICADOR
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      Remover Marca da Morte
+                    </div>
+                  </div>
+                  <div className="text-cyan-400 group-hover:translate-x-1 group-hover:text-cyan-300 transition-all text-xl">
+                    →
+                  </div>
+                </div>
+              </div>
+            </button>
+
             {/* Botão Meus Avatares */}
             <button
               onClick={() => router.push("/avatares")}
