@@ -29,6 +29,26 @@ export default function TradePage() {
     carregarDados(parsedUser.id);
   }, [router]);
 
+  // Recarregar dados quando mudar de aba
+  useEffect(() => {
+    if (user && activeTab === 'sell') {
+      console.log('[Trade] Aba "Vender" selecionada - recarregando avatares vendíveis');
+      carregarAvatares(user.id);
+    }
+  }, [activeTab, user]);
+
+  const carregarAvatares = async (userId) => {
+    try {
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
+      const avataresData = await avataresRes.json();
+      if (avataresRes.ok) {
+        setAvataresVendiveis(avataresData.avatares || []);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar avatares:", error);
+    }
+  };
+
   const carregarDados = async (userId) => {
     setLoading(true);
     try {
@@ -217,17 +237,14 @@ export default function TradePage() {
             {avataresVendiveis.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4 opacity-20">😔</div>
-                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar disponível</h3>
-                <p className="text-slate-500 text-sm">
-                  Apenas avatares vivos, inativos, sem marca da morte e não listados podem ser vendidos.
-                </p>
+                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar encontrado</h3>
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Selecionar Avatar */}
                 <div>
                   <label className="block text-amber-400 font-bold mb-3">
-                    Selecione o Avatar ({avataresVendiveis.length} disponíveis)
+                    Selecione o Avatar ({avataresVendiveis.length} avatares)
                   </label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {avataresVendiveis.map((avatar) => (
