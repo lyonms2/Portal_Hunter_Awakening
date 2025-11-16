@@ -35,13 +35,16 @@ export async function GET(request) {
       .eq('user_id', userId);
 
     console.log(`[available-avatares] 📊 COUNT direto do PostgreSQL: ${totalCount} avatares para este user`);
+    console.log(`[available-avatares] ⚠️ ATENÇÃO: COUNT diz ${totalCount}, mas vamos ver quantos o SELECT retorna...`);
 
-    // BUSCAR TODOS os avatares do usuário primeiro
+    // SOLUÇÃO 1: Tentar com range para forçar query nova
+    console.log(`[available-avatares] 🔧 Tentando query com LIMIT 1000 para forçar bypass de cache...`);
     const { data: todosAvatares, error: erroTodos } = await supabase
       .from('avatares')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(1000);  // Forçar LIMIT pode ajudar
 
     if (erroTodos) {
       console.error("[available-avatares] Erro ao buscar todos:", erroTodos);
@@ -49,10 +52,37 @@ export async function GET(request) {
     }
 
     console.log(`[available-avatares] TOTAL DE AVATARES RETORNADOS: ${todosAvatares?.length || 0}`);
+    console.log(`[available-avatares] ⚠️ DISCREPÂNCIA: COUNT=${totalCount} mas SELECT retornou ${todosAvatares?.length || 0}!`);
+
     console.log("[available-avatares] DADOS CRUS DO POSTGRESQL:");
     todosAvatares?.forEach(av => {
-      console.log(`  - ID=${av.id.substring(0, 8)} | user_id=${av.user_id.substring(0, 8)} | ${av.nome} | ativo=${av.ativo} (${typeof av.ativo}) | created=${av.created_at} | updated=${av.updated_at}`);
+      // Verificar IDs específicos que deveriam existir
+      const isBolt = av.id === '1302ca2b-085b-4807-ad29-f8afa71a6aa5';
+      const isGloom = av.id === 'e6799829-54fd-4a8a-9504-55853b9a9c80';
+      const isRain = av.id === 'dc8647e2-b65c-451f-9aaa-73da69bb6a54';
+      const isNox = av.id === '592e14ef-86d9-49c8-aaa2-e5cae553b67c';
+
+      const flag = isBolt ? '⚡BOLT' : isGloom ? '🌑GLOOM' : isRain ? '💧RAIN' : isNox ? '🚨NOX' : '';
+
+      console.log(`  ${flag} - ID=${av.id.substring(0, 8)} | user_id=${av.user_id.substring(0, 8)} | ${av.nome} | ativo=${av.ativo} (${typeof av.ativo}) | created=${av.created_at} | updated=${av.updated_at}`);
     });
+
+    // Verificar quais IDs deveriam existir
+    const idsEsperados = {
+      '1302ca2b-085b-4807-ad29-f8afa71a6aa5': 'Bolt, o Mascarado',
+      'e6799829-54fd-4a8a-9504-55853b9a9c80': 'Gloom, o Inabalável',
+      'dc8647e2-b65c-451f-9aaa-73da69bb6a54': 'Rain, o Custódio'
+    };
+
+    console.log(`[available-avatares] 🔍 Verificando IDs esperados...`);
+    for (const [id, nome] of Object.entries(idsEsperados)) {
+      const existe = todosAvatares?.find(av => av.id === id);
+      if (existe) {
+        console.log(`  ✅ ${nome} ENCONTRADO`);
+      } else {
+        console.error(`  ❌ ${nome} (${id.substring(0, 8)}) NÃO ENCONTRADO! Deveria existir!`);
+      }
+    }
 
     // VERIFICAÇÃO DE SEGURANÇA: Checar se algum avatar não pertence ao usuário
     const avatarsOutroUsuario = todosAvatares?.filter(av => av.user_id !== userId) || [];
