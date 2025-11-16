@@ -92,6 +92,7 @@ export default function TradePage() {
 
   const carregarMeusListings = async () => {
     if (!user) return;
+    console.log("[Frontend] Carregando meus listings para userId:", user.id);
     try {
       const res = await fetch(`/api/trade/my-listings?userId=${user.id}`);
       const data = await res.json();
