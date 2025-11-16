@@ -63,6 +63,9 @@ export default function TradePage() {
       // Meus listings
       const myListingsRes = await fetch(`/api/trade/my-listings?userId=${userId}`);
       const myListingsData = await myListingsRes.json();
+      console.log('[Frontend] my-listings response:', myListingsData);
+      console.log('[Frontend] my-listings status:', myListingsRes.status);
+      console.log('[Frontend] my-listings ok:', myListingsRes.ok);
       setDebugData(prev => ({ ...prev, myListings: myListingsData }));
       if (myListingsRes.ok) {
         setMyListings(myListingsData.listings || []);
