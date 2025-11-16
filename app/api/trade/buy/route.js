@@ -125,12 +125,14 @@ export async function POST(request) {
         .eq('user_id', listing.seller_id);
     }
 
-    // 6. Transferir avatar
+    // 6. Transferir avatar e marcar como NÃO em venda
+    console.log(`[trade/buy] Transferindo avatar ${listing.avatar_id} para ${userId} e marcando em_venda=false`);
     const { error: transferError } = await supabase
       .from('avatares')
       .update({
         user_id: userId,
-        ativo: false
+        ativo: false,
+        em_venda: false
       })
       .eq('id', listing.avatar_id);
 
