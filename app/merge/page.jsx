@@ -233,7 +233,7 @@ export default function MergePage() {
         </div>
 
         {/* Resultado da Fusão */}
-        {resultado && (
+        {resultado && resultado.avatar && (
           <div className="mb-8 relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/30 via-violet-500/30 to-purple-500/30 rounded-lg blur opacity-75 animate-pulse"></div>
 
@@ -251,38 +251,38 @@ export default function MergePage() {
                     <div className="inline-block">
                       <AvatarSVG avatar={resultado.avatar} tamanho={120} />
                     </div>
-                    <h3 className="text-xl font-bold text-indigo-300 mt-2">{resultado.avatar.nome}</h3>
+                    <h3 className="text-xl font-bold text-indigo-300 mt-2">{resultado.avatar?.nome || 'Avatar'}</h3>
                     <div className="text-sm text-slate-400">
-                      {resultado.avatar.raridade} • {resultado.avatar.elemento} • Nv.{resultado.avatar.nivel}
+                      {resultado.avatar?.raridade || 'Comum'} • {resultado.avatar?.elemento || 'Neutro'} • Nv.{resultado.avatar?.nivel || 1}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="bg-slate-900/50 rounded p-2">
                       <div className="text-xs text-slate-500">Força</div>
-                      <div className="text-lg font-bold text-red-400">{resultado.avatar.forca}</div>
-                      {resultado.ganhos.forca > 0 && (
+                      <div className="text-lg font-bold text-red-400">{resultado.avatar?.forca || 0}</div>
+                      {resultado.ganhos?.forca > 0 && (
                         <div className="text-xs text-green-400">+{resultado.ganhos.forca}</div>
                       )}
                     </div>
                     <div className="bg-slate-900/50 rounded p-2">
                       <div className="text-xs text-slate-500">Agilidade</div>
-                      <div className="text-lg font-bold text-green-400">{resultado.avatar.agilidade}</div>
-                      {resultado.ganhos.agilidade > 0 && (
+                      <div className="text-lg font-bold text-green-400">{resultado.avatar?.agilidade || 0}</div>
+                      {resultado.ganhos?.agilidade > 0 && (
                         <div className="text-xs text-green-400">+{resultado.ganhos.agilidade}</div>
                       )}
                     </div>
                     <div className="bg-slate-900/50 rounded p-2">
                       <div className="text-xs text-slate-500">Resistência</div>
-                      <div className="text-lg font-bold text-blue-400">{resultado.avatar.resistencia}</div>
-                      {resultado.ganhos.resistencia > 0 && (
+                      <div className="text-lg font-bold text-blue-400">{resultado.avatar?.resistencia || 0}</div>
+                      {resultado.ganhos?.resistencia > 0 && (
                         <div className="text-xs text-green-400">+{resultado.ganhos.resistencia}</div>
                       )}
                     </div>
                     <div className="bg-slate-900/50 rounded p-2">
                       <div className="text-xs text-slate-500">Foco</div>
-                      <div className="text-lg font-bold text-purple-400">{resultado.avatar.foco}</div>
-                      {resultado.ganhos.foco > 0 && (
+                      <div className="text-lg font-bold text-purple-400">{resultado.avatar?.foco || 0}</div>
+                      {resultado.ganhos?.foco > 0 && (
                         <div className="text-xs text-green-400">+{resultado.ganhos.foco}</div>
                       )}
                     </div>
@@ -298,18 +298,18 @@ export default function MergePage() {
                       <div>
                         <div className="font-bold text-indigo-300 text-sm">Stats Aumentados</div>
                         <div className="text-xs text-slate-400">
-                          +{resultado.ganhos.forca} FOR, +{resultado.ganhos.agilidade} AGI, +{resultado.ganhos.resistencia} RES, +{resultado.ganhos.foco} FOC
+                          +{resultado.ganhos?.forca || 0} FOR, +{resultado.ganhos?.agilidade || 0} AGI, +{resultado.ganhos?.resistencia || 0} RES, +{resultado.ganhos?.foco || 0} FOC
                         </div>
                       </div>
                     </div>
 
-                    {resultado.mudouElemento && (
+                    {resultado?.mudouElemento && (
                       <div className="flex items-start gap-2 p-3 bg-violet-950/30 rounded border border-violet-500/30">
                         <span className="text-2xl">✨</span>
                         <div>
                           <div className="font-bold text-violet-300 text-sm">Elemento Transmutado!</div>
                           <div className="text-xs text-slate-400">
-                            O avatar absorveu o elemento {resultado.elementoOriginal}
+                            O avatar absorveu o elemento {resultado.elementoOriginal || ''}
                           </div>
                         </div>
                       </div>
