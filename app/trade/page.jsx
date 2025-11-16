@@ -38,8 +38,15 @@ export default function TradePage() {
     }
   }, [activeTab, user]);
 
-  // Recarregar quando a página recebe foco (volta de outra página)
+  // Recarregar quando a página fica visível novamente (volta de outra página)
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user && activeTab === 'sell') {
+        console.log('[Trade] Página ficou visível - recarregando dados');
+        carregarAvatares(user.id);
+      }
+    };
+
     const handleFocus = () => {
       if (user && activeTab === 'sell') {
         console.log('[Trade] Página recebeu foco - recarregando dados');
@@ -47,8 +54,13 @@ export default function TradePage() {
       }
     };
 
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [user, activeTab]);
 
   const carregarAvatares = async (userId) => {
@@ -84,6 +96,15 @@ export default function TradePage() {
       console.error("Erro ao carregar avatares:", error);
     } finally {
       setLoadingAvatares(false);
+    }
+  };
+
+  const abrirAbaVender = () => {
+    console.log('[Trade] Clique na aba "Vender" - forçando reload');
+    setActiveTab('sell');
+    if (user) {
+      // Força reload mesmo se já estava na aba sell
+      carregarAvatares(user.id);
     }
   };
 
@@ -238,7 +259,7 @@ export default function TradePage() {
             📋 Meus Anúncios
           </button>
           <button
-            onClick={() => setActiveTab('sell')}
+            onClick={abrirAbaVender}
             className={`px-6 py-3 rounded-lg font-bold transition-all ${
               activeTab === 'sell'
                 ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white'
