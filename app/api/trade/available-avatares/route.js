@@ -38,11 +38,20 @@ export async function GET(request) {
       );
     }
 
+    console.log(`[available-avatares] Total avatares do user: ${avatares?.length || 0}`);
+    avatares?.forEach(av => {
+      console.log(`  - ${av.nome}: ativo=${av.ativo} (${typeof av.ativo}), vivo=${av.vivo}, em_venda=${av.em_venda}`);
+    });
+
     // Filtrar apenas avatares disponíveis para venda (inativos)
     const avataresFiltrados = (avatares || []).filter(av => {
       const ativoValue = av.ativo;
-      return ativoValue === false || ativoValue === 'false';
+      const isInativo = ativoValue === false || ativoValue === 'false';
+      console.log(`  ${isInativo ? '✓' : '✗'} ${av.nome}: ativo=${av.ativo}`);
+      return isInativo;
     });
+
+    console.log(`[available-avatares] Filtrados: ${avataresFiltrados.length} de ${avatares?.length || 0}`);
 
     return Response.json({
       avatares: avataresFiltrados,
