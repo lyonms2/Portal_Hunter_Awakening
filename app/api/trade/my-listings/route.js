@@ -15,9 +15,9 @@ export async function GET(request) {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
       return Response.json({
-        error: "Serviço indisponível",
+        listings: [],
         debug: { ...debugInfo, step: 'supabase_client_failed' }
-      }, { status: 503 });
+      }, { status: 200 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -26,9 +26,9 @@ export async function GET(request) {
 
     if (!userId) {
       return Response.json({
-        error: "userId é obrigatório",
+        listings: [],
         debug: { ...debugInfo, step: 'missing_userId' }
-      }, { status: 400 });
+      }, { status: 200 });
     }
 
     debugInfo.step = 'querying_raw_listings';
@@ -91,12 +91,13 @@ export async function GET(request) {
     debugInfo.joinListings = listings;
     debugInfo.joinError = error;
 
+    // MESMO SE DER ERRO, retornar debug
     if (error) {
       console.error("[trade/my-listings] Erro ao buscar:", error);
       return Response.json({
-        error: "Erro ao carregar seus anúncios",
-        debug: { ...debugInfo, step: 'join_query_failed' }
-      }, { status: 500 });
+        listings: [],
+        debug: { ...debugInfo, step: 'join_query_failed', joinError: error }
+      }, { status: 200 });
     }
 
     // Verificar listings sem avatar
@@ -131,8 +132,8 @@ export async function GET(request) {
   } catch (error) {
     console.error("[trade/my-listings] Erro:", error);
     return Response.json({
-      error: "Erro interno do servidor",
+      listings: [],
       debug: { ...debugInfo, step: 'exception', exception: error.message }
-    }, { status: 500 });
+    }, { status: 200 });
   }
 }

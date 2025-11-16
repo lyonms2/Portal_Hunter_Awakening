@@ -14,9 +14,9 @@ export async function GET(request) {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
       return Response.json({
-        error: "Serviço indisponível",
+        listings: [],
         debug: { ...debugInfo, step: 'supabase_client_failed' }
-      }, { status: 503 });
+      }, { status: 200 }); // Retornar 200 para debug aparecer
     }
 
     debugInfo.step = 'querying_raw_listings';
@@ -34,7 +34,7 @@ export async function GET(request) {
     debugInfo.rawListings = rawListings;
     debugInfo.rawError = rawError;
 
-    // SEGUNDO: Buscar com JOIN (LEFT JOIN via sintaxe do Supabase)
+    // SEGUNDO: Buscar com JOIN
     debugInfo.step = 'querying_with_join';
 
     const { data: listings, error } = await supabase
@@ -77,12 +77,13 @@ export async function GET(request) {
     debugInfo.joinListings = listings;
     debugInfo.joinError = error;
 
+    // MESMO SE DER ERRO, retornar debug
     if (error) {
       console.error("[trade/listings] Erro ao buscar:", error);
       return Response.json({
-        error: "Erro ao carregar anúncios",
-        debug: { ...debugInfo, step: 'join_query_failed' }
-      }, { status: 500 });
+        listings: [],
+        debug: { ...debugInfo, step: 'join_query_failed', joinError: error }
+      }, { status: 200 }); // 200 para debug aparecer
     }
 
     // Verificar se algum listing não tem avatar
@@ -117,8 +118,8 @@ export async function GET(request) {
   } catch (error) {
     console.error("[trade/listings] Erro:", error);
     return Response.json({
-      error: "Erro interno do servidor",
+      listings: [],
       debug: { ...debugInfo, step: 'exception', exception: error.message }
-    }, { status: 500 });
+    }, { status: 200 }); // 200 para debug aparecer
   }
 }
