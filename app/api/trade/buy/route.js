@@ -145,17 +145,39 @@ export async function POST(request) {
     }
 
     // 8. Marcar listing como vendido
-    const { error: updateListingError } = await supabase
+    console.log("[buy] Tentando marcar listing como vendido:", listingId);
+    const { data: updatedListing, error: updateListingError } = await supabase
       .from('trade_listings')
       .update({
         status: 'sold',
         sold_at: new Date().toISOString()
       })
-      .eq('id', listingId);
+      .eq('id', listingId)
+      .select();
 
     if (updateListingError) {
-      console.error("Erro ao atualizar listing:", updateListingError);
+      console.error("[buy] ERRO ao atualizar listing:", updateListingError);
+      console.error("[buy] Detalhes do erro:", {
+        code: updateListingError.code,
+        message: updateListingError.message,
+        details: updateListingError.details,
+        hint: updateListingError.hint
+      });
+      return Response.json(
+        { message: "Erro ao marcar listing como vendido. Possível problema de RLS." },
+        { status: 500 }
+      );
     }
+
+    if (!updatedListing || updatedListing.length === 0) {
+      console.error("[buy] AVISO: UPDATE não afetou nenhuma linha! Possível RLS bloqueando.");
+      return Response.json(
+        { message: "Listing não pôde ser atualizado. Verifique RLS policies." },
+        { status: 500 }
+      );
+    }
+
+    console.log("[buy] Listing marcado como vendido com sucesso:", updatedListing);
 
     // 9. Criar registro de transação
     await supabase
