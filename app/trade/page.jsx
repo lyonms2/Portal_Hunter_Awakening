@@ -39,9 +39,11 @@ export default function TradePage() {
 
   const carregarAvatares = async (userId) => {
     try {
-      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
+      // Adicionar timestamp para evitar cache
+      const timestamp = new Date().getTime();
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}&t=${timestamp}`);
       const avataresData = await avataresRes.json();
-      console.log('[Trade] Avatares vendíveis carregados:', avataresData.count);
+      console.log('[Trade] Avatares vendíveis carregados:', avataresData.count, avataresData.avatares);
       if (avataresRes.ok) {
         setAvataresVendiveis(avataresData.avatares || []);
       }
@@ -233,7 +235,15 @@ export default function TradePage() {
         {/* VENDER */}
         {activeTab === 'sell' && (
           <div className="max-w-4xl mx-auto bg-slate-900/50 border border-amber-500/30 rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-amber-400 mb-4">Vender Avatar</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-amber-400">Vender Avatar</h2>
+              <button
+                onClick={() => user && carregarAvatares(user.id)}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold transition-all"
+              >
+                🔄 Recarregar
+              </button>
+            </div>
 
             {avataresVendiveis.length === 0 ? (
               <div className="text-center py-12">
