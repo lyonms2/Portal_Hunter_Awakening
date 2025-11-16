@@ -45,17 +45,19 @@ export async function GET(request) {
     console.log(`[available-avatares] Total de avatares do usuário: ${todosAvatares?.length || 0}`);
 
     // FILTRAR MANUALMENTE em JavaScript - Regras exatas:
-    // - vivo === true
-    // - ativo === false
-    // - marca_morte === false
-    // - em_venda === false
+    // - vivo === true (aceita boolean ou string)
+    // - ativo === false (aceita boolean ou string)
+    // - marca_morte === false (aceita boolean ou string)
+    // - em_venda === false (aceita boolean ou string)
     const avatares = (todosAvatares || []).filter(av => {
-      const vendivel = av.vivo === true &&
-                      av.ativo === false &&
-                      av.marca_morte === false &&
-                      av.em_venda === false;
+      const vivo = av.vivo === true || av.vivo === 'true';
+      const naoAtivo = av.ativo === false || av.ativo === 'false';
+      const semMarcaMorte = av.marca_morte === false || av.marca_morte === 'false';
+      const naoEmVenda = av.em_venda === false || av.em_venda === 'false';
 
-      console.log(`[available-avatares] ${av.nome}: vivo=${av.vivo} ativo=${av.ativo} marca=${av.marca_morte} venda=${av.em_venda} -> ${vendivel ? 'VENDÍVEL' : 'NÃO VENDÍVEL'}`);
+      const vendivel = vivo && naoAtivo && semMarcaMorte && naoEmVenda;
+
+      console.log(`[available-avatares] ${av.nome}: vivo=${av.vivo}(${typeof av.vivo}) ativo=${av.ativo}(${typeof av.ativo}) marca=${av.marca_morte} venda=${av.em_venda} -> ${vendivel ? 'VENDÍVEL ✓' : 'NÃO VENDÍVEL ✗'}`);
 
       return vendivel;
     });
