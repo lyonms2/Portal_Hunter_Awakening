@@ -29,6 +29,27 @@ export default function TradePage() {
     carregarDados(parsedUser.id);
   }, [router]);
 
+  // Recarregar dados quando mudar de aba
+  useEffect(() => {
+    if (user && activeTab === 'sell') {
+      console.log('[Trade] Aba "Vender" selecionada - recarregando avatares vendíveis');
+      carregarAvatares(user.id);
+    }
+  }, [activeTab, user]);
+
+  const carregarAvatares = async (userId) => {
+    try {
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
+      const avataresData = await avataresRes.json();
+      console.log('[Trade] Avatares vendíveis carregados:', avataresData.count);
+      if (avataresRes.ok) {
+        setAvataresVendiveis(avataresData.avatares || []);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar avatares vendíveis:", error);
+    }
+  };
+
   const carregarDados = async (userId) => {
     setLoading(true);
     try {
