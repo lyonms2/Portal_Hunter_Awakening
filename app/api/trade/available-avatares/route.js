@@ -16,22 +16,45 @@ export async function GET(request) {
       return Response.json({ error: "userId obrigatório" }, { status: 400 });
     }
 
-    // BUSCAR avatares do usuário com ativo = FALSE
-    const { data: avatares, error } = await supabase
+    // BUSCAR TODOS os avatares do usuário primeiro
+    const { data: todosAvatares, error: erroTodos } = await supabase
       .from('avatares')
       .select('*')
       .eq('user_id', userId)
-      .eq('ativo', false)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("[available-avatares] Erro:", error);
+    if (erroTodos) {
+      console.error("[available-avatares] Erro ao buscar todos:", erroTodos);
       return Response.json({ error: "Erro ao buscar avatares" }, { status: 500 });
     }
 
+    console.log("[available-avatares] TODOS avatares do user:", todosAvatares?.map(av => ({
+      id: av.id.substring(0, 8),
+      nome: av.nome,
+      ativo: av.ativo,
+      tipo_ativo: typeof av.ativo
+    })));
+
+    // Filtrar manualmente para evitar problema de tipo
+    const avataresFiltrados = (todosAvatares || []).filter(av => {
+      const ativoValue = av.ativo;
+      // Aceitar false como boolean ou string
+      const isInativo = ativoValue === false || ativoValue === 'false';
+
+      if (isInativo) {
+        console.log(`[available-avatares] ✓ Avatar ${av.nome} incluído (ativo=${av.ativo})`);
+      } else {
+        console.log(`[available-avatares] ✗ Avatar ${av.nome} excluído (ativo=${av.ativo})`);
+      }
+
+      return isInativo;
+    });
+
+    console.log(`[available-avatares] Total: ${todosAvatares?.length || 0} | Filtrados: ${avataresFiltrados.length}`);
+
     return Response.json({
-      avatares: avatares || [],
-      count: avatares?.length || 0
+      avatares: avataresFiltrados,
+      count: avataresFiltrados.length
     });
 
   } catch (error) {

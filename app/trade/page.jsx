@@ -37,10 +37,35 @@ export default function TradePage() {
     }
   }, [activeTab, user]);
 
+  // Recarregar quando a página recebe foco (volta de outra página)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user && activeTab === 'sell') {
+        console.log('[Trade] Página recebeu foco - recarregando dados');
+        carregarAvatares(user.id);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user, activeTab]);
+
   const carregarAvatares = async (userId) => {
     try {
+      console.log(`[Trade Frontend] Carregando avatares para user ${userId}...`);
       const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}&t=${Date.now()}`);
       const avataresData = await avataresRes.json();
+
+      console.log(`[Trade Frontend] Resposta:`, {
+        ok: avataresRes.ok,
+        count: avataresData.count,
+        avatares: avataresData.avatares?.map(av => ({
+          id: av.id.substring(0, 8),
+          nome: av.nome,
+          ativo: av.ativo
+        }))
+      });
+
       if (avataresRes.ok) {
         setAvataresVendiveis(avataresData.avatares || []);
       }
