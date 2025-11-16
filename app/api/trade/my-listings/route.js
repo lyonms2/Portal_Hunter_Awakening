@@ -1,103 +1,137 @@
 import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
-// Forçar rota dinâmica (não pode ser estaticamente renderizada)
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    step: 'start',
+  };
+
   try {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
+      return Response.json({
+        listings: [],
+        debug: { ...debugInfo, step: 'supabase_client_failed' }
+      });
     }
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-
-    console.log("[my-listings] userId recebido:", userId);
+    debugInfo.userId = userId;
 
     if (!userId) {
-      return Response.json(
-        { message: "userId é obrigatório" },
-        { status: 400 }
-      );
+      return Response.json({
+        listings: [],
+        debug: { ...debugInfo, step: 'missing_userId' }
+      });
     }
 
-    // Buscar listings do usuário
-    const { data: listings, error } = await supabase
+    // BUSCAR LISTINGS DO USUÁRIO
+    debugInfo.step = 'fetching_listings';
+
+    // WORKAROUND: Buscar TODOS os listings ativos e filtrar manualmente em JS
+    // Porque o .eq('seller_id', userId) do Supabase não está funcionando
+    const { data: allActiveListings, error: listingsError } = await supabase
       .from('trade_listings')
-      .select(`
-        *,
-        avatares!inner (
-          id,
-          nome,
-          descricao,
-          raridade,
-          elemento,
-          nivel,
-          experiencia,
-          vinculo,
-          forca,
-          agilidade,
-          resistencia,
-          foco,
-          habilidades,
-          vivo,
-          ativo,
-          marca_morte,
-          exaustao,
-          hp_atual
-        )
-      `)
-      .eq('seller_id', userId)
+      .select('*')
       .eq('status', 'active')
-      .eq('listing_type', 'avatar')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Erro ao buscar meus listings:", error);
-      return Response.json(
-        { message: "Erro ao buscar listings" },
-        { status: 500 }
-      );
-    }
+    debugInfo.allActiveCount = allActiveListings?.length || 0;
+    debugInfo.allActiveListings = allActiveListings?.map(l => ({ id: l.id, seller_id: l.seller_id, status: l.status }));
+    debugInfo.listingsError = listingsError;
+    debugInfo.userIdSent = userId;
+    debugInfo.userIdType = typeof userId;
 
-    console.log("[my-listings] Listings encontrados:", listings?.length || 0);
-    if (listings && listings.length > 0) {
-      console.log("[my-listings] Primeiro listing:", {
-        id: listings[0].id,
-        seller_id: listings[0].seller_id,
-        userId_esperado: userId,
-        ids_batem: listings[0].seller_id === userId
+    if (listingsError) {
+      return Response.json({
+        listings: [],
+        debug: { ...debugInfo, step: 'listings_query_failed', error: listingsError }
       });
-    } else {
-      console.log("[my-listings] Nenhum listing encontrado para userId:", userId);
-      // Debug: buscar TODOS os listings sem filtro de seller_id
-      const { data: allListings } = await supabase
-        .from('trade_listings')
-        .select('id, seller_id, status')
-        .eq('status', 'active')
-        .limit(5);
-      console.log("[my-listings] DEBUG - Primeiros 5 listings ativos (sem filtro):", allListings);
     }
 
-    // Formatar dados
-    const formattedListings = listings.map(listing => ({
-      ...listing,
-      avatar_data: listing.avatares
+    // FILTRO MANUAL EM JAVASCRIPT (workaround para bug do Supabase .eq())
+    const rawListings = (allActiveListings || []).filter(listing => listing.seller_id === userId);
+
+    debugInfo.rawCount = rawListings.length;
+    debugInfo.filterMethod = 'manual_javascript';
+
+    if (!rawListings || rawListings.length === 0) {
+      return Response.json({
+        listings: [],
+        debug: {
+          ...debugInfo,
+          step: 'no_listings_after_manual_filter',
+          rawCount: 0,
+          joinCount: 0,
+          finalCount: 0
+        }
+      });
+    }
+
+    // BUSCAR AVATARES MANUALMENTE
+    debugInfo.step = 'fetching_avatars';
+    const avatarIds = rawListings.map(l => l.avatar_id);
+    const { data: avatares, error: avataresError } = await supabase
+      .from('avatares')
+      .select('*')
+      .in('id', avatarIds);
+
+    debugInfo.avatarIds = avatarIds;
+    debugInfo.avataresCount = avatares?.length || 0;
+    debugInfo.avataresError = avataresError;
+
+    if (avataresError) {
+      return Response.json({
+        listings: [],
+        debug: { ...debugInfo, step: 'avatares_query_failed', error: avataresError }
+      });
+    }
+
+    // FAZER JOIN MANUAL
+    debugInfo.step = 'manual_join';
+    const avatarMap = {};
+    (avatares || []).forEach(avatar => {
+      avatarMap[avatar.id] = avatar;
+    });
+
+    const listingsWithAvatars = rawListings
+      .map(listing => ({
+        ...listing,
+        avatar: avatarMap[listing.avatar_id]
+      }))
+      .filter(listing => listing.avatar);
+
+    debugInfo.joinCount = rawListings.length;
+    debugInfo.missingAvatars = rawListings.filter(l => !avatarMap[l.avatar_id]);
+    debugInfo.finalCount = listingsWithAvatars.length;
+
+    // FORMATAR RESPONSE
+    const formattedListings = listingsWithAvatars.map(listing => ({
+      id: listing.id,
+      seller_id: listing.seller_id,
+      seller_username: listing.seller_username || "Caçador Anônimo",
+      avatar_id: listing.avatar_id,
+      price_moedas: listing.price_moedas,
+      price_fragmentos: listing.price_fragmentos,
+      created_at: listing.created_at,
+      avatar: listing.avatar
     }));
 
+    debugInfo.step = 'success';
+
     return Response.json({
-      listings: formattedListings
+      listings: formattedListings,
+      debug: debugInfo
     });
 
   } catch (error) {
-    console.error("Erro no servidor:", error);
-    return Response.json(
-      { message: "Erro ao processar: " + error.message },
-      { status: 500 }
-    );
+    console.error("[trade/my-listings] Exception:", error);
+    return Response.json({
+      listings: [],
+      debug: { ...debugInfo, step: 'exception', exception: error.message, stack: error.stack }
+    });
   }
 }

@@ -1,11 +1,18 @@
 import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/trade/buy
+ *
+ * Compra um avatar do marketplace
+ */
 export async function POST(request) {
   try {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
       return Response.json(
-        { message: "Serviço temporariamente indisponível" },
+        { error: "Serviço indisponível" },
         { status: 503 }
       );
     }
@@ -14,33 +21,39 @@ export async function POST(request) {
 
     if (!userId || !listingId) {
       return Response.json(
-        { message: "userId e listingId são obrigatórios" },
+        { error: "userId e listingId são obrigatórios" },
         { status: 400 }
       );
     }
 
-    // 1. Buscar o listing
+    // 1. Buscar o listing com dados do avatar
     const { data: listing, error: listingError } = await supabase
       .from('trade_listings')
       .select(`
         *,
-        avatares!inner (*)
+        avatares (*)
       `)
       .eq('id', listingId)
-      .eq('status', 'active')
       .single();
 
     if (listingError || !listing) {
       return Response.json(
-        { message: "Anúncio não encontrado ou já vendido" },
+        { error: "Anúncio não encontrado" },
         { status: 404 }
       );
     }
 
-    // Verificar se não está tentando comprar o próprio anúncio
+    // Validações
+    if (listing.status !== 'active') {
+      return Response.json(
+        { error: "Este anúncio não está mais disponível" },
+        { status: 400 }
+      );
+    }
+
     if (listing.seller_id === userId) {
       return Response.json(
-        { message: "Você não pode comprar seu próprio anúncio" },
+        { error: "Você não pode comprar seu próprio anúncio" },
         { status: 400 }
       );
     }
@@ -48,41 +61,38 @@ export async function POST(request) {
     // 2. Buscar stats do comprador
     const { data: buyerStats, error: buyerError } = await supabase
       .from('player_stats')
-      .select('*')
+      .select('moedas, fragmentos, nome_operacao')
       .eq('user_id', userId)
       .single();
 
     if (buyerError || !buyerStats) {
       return Response.json(
-        { message: "Erro ao carregar dados do comprador" },
-        { status: 500 }
+        { error: "Dados do comprador não encontrados" },
+        { status: 404 }
       );
     }
 
-    // 3. Calcular taxa (5%)
+    // 3. Calcular valores (taxa de 5%)
     const feeMoedas = Math.ceil(listing.price_moedas * 0.05);
     const feeFragmentos = Math.ceil(listing.price_fragmentos * 0.05);
-
     const totalMoedas = listing.price_moedas + feeMoedas;
     const totalFragmentos = listing.price_fragmentos + feeFragmentos;
 
-    // 4. Verificar se comprador tem saldo
+    // Verificar saldo
     if (buyerStats.moedas < totalMoedas) {
-      return Response.json(
-        { message: `Moedas insuficientes. Você tem ${buyerStats.moedas}, precisa de ${totalMoedas}` },
-        { status: 400 }
-      );
+      return Response.json({
+        error: `Moedas insuficientes. Você tem ${buyerStats.moedas}, precisa de ${totalMoedas} (inclui taxa de 5%)`
+      }, { status: 400 });
     }
 
     if (buyerStats.fragmentos < totalFragmentos) {
-      return Response.json(
-        { message: `Fragmentos insuficientes. Você tem ${buyerStats.fragmentos}, precisa de ${totalFragmentos}` },
-        { status: 400 }
-      );
+      return Response.json({
+        error: `Fragmentos insuficientes. Você tem ${buyerStats.fragmentos}, precisa de ${totalFragmentos} (inclui taxa de 5%)`
+      }, { status: 400 });
     }
 
-    // 5. Deduzir do comprador
-    const { error: updateBuyerError } = await supabase
+    // 4. Deduzir do comprador
+    const { error: deductError } = await supabase
       .from('player_stats')
       .update({
         moedas: buyerStats.moedas - totalMoedas,
@@ -90,46 +100,44 @@ export async function POST(request) {
       })
       .eq('user_id', userId);
 
-    if (updateBuyerError) {
-      console.error("Erro ao deduzir do comprador:", updateBuyerError);
+    if (deductError) {
+      console.error("[trade/buy] Erro ao deduzir do comprador:", deductError);
       return Response.json(
-        { message: "Erro ao processar pagamento" },
+        { error: "Erro ao processar pagamento" },
         { status: 500 }
       );
     }
 
-    // 6. Buscar stats do vendedor e adicionar moedas (preço - taxa)
-    const { data: sellerStats, error: sellerStatsError } = await supabase
+    // 5. Adicionar ao vendedor (preço - taxa)
+    const { data: sellerStats } = await supabase
       .from('player_stats')
-      .select('*')
+      .select('moedas, fragmentos')
       .eq('user_id', listing.seller_id)
       .single();
 
-    if (!sellerStatsError && sellerStats) {
-      const valorVendedor = listing.price_moedas - feeMoedas;
-      const fragVendedor = listing.price_fragmentos - feeFragmentos;
-
+    if (sellerStats) {
       await supabase
         .from('player_stats')
         .update({
-          moedas: sellerStats.moedas + valorVendedor,
-          fragmentos: sellerStats.fragmentos + fragVendedor
+          moedas: sellerStats.moedas + (listing.price_moedas - feeMoedas),
+          fragmentos: sellerStats.fragmentos + (listing.price_fragmentos - feeFragmentos)
         })
         .eq('user_id', listing.seller_id);
     }
 
-    // 7. Transferir avatar para o comprador
+    // 6. Transferir avatar
     const { error: transferError } = await supabase
       .from('avatares')
       .update({
         user_id: userId,
-        ativo: false // Garantir que não fique ativo
+        ativo: false
       })
       .eq('id', listing.avatar_id);
 
     if (transferError) {
-      console.error("Erro ao transferir avatar:", transferError);
-      // Reverter a dedução do comprador
+      console.error("[trade/buy] Erro ao transferir avatar:", transferError);
+
+      // Reverter pagamento
       await supabase
         .from('player_stats')
         .update({
@@ -139,72 +147,55 @@ export async function POST(request) {
         .eq('user_id', userId);
 
       return Response.json(
-        { message: "Erro ao transferir avatar" },
+        { error: "Erro ao transferir avatar" },
         { status: 500 }
       );
     }
 
-    // 8. Marcar listing como vendido
-    console.log("[buy] Tentando marcar listing como vendido:", listingId);
-    const { data: updatedListing, error: updateListingError } = await supabase
+    // 7. Marcar listing como vendido
+    const { error: updateError } = await supabase
       .from('trade_listings')
       .update({
         status: 'sold',
         sold_at: new Date().toISOString()
       })
-      .eq('id', listingId)
-      .select();
+      .eq('id', listingId);
 
-    if (updateListingError) {
-      console.error("[buy] ERRO ao atualizar listing:", updateListingError);
-      console.error("[buy] Detalhes do erro:", {
-        code: updateListingError.code,
-        message: updateListingError.message,
-        details: updateListingError.details,
-        hint: updateListingError.hint
-      });
-      return Response.json(
-        { message: "Erro ao marcar listing como vendido. Possível problema de RLS." },
-        { status: 500 }
-      );
+    if (updateError) {
+      console.error("[trade/buy] Erro ao marcar como vendido:", updateError);
+      // Não reverter - a transação já foi completada
     }
 
-    if (!updatedListing || updatedListing.length === 0) {
-      console.error("[buy] AVISO: UPDATE não afetou nenhuma linha! Possível RLS bloqueando.");
-      return Response.json(
-        { message: "Listing não pôde ser atualizado. Verifique RLS policies." },
-        { status: 500 }
-      );
-    }
-
-    console.log("[buy] Listing marcado como vendido com sucesso:", updatedListing);
-
-    // 9. Criar registro de transação
+    // 8. Criar registro da transação
     await supabase
       .from('trade_transactions')
-      .insert([{
+      .insert({
         listing_id: listingId,
         seller_id: listing.seller_id,
         buyer_id: userId,
-        listing_type: 'avatar',
         avatar_id: listing.avatar_id,
-        avatar_snapshot: listing.avatares, // Snapshot completo
+        avatar_snapshot: listing.avatares,
         price_moedas: listing.price_moedas,
         price_fragmentos: listing.price_fragmentos,
         system_fee_moedas: feeMoedas,
         system_fee_fragmentos: feeFragmentos,
         status: 'completed'
-      }]);
+      });
 
     return Response.json({
       message: "Compra realizada com sucesso!",
-      avatar: listing.avatares
+      avatar: listing.avatares,
+      paid: {
+        moedas: totalMoedas,
+        fragmentos: totalFragmentos,
+        fee: `${feeMoedas} moedas + ${feeFragmentos} fragmentos (5%)`
+      }
     });
 
   } catch (error) {
-    console.error("Erro no servidor:", error);
+    console.error("[trade/buy] Erro:", error);
     return Response.json(
-      { message: "Erro ao processar: " + error.message },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

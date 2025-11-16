@@ -1,11 +1,18 @@
 import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
 
-export async function DELETE(request) {
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/trade/cancel
+ *
+ * Cancela um anúncio do usuário
+ */
+export async function POST(request) {
   try {
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
       return Response.json(
-        { message: "Serviço temporariamente indisponível" },
+        { error: "Serviço indisponível" },
         { status: 503 }
       );
     }
@@ -14,69 +21,63 @@ export async function DELETE(request) {
 
     if (!userId || !listingId) {
       return Response.json(
-        { message: "userId e listingId são obrigatórios" },
+        { error: "userId e listingId são obrigatórios" },
         { status: 400 }
       );
     }
 
-    // Verificar se o listing pertence ao usuário
-    const { data: listing, error: listingError } = await supabase
+    // Buscar o listing
+    const { data: listing, error: fetchError } = await supabase
       .from('trade_listings')
-      .select('*')
+      .select('id, seller_id, status, avatar_id')
       .eq('id', listingId)
-      .eq('seller_id', userId)
-      .eq('status', 'active')
       .single();
 
-    if (listingError || !listing) {
+    if (fetchError || !listing) {
       return Response.json(
-        { message: "Anúncio não encontrado ou você não tem permissão para cancelá-lo" },
+        { error: "Anúncio não encontrado" },
         { status: 404 }
       );
     }
 
+    // Verificar se é o dono
+    if (listing.seller_id !== userId) {
+      return Response.json(
+        { error: "Você não pode cancelar anúncios de outros usuários" },
+        { status: 403 }
+      );
+    }
+
+    // Verificar se já não foi cancelado/vendido
+    if (listing.status !== 'active') {
+      return Response.json(
+        { error: "Este anúncio já não está mais ativo" },
+        { status: 400 }
+      );
+    }
+
     // Cancelar o listing
-    console.log("[cancel] Tentando cancelar listing:", listingId, "do seller:", userId);
-    const { data: cancelledListing, error: updateError } = await supabase
+    const { error: updateError } = await supabase
       .from('trade_listings')
-      .update({
-        status: 'cancelled'
-      })
-      .eq('id', listingId)
-      .select();
+      .update({ status: 'cancelled' })
+      .eq('id', listingId);
 
     if (updateError) {
-      console.error("[cancel] ERRO ao cancelar listing:", updateError);
-      console.error("[cancel] Detalhes do erro:", {
-        code: updateError.code,
-        message: updateError.message,
-        details: updateError.details,
-        hint: updateError.hint
-      });
+      console.error("[trade/cancel] Erro ao cancelar:", updateError);
       return Response.json(
-        { message: "Erro ao cancelar anúncio. Possível problema de RLS." },
+        { error: "Erro ao cancelar anúncio" },
         { status: 500 }
       );
     }
-
-    if (!cancelledListing || cancelledListing.length === 0) {
-      console.error("[cancel] AVISO: UPDATE não afetou nenhuma linha! Possível RLS bloqueando.");
-      return Response.json(
-        { message: "Anúncio não pôde ser cancelado. Verifique RLS policies." },
-        { status: 500 }
-      );
-    }
-
-    console.log("[cancel] Listing cancelado com sucesso:", cancelledListing);
 
     return Response.json({
       message: "Anúncio cancelado com sucesso!"
     });
 
   } catch (error) {
-    console.error("Erro no servidor:", error);
+    console.error("[trade/cancel] Erro:", error);
     return Response.json(
-      { message: "Erro ao processar: " + error.message },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
