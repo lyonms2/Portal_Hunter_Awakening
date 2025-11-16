@@ -104,10 +104,13 @@ export async function POST(request) {
     const sellerUsername = sellerStats?.nome_operacao || "Caçador Anônimo";
 
     // Marcar avatar como em_venda
-    const { error: updateError } = await supabase
+    console.log(`[trade/create] Marcando avatar ${avatarId} como em_venda=true`);
+    const { data: updatedAvatar, error: updateError } = await supabase
       .from('avatares')
       .update({ em_venda: true })
-      .eq('id', avatarId);
+      .eq('id', avatarId)
+      .select()
+      .single();
 
     if (updateError) {
       console.error("[trade/create] Erro ao marcar avatar em_venda:", updateError);
@@ -116,6 +119,8 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+
+    console.log(`[trade/create] Avatar atualizado:`, updatedAvatar);
 
     // Criar o listing
     const { data: listing, error: createError } = await supabase
