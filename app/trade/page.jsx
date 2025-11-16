@@ -213,6 +213,22 @@ export default function TradePage() {
     return emojis[elemento] || '⭐';
   };
 
+  const getCorRaridade = (raridade) => {
+    switch (raridade) {
+      case 'Lendário': return 'from-amber-500 to-yellow-500';
+      case 'Raro': return 'from-purple-500 to-pink-500';
+      default: return 'from-slate-600 to-slate-700';
+    }
+  };
+
+  const getCorBorda = (raridade) => {
+    switch (raridade) {
+      case 'Lendário': return 'border-amber-500';
+      case 'Raro': return 'border-purple-500';
+      default: return 'border-slate-600';
+    }
+  };
+
   // Avatares disponíveis para venda
   const avatarIdsEmAnuncios = new Set(myListings.map(l => l.avatar_id));
   const avataresVendiveis = myAvatares.filter(av =>
@@ -510,14 +526,14 @@ export default function TradePage() {
 
       {/* Modal Detalhes */}
       {modalDetalhes && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setModalDetalhes(null)}>
-          <div onClick={(e) => e.stopPropagation()}>
-            <AvatarDetalhes
-              avatar={modalDetalhes}
-              onClose={() => setModalDetalhes(null)}
-            />
-          </div>
-        </div>
+        <AvatarDetalhes
+          avatar={modalDetalhes}
+          onClose={() => setModalDetalhes(null)}
+          getCorRaridade={getCorRaridade}
+          getCorBorda={getCorBorda}
+          getCorElemento={getCorElemento}
+          getEmojiElemento={getEmojiElemento}
+        />
       )}
     </div>
   );
