@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic';
  * GET /api/trade/available-avatares?userId=xxx
  *
  * Retorna avatares disponíveis para venda
- * Regras: vivo=true, ativo=false, marca_morte=false, em_venda=false
  */
 export async function GET(request) {
   try {
@@ -22,7 +21,12 @@ export async function GET(request) {
       return Response.json({ error: "userId obrigatório" }, { status: 400 });
     }
 
-    // BUSCAR AVATARES VENDÍVEIS
+    // BUSCAR AVATARES VENDÍVEIS - Regras exatas:
+    // - user_id = userId (do usuário)
+    // - vivo = true
+    // - ativo = false
+    // - marca_morte = false
+    // - em_venda = false
     const { data: avatares, error } = await supabase
       .from('avatares')
       .select('*')
@@ -37,6 +41,8 @@ export async function GET(request) {
       console.error("[available-avatares] Erro:", error);
       return Response.json({ error: "Erro ao buscar avatares" }, { status: 500 });
     }
+
+    console.log(`[available-avatares] User ${userId}: encontrados ${avatares?.length || 0} avatares vendíveis`);
 
     return Response.json({
       avatares: avatares || [],
