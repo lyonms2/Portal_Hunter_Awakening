@@ -50,7 +50,13 @@ export async function GET(request) {
     if (!rawListings || rawListings.length === 0) {
       return Response.json({
         listings: [],
-        debug: { ...debugInfo, step: 'no_listings', joinCount: 0, finalCount: 0 }
+        debug: {
+          ...debugInfo,
+          step: 'no_listings',
+          rawCount: 0,
+          joinCount: 0,
+          finalCount: 0
+        }
       });
     }
 
