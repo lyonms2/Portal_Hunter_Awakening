@@ -13,6 +13,8 @@ export default function AvatarsPage() {
   const [loading, setLoading] = useState(true);
   const [modalConfirmacao, setModalConfirmacao] = useState(null);
   const [ativando, setAtivando] = useState(false);
+  const [modalSacrificar, setModalSacrificar] = useState(null);
+  const [sacrificando, setSacrificando] = useState(false);
 
   // Estados de filtros
   const [filtroRaridade, setFiltroRaridade] = useState('Todos');
@@ -87,6 +89,47 @@ export default function AvatarsPage() {
       setTimeout(() => setModalConfirmacao(null), 3000);
     } finally {
       setAtivando(false);
+    }
+  };
+
+  const sacrificarAvatar = async (avatar) => {
+    setSacrificando(true);
+    try {
+      const response = await fetch("/api/sacrificar-avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          avatarId: avatar.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setModalSacrificar(null);
+        setModalConfirmacao({
+          tipo: 'sucesso',
+          mensagem: `${avatar.nome} foi enviado ao Memorial...`
+        });
+        setTimeout(() => setModalConfirmacao(null), 3000);
+        await carregarAvatares(user.id);
+      } else {
+        setModalConfirmacao({
+          tipo: 'erro',
+          mensagem: data.message || 'Erro ao sacrificar avatar'
+        });
+        setTimeout(() => setModalConfirmacao(null), 3000);
+      }
+    } catch (error) {
+      console.error("Erro ao sacrificar avatar:", error);
+      setModalConfirmacao({
+        tipo: 'erro',
+        mensagem: 'Erro de conexão'
+      });
+      setTimeout(() => setModalConfirmacao(null), 3000);
+    } finally {
+      setSacrificando(false);
     }
   };
 
@@ -228,6 +271,15 @@ export default function AvatarsPage() {
           </div>
 
           <div className="flex gap-2 flex-wrap">
+            {/* Botão Merge */}
+            <button
+              onClick={() => router.push("/merge")}
+              className="px-4 py-2 bg-gradient-to-r from-indigo-900/30 to-violet-900/30 hover:from-indigo-800/40 hover:to-violet-800/40 border border-indigo-500/30 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-indigo-400"
+            >
+              <span>🧬</span>
+              <span>FUSÃO</span>
+            </button>
+
             {/* Botão Memorial */}
             {avataresCaidos > 0 && (
               <button
@@ -408,7 +460,7 @@ export default function AvatarsPage() {
                   </div>
 
                   {/* Avatar */}
-                  <div className={`py-4 ${!avatar.vivo ? 'opacity-40 grayscale' : ''}`}>
+                  <div className={`py-4 flex items-center justify-center ${!avatar.vivo ? 'opacity-40 grayscale' : ''}`}>
                     <AvatarSVG avatar={avatar} tamanho={120} />
                   </div>
 
@@ -435,20 +487,32 @@ export default function AvatarsPage() {
                     </div>
 
                     {/* Botões */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setAvatarSelecionado(avatar)}
-                        className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs font-semibold text-slate-300 transition-all"
-                      >
-                        VER
-                      </button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setAvatarSelecionado(avatar)}
+                          className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs font-semibold text-slate-300 transition-all"
+                        >
+                          VER
+                        </button>
+                        {avatar.vivo && !avatar.ativo && (
+                          <button
+                            onClick={() => ativarAvatar(avatar.id, avatar.nome)}
+                            disabled={ativando}
+                            className="flex-1 px-3 py-1.5 bg-cyan-900/30 hover:bg-cyan-800/40 border border-cyan-500/30 rounded text-xs font-semibold text-cyan-400 transition-all disabled:opacity-50"
+                          >
+                            ATIVAR
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Botão Sacrificar - Apenas para avatares vivos e inativos */}
                       {avatar.vivo && !avatar.ativo && (
                         <button
-                          onClick={() => ativarAvatar(avatar.id, avatar.nome)}
-                          disabled={ativando}
-                          className="flex-1 px-3 py-1.5 bg-cyan-900/30 hover:bg-cyan-800/40 border border-cyan-500/30 rounded text-xs font-semibold text-cyan-400 transition-all disabled:opacity-50"
+                          onClick={() => setModalSacrificar(avatar)}
+                          className="w-full px-2 py-1 bg-red-950/20 hover:bg-red-900/30 border border-red-900/30 hover:border-red-800/50 rounded text-xs font-semibold text-red-500/70 hover:text-red-400 transition-all"
                         >
-                          ATIVAR
+                          ⚠️ Sacrificar
                         </button>
                       )}
                     </div>
@@ -474,6 +538,120 @@ export default function AvatarsPage() {
           getCorElemento={getCorElemento}
           getEmojiElemento={getEmojiElemento}
         />
+      )}
+
+      {/* Modal de Sacrifício */}
+      {modalSacrificar && (
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => !sacrificando && setModalSacrificar(null)}
+        >
+          <div
+            className="max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-red-600/40 via-orange-600/40 to-red-600/40 rounded-lg blur opacity-75 animate-pulse"></div>
+
+              <div className="relative bg-slate-950/95 backdrop-blur-xl border-2 border-red-900/50 rounded-lg overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-red-900/80 to-orange-900/80 p-6 text-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20"></div>
+                  <div className="relative">
+                    <div className="text-6xl mb-3 animate-pulse">⚠️</div>
+                    <h2 className="text-2xl font-black uppercase tracking-wider text-red-200 mb-1">
+                      Ritual de Sacrifício
+                    </h2>
+                    <p className="text-sm text-red-300/80 font-mono">
+                      Esta ação é irreversível
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  {/* Avatar Preview */}
+                  <div className="mb-6 text-center">
+                    <div className="inline-block relative">
+                      <div className="absolute -inset-2 bg-gradient-to-r from-red-500/30 to-orange-500/30 rounded-full blur"></div>
+                      <div className="relative bg-slate-900/50 rounded-full p-3 border-2 border-red-500/50">
+                        <AvatarSVG avatar={modalSacrificar} tamanho={100} />
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mt-4">{modalSacrificar.nome}</h3>
+                    <div className="text-sm text-slate-400 mt-1">
+                      {modalSacrificar.raridade} • {modalSacrificar.elemento} • Nv.{modalSacrificar.nivel}
+                    </div>
+                  </div>
+
+                  {/* Lore Text */}
+                  <div className="bg-gradient-to-br from-red-950/40 to-orange-950/40 rounded-lg p-4 border border-red-900/50 mb-6">
+                    <p className="text-sm text-red-200/90 leading-relaxed text-center italic">
+                      "Nas profundezas da Organização de Caçadores Dimensionais, existe um ritual sombrio reservado apenas para os mais desesperados.
+                      <span className="block mt-2 font-bold text-red-300">
+                        Ao sacrificar um avatar, sua essência é consumida pelo Vazio Dimensional, e sua alma é enviada ao Memorial Eterno.
+                      </span>
+                      <span className="block mt-2 text-red-400/80">
+                        Uma vez realizado, não há retorno. Nem mesmo o Necromante mais poderoso pode trazer de volta o que foi entregue ao Vazio.
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Warnings */}
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-start gap-3 p-3 bg-red-950/30 rounded border border-red-900/50">
+                      <span className="text-2xl">💀</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-red-300 text-sm">Morte Permanente</div>
+                        <div className="text-xs text-red-400/80">O avatar será marcado com a Marca da Morte e enviado ao Memorial</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 bg-red-950/30 rounded border border-red-900/50">
+                      <span className="text-2xl">⛔</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-red-300 text-sm">Sem Ressurreição</div>
+                        <div className="text-xs text-red-400/80">Nem o Necromante nem o Purificador poderão reverter este ritual</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 bg-red-950/30 rounded border border-red-900/50">
+                      <span className="text-2xl">🌑</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-red-300 text-sm">Consumido pelo Vazio</div>
+                        <div className="text-xs text-red-400/80">Todas as habilidades, stats e progresso serão perdidos para sempre</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Confirmation Question */}
+                  <div className="bg-gradient-to-r from-slate-900/80 to-red-950/80 rounded-lg p-4 border-2 border-red-600/50 mb-6">
+                    <p className="text-center font-bold text-red-200 text-lg">
+                      Você realmente deseja sacrificar {modalSacrificar.nome}?
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModalSacrificar(null)}
+                      disabled={sacrificando}
+                      className="flex-1 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition-all disabled:opacity-50"
+                    >
+                      ← Cancelar
+                    </button>
+                    <button
+                      onClick={() => sacrificarAvatar(modalSacrificar)}
+                      disabled={sacrificando}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-red-900/50"
+                    >
+                      {sacrificando ? 'Sacrificando...' : '💀 Confirmar Sacrifício'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast de Confirmação */}
