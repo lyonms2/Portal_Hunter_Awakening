@@ -20,7 +20,8 @@ export async function GET(request) {
       return Response.json({ error: "Serviço indisponível" }, { status: 503 });
     }
 
-    console.log(`[available-avatares] Fazendo query REAL no PostgreSQL para userId=${userId.substring(0, 8)}...`);
+    console.log(`[available-avatares] Fazendo query REAL no PostgreSQL para userId=${userId}`);
+    console.log(`[available-avatares] Query SQL: SELECT * FROM avatares WHERE user_id = '${userId}' ORDER BY created_at DESC`);
 
     // BUSCAR TODOS os avatares do usuário primeiro
     const { data: todosAvatares, error: erroTodos } = await supabase
@@ -34,10 +35,20 @@ export async function GET(request) {
       return Response.json({ error: "Erro ao buscar avatares" }, { status: 500 });
     }
 
+    console.log(`[available-avatares] TOTAL DE AVATARES RETORNADOS: ${todosAvatares?.length || 0}`);
     console.log("[available-avatares] DADOS CRUS DO POSTGRESQL:");
     todosAvatares?.forEach(av => {
-      console.log(`  - ${av.nome} | ativo=${av.ativo} (${typeof av.ativo}) | updated_at=${av.updated_at}`);
+      console.log(`  - ID=${av.id.substring(0, 8)} | user_id=${av.user_id.substring(0, 8)} | ${av.nome} | ativo=${av.ativo} (${typeof av.ativo}) | created=${av.created_at} | updated=${av.updated_at}`);
     });
+
+    // VERIFICAÇÃO DE SEGURANÇA: Checar se algum avatar não pertence ao usuário
+    const avatarsOutroUsuario = todosAvatares?.filter(av => av.user_id !== userId) || [];
+    if (avatarsOutroUsuario.length > 0) {
+      console.error(`[available-avatares] 🚨 ALERTA DE SEGURANÇA! ${avatarsOutroUsuario.length} avatares de OUTRO USUÁRIO foram retornados!`);
+      avatarsOutroUsuario.forEach(av => {
+        console.error(`  🚨 Avatar ${av.nome} pertence ao user ${av.user_id}, NÃO ao ${userId}`);
+      });
+    }
 
     // Filtrar manualmente para evitar problema de tipo
     const avataresFiltrados = (todosAvatares || []).filter(av => {
