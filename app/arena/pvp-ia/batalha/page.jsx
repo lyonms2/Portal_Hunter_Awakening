@@ -705,17 +705,36 @@ export default function BatalhaIAPage() {
         break;
     }
 
+    // Nova mecânica de morte: 30% morte real, 70% incapacidade (1 HP)
+    let avatarMorreu = false;
+    let hpFinalReal = jogadorHP;
+
+    if (tipoResultado === 'derrota') {
+      const chanceDeathMaster = Math.random();
+      if (chanceDeathMaster < 0.30) {
+        // 30% de chance: MORTE REAL
+        avatarMorreu = true;
+        hpFinalReal = 0;
+        addLog('💀 SEU AVATAR FOI MORTO! Procure o Necromante para ressuscitá-lo.', 'morte');
+      } else {
+        // 70% de chance: INCAPACIDADE (1 HP)
+        avatarMorreu = false;
+        hpFinalReal = 1;
+        addLog('😰 SEU AVATAR FOI INCAPACITADO! Ele sobreviveu com 1 HP.', 'aviso');
+      }
+    }
+
     setResultado({
       vitoria,
       tipoResultado,
       famaGanha,
       vinculoGanho,
       exaustaoGanha,
-      avatarMorreu: tipoResultado === 'derrota'
+      avatarMorreu
     });
 
     // Salvar resultado no backend
-    await salvarResultadoBatalha(vitoria, famaGanha, vinculoGanho, exaustaoGanha, tipoResultado === 'derrota', jogadorHP);
+    await salvarResultadoBatalha(vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinalReal);
   };
 
   const salvarResultadoBatalha = async (vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinal) => {
