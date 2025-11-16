@@ -70,6 +70,18 @@ export async function POST(request) {
       );
     }
 
+    // Marcar avatar como NÃO em venda
+    console.log(`[trade/cancel] Marcando avatar ${listing.avatar_id} como em_venda=false`);
+    const { error: avatarUpdateError } = await supabase
+      .from('avatares')
+      .update({ em_venda: false })
+      .eq('id', listing.avatar_id);
+
+    if (avatarUpdateError) {
+      console.error("[trade/cancel] Erro ao atualizar avatar:", avatarUpdateError);
+      // Não retorna erro, pois o listing já foi cancelado
+    }
+
     return Response.json({
       message: "Anúncio cancelado com sucesso!"
     });
