@@ -469,6 +469,10 @@ export default function AvatarsPage() {
             ativarAvatar(id, nome);
             setAvatarSelecionado(null);
           }}
+          getCorRaridade={getCorRaridade}
+          getCorBorda={getCorBorda}
+          getCorElemento={getCorElemento}
+          getEmojiElemento={getEmojiElemento}
         />
       )}
 
