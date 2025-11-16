@@ -4,38 +4,55 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    // Inicializar Supabase dentro da função (IGUAL ao meus-avatares)
     const supabase = getSupabaseClientSafe(true);
     if (!supabase) {
-      return Response.json({ error: "Serviço indisponível" }, { status: 503 });
+      return Response.json(
+        { message: "Serviço temporariamente indisponível" },
+        { status: 503 }
+      );
     }
 
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
 
     if (!userId) {
-      return Response.json({ error: "userId obrigatório" }, { status: 400 });
+      return Response.json(
+        { message: "ID do usuário é obrigatório" },
+        { status: 400 }
+      );
     }
 
-    // BUSCAR avatares do usuário com ativo = FALSE
+    // COPIAR EXATAMENTE o padrão que funciona em /api/meus-avatares
     const { data: avatares, error } = await supabase
       .from('avatares')
       .select('*')
       .eq('user_id', userId)
-      .eq('ativo', false)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error("[available-avatares] Erro:", error);
-      return Response.json({ error: "Erro ao buscar avatares" }, { status: 500 });
+      console.error("Erro ao buscar avatares:", error);
+      return Response.json(
+        { message: "Erro ao buscar avatares: " + error.message },
+        { status: 500 }
+      );
     }
 
-    return Response.json({
-      avatares: avatares || [],
-      count: avatares?.length || 0
+    // Filtrar apenas avatares disponíveis para venda (inativos)
+    const avataresFiltrados = (avatares || []).filter(av => {
+      const ativoValue = av.ativo;
+      return ativoValue === false || ativoValue === 'false';
     });
 
+    return Response.json({
+      avatares: avataresFiltrados,
+      total: avataresFiltrados.length
+    });
   } catch (error) {
-    console.error("[available-avatares] Exception:", error);
-    return Response.json({ error: "Erro interno" }, { status: 500 });
+    console.error("Erro no servidor:", error);
+    return Response.json(
+      { message: "Erro ao processar: " + error.message },
+      { status: 500 }
+    );
   }
 }

@@ -10,6 +10,7 @@ export default function TradePage() {
   const [stats, setStats] = useState(null);
   const [activeTab, setActiveTab] = useState('marketplace');
   const [loading, setLoading] = useState(true);
+  const [loadingAvatares, setLoadingAvatares] = useState(false);
 
   // Aba Vender
   const [avataresVendiveis, setAvataresVendiveis] = useState([]);
@@ -37,15 +38,73 @@ export default function TradePage() {
     }
   }, [activeTab, user]);
 
+  // Recarregar quando a página fica visível novamente (volta de outra página)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user && activeTab === 'sell') {
+        console.log('[Trade] Página ficou visível - recarregando dados');
+        carregarAvatares(user.id);
+      }
+    };
+
+    const handleFocus = () => {
+      if (user && activeTab === 'sell') {
+        console.log('[Trade] Página recebeu foco - recarregando dados');
+        carregarAvatares(user.id);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user, activeTab]);
+
   const carregarAvatares = async (userId) => {
+    setLoadingAvatares(true);
     try {
-      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
+      const timestamp = Date.now();
+      console.log(`[Trade Frontend] 🔄 INICIANDO GET em ${new Date(timestamp).toLocaleTimeString()}`);
+      console.log(`[Trade Frontend] Carregando avatares para user ${userId}...`);
+
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}&t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       const avataresData = await avataresRes.json();
+
+      console.log(`[Trade Frontend] ✅ RESPOSTA RECEBIDA em ${new Date().toLocaleTimeString()}:`, {
+        ok: avataresRes.ok,
+        count: avataresData.count,
+        avatares: avataresData.avatares?.map(av => ({
+          id: av.id.substring(0, 8),
+          nome: av.nome,
+          ativo: av.ativo
+        }))
+      });
+
       if (avataresRes.ok) {
         setAvataresVendiveis(avataresData.avatares || []);
       }
     } catch (error) {
       console.error("Erro ao carregar avatares:", error);
+    } finally {
+      setLoadingAvatares(false);
+    }
+  };
+
+  const abrirAbaVender = () => {
+    console.log('[Trade] Clique na aba "Vender" - forçando reload');
+    setActiveTab('sell');
+    if (user) {
+      // Força reload mesmo se já estava na aba sell
+      carregarAvatares(user.id);
     }
   };
 
@@ -62,7 +121,7 @@ export default function TradePage() {
       setStats(statsData.stats);
 
       // Avatares vendíveis
-      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}`);
+      const avataresRes = await fetch(`/api/trade/available-avatares?userId=${userId}&t=${Date.now()}`);
       const avataresData = await avataresRes.json();
       if (avataresRes.ok) {
         setAvataresVendiveis(avataresData.avatares || []);
@@ -200,7 +259,7 @@ export default function TradePage() {
             📋 Meus Anúncios
           </button>
           <button
-            onClick={() => setActiveTab('sell')}
+            onClick={abrirAbaVender}
             className={`px-6 py-3 rounded-lg font-bold transition-all ${
               activeTab === 'sell'
                 ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white'
@@ -232,12 +291,26 @@ export default function TradePage() {
         {/* VENDER */}
         {activeTab === 'sell' && (
           <div className="max-w-4xl mx-auto bg-slate-900/50 border border-amber-500/30 rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-amber-400 mb-4">Vender Avatar</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-amber-400">Vender Avatar</h2>
+              {loadingAvatares && (
+                <div className="flex items-center gap-2 text-cyan-400 animate-pulse">
+                  <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-sm font-mono">Atualizando...</span>
+                </div>
+              )}
+            </div>
 
-            {avataresVendiveis.length === 0 ? (
+            {loadingAvatares ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4 animate-pulse">🔄</div>
+                <h3 className="text-xl font-bold text-cyan-400 mb-2">Carregando avatares do banco de dados...</h3>
+              </div>
+            ) : avataresVendiveis.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4 opacity-20">😔</div>
-                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar encontrado</h3>
+                <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar disponível para venda</h3>
+                <p className="text-slate-500 text-sm">Apenas avatares inativos (ativo=false) podem ser vendidos</p>
               </div>
             ) : (
               <div className="space-y-6">

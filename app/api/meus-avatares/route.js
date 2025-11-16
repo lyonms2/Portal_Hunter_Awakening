@@ -115,6 +115,9 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
+  const requestTime = new Date().toISOString();
+  console.log(`\n[ATIVAR AVATAR] ====== REQUISIÇÃO em ${requestTime} ======`);
+
   try {
     // Inicializar Supabase dentro da função
     const supabase = getSupabaseClientSafe(true);
@@ -125,8 +128,14 @@ export async function PUT(request) {
       );
     }
 
+    // Debug: verificar configuração do Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    console.log(`[ATIVAR AVATAR] 🔧 Supabase URL: ${supabaseUrl?.substring(0, 30)}...`);
+
     const body = await request.json();
     const { userId, avatarId } = body;
+
+    console.log(`[ATIVAR AVATAR] userId=${userId?.substring(0, 8)}, avatarId=${avatarId?.substring(0, 8)}`);
 
     if (!userId || !avatarId) {
       return Response.json(
@@ -144,13 +153,17 @@ export async function PUT(request) {
       .single();
 
     if (checkError || !avatarToActivate) {
+      console.log(`[ATIVAR AVATAR] ❌ Avatar não encontrado`);
       return Response.json(
         { message: "Avatar não encontrado ou não pertence ao usuário" },
         { status: 404 }
       );
     }
 
+    console.log(`[ATIVAR AVATAR] Avatar encontrado: ${avatarToActivate.nome} (vivo=${avatarToActivate.vivo}, ativo atual=${avatarToActivate.ativo})`);
+
     if (!avatarToActivate.vivo) {
+      console.log(`[ATIVAR AVATAR] ❌ Avatar morto, não pode ativar`);
       return Response.json(
         { message: "Não é possível ativar um avatar destruído" },
         { status: 400 }
@@ -158,41 +171,77 @@ export async function PUT(request) {
     }
 
     // Desativar todos os avatares do usuário
-    const { error: deactivateError } = await supabase
+    console.log(`[ATIVAR AVATAR] 1️⃣ Desativando TODOS os avatares do usuário...`);
+
+    // SOLUÇÃO: Tocar em updated_at via SQL RAW para forçar trigger
+    const timestampNow = new Date().toISOString();
+    const { data: desativados, error: deactivateError } = await supabase
       .from('avatares')
-      .update({ ativo: false })
-      .eq('user_id', userId);
+      .update({
+        ativo: false,
+        updated_at: timestampNow  // Tentar forçar (pode ser sobrescrito por trigger)
+      })
+      .eq('user_id', userId)
+      .select();
+
+    console.log(`[ATIVAR AVATAR] 🔧 Tentou definir updated_at=${timestampNow}`);
+
+    // Verificar o que realmente foi salvo
+    if (desativados && desativados.length > 0) {
+      console.log(`[ATIVAR AVATAR] 🔍 Verificando updated_at salvo no banco:`);
+      desativados.forEach(av => {
+        console.log(`  - ${av.nome}: updated_at=${av.updated_at} (esperava ${timestampNow})`);
+      });
+    }
 
     if (deactivateError) {
-      console.error("Erro ao desativar avatares:", deactivateError);
+      console.error("[ATIVAR AVATAR] ❌ Erro ao desativar avatares:", deactivateError);
       return Response.json(
         { message: "Erro ao desativar avatares: " + deactivateError.message },
         { status: 500 }
       );
     }
 
+    console.log(`[ATIVAR AVATAR] ✅ ${desativados?.length || 0} avatares desativados`);
+
     // Ativar o avatar escolhido
+    console.log(`[ATIVAR AVATAR] 2️⃣ Ativando avatar ${avatarToActivate.nome}...`);
+    const timestampAtivacao = new Date().toISOString();
     const { data: avatarAtivado, error: activateError } = await supabase
       .from('avatares')
-      .update({ ativo: true })
+      .update({
+        ativo: true,
+        updated_at: timestampAtivacao  // FORÇAR updated_at para invalidar cache
+      })
       .eq('id', avatarId)
       .select()
       .single();
 
     if (activateError || !avatarAtivado) {
-      console.error("Erro ao ativar avatar:", activateError);
+      console.error("[ATIVAR AVATAR] ❌ Erro ao ativar avatar:", activateError);
       return Response.json(
         { message: "Erro ao ativar avatar" },
         { status: 500 }
       );
     }
 
+    console.log(`[ATIVAR AVATAR] ✅ Avatar ativado com sucesso! Novo ativo=${avatarAtivado.ativo}`);
+    console.log(`[ATIVAR AVATAR] 🔍 updated_at salvo: ${avatarAtivado.updated_at} (esperava ${timestampAtivacao})`);
+
     // Buscar todos os avatares atualizados
+    console.log(`[ATIVAR AVATAR] 3️⃣ Buscando todos os avatares atualizados...`);
     const { data: todosAvatares } = await supabase
       .from('avatares')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    console.log(`[ATIVAR AVATAR] Estado final dos avatares:`);
+    todosAvatares?.forEach(av => {
+      console.log(`  - ${av.nome}: ativo=${av.ativo} (${typeof av.ativo})`);
+    });
+
+    console.log(`[ATIVAR AVATAR] ====== FIM REQUISIÇÃO ======\n`);
 
     return Response.json({
       success: true,
@@ -202,7 +251,7 @@ export async function PUT(request) {
     });
 
   } catch (error) {
-    console.error("Erro crítico:", error);
+    console.error("[ATIVAR AVATAR] Erro crítico:", error);
     return Response.json(
       { message: "Erro ao processar requisição" },
       { status: 500 }
