@@ -13,6 +13,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
+    console.log("[my-listings] userId recebido:", userId);
+
     if (!userId) {
       return Response.json(
         { message: "userId é obrigatório" },
@@ -58,6 +60,9 @@ export async function GET(request) {
         { status: 500 }
       );
     }
+
+    console.log("[my-listings] Listings encontrados:", listings?.length || 0);
+    console.log("[my-listings] Primeiro listing (se houver):", listings?.[0]);
 
     // Formatar dados
     const formattedListings = listings.map(listing => ({

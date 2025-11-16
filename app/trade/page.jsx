@@ -57,6 +57,9 @@ export default function TradePage() {
       // Carregar listings do mercado
       await carregarListings();
 
+      // Carregar meus listings
+      await carregarMeusListings();
+
       // Carregar meus avatares (para vender)
       const avataresRes = await fetch(`/api/meus-avatares?userId=${userId}`);
       const avataresData = await avataresRes.json();
@@ -268,6 +271,9 @@ export default function TradePage() {
   // Filtrar e ordenar listings
   let listingsFiltrados = [...listings];
 
+  console.log("[Trade Page] Total de listings no estado:", listings.length);
+  console.log("[Trade Page] Listings filtrados inicialmente:", listingsFiltrados.length);
+
   if (filtroTipo !== 'all') {
     listingsFiltrados = listingsFiltrados.filter(l => l.listing_type === filtroTipo);
   }
@@ -297,9 +303,12 @@ export default function TradePage() {
     }
   });
 
-  // Avatares que podem ser vendidos
+  // IDs dos avatares que já estão em anúncios ativos
+  const avatarIdsEmAnuncios = new Set(myListings.map(l => l.avatar_id));
+
+  // Avatares que podem ser vendidos (excluindo os que já estão em anúncios)
   const avataresVendiveis = myAvatares.filter(av =>
-    av.vivo && !av.ativo && !av.marca_morte
+    av.vivo && !av.ativo && !av.marca_morte && !avatarIdsEmAnuncios.has(av.id)
   );
 
   if (loading) {

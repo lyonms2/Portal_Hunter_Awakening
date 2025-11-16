@@ -48,6 +48,15 @@ export async function GET(request) {
       );
     }
 
+    console.log("[listings] Total de listings ativos:", listings?.length || 0);
+    if (listings && listings.length > 0) {
+      console.log("[listings] Primeiro listing:", {
+        id: listings[0].id,
+        seller_id: listings[0].seller_id,
+        avatar_id: listings[0].avatar_id
+      });
+    }
+
     // Formatar dados
     const formattedListings = listings.map(listing => ({
       ...listing,
