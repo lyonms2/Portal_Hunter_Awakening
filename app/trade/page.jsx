@@ -52,8 +52,8 @@ export default function TradePage() {
       const statsData = await statsRes.json();
       setStats(statsData.stats);
 
-      // Listings marketplace
-      const listingsRes = await fetch('/api/trade/listings');
+      // Listings marketplace (EXCLUIR os meus)
+      const listingsRes = await fetch(`/api/trade/listings?userId=${userId}`);
       const listingsData = await listingsRes.json();
       setDebugData(prev => ({ ...prev, listings: listingsData }));
       if (listingsRes.ok) {
