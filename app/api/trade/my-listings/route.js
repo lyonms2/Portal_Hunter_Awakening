@@ -28,18 +28,22 @@ export async function GET(request) {
         avatares!inner (
           id,
           nome,
+          descricao,
           raridade,
           elemento,
           nivel,
+          experiencia,
+          vinculo,
           forca,
           agilidade,
           resistencia,
           foco,
-          cor_olhos,
-          cor_roupa,
-          tipo_cabelo,
-          cor_cabelo,
-          acessorio
+          habilidades,
+          vivo,
+          ativo,
+          marca_morte,
+          exaustao,
+          hp_atual
         )
       `)
       .eq('seller_id', userId)
