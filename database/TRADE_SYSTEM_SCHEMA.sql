@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS trade_listings (
 
   -- Referência ao item (apenas um será preenchido)
   avatar_id UUID REFERENCES avatares(id) ON DELETE CASCADE,
-  item_id UUID REFERENCES inventario(id) ON DELETE CASCADE,
+  item_id UUID REFERENCES player_inventory(id) ON DELETE CASCADE,
 
   -- Preço
   price_moedas INTEGER NOT NULL DEFAULT 0 CHECK (price_moedas >= 0),
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS trade_transactions (
   -- Item vendido (cache de dados)
   listing_type TEXT NOT NULL,
   avatar_id UUID REFERENCES avatares(id) ON DELETE SET NULL,
-  item_id UUID REFERENCES inventario(id) ON DELETE SET NULL,
+  item_id UUID REFERENCES player_inventory(id) ON DELETE SET NULL,
   avatar_snapshot JSONB, -- Snapshot dos dados do avatar no momento da venda
   item_snapshot JSONB,   -- Snapshot dos dados do item no momento da venda
 
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS trade_offers (
 
   -- Troca (opcional - trocar avatar por avatar)
   trade_avatar_id UUID REFERENCES avatares(id) ON DELETE SET NULL,
-  trade_item_id UUID REFERENCES inventario(id) ON DELETE SET NULL,
+  trade_item_id UUID REFERENCES player_inventory(id) ON DELETE SET NULL,
 
   -- Mensagem (opcional)
   message TEXT,
