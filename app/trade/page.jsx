@@ -74,11 +74,16 @@ export default function TradePage() {
     try {
       const res = await fetch('/api/trade/listings');
       const data = await res.json();
+      console.log("Resposta da API listings:", data);
       if (res.ok) {
         setListings(data.listings || []);
+      } else {
+        console.error("Erro na resposta:", data);
+        mostrarMensagem(data.message || 'Erro ao carregar anúncios', 'erro');
       }
     } catch (error) {
       console.error("Erro ao carregar listings:", error);
+      mostrarMensagem('Erro de conexão ao carregar anúncios', 'erro');
     }
   };
 
@@ -87,11 +92,16 @@ export default function TradePage() {
     try {
       const res = await fetch(`/api/trade/my-listings?userId=${user.id}`);
       const data = await res.json();
+      console.log("Resposta da API my-listings:", data);
       if (res.ok) {
         setMyListings(data.listings || []);
+      } else {
+        console.error("Erro na resposta:", data);
+        mostrarMensagem(data.message || 'Erro ao carregar seus anúncios', 'erro');
       }
     } catch (error) {
       console.error("Erro ao carregar meus listings:", error);
+      mostrarMensagem('Erro de conexão ao carregar seus anúncios', 'erro');
     }
   };
 
@@ -736,6 +746,9 @@ function ListingCard({ listing, onComprar, onVerDetalhes, isOwnListing, getCorRa
 
   const poderTotal = (avatar.forca || 0) + (avatar.agilidade || 0) + (avatar.resistencia || 0) + (avatar.foco || 0);
 
+  // Garantir que habilidades seja um array
+  const habilidades = Array.isArray(avatar.habilidades) ? avatar.habilidades : [];
+
   return (
     <div className="group relative">
       <div className={`absolute -inset-0.5 bg-gradient-to-r ${getCorRaridade(avatar.raridade)} rounded-lg blur opacity-20 group-hover:opacity-40 transition-all`}></div>
@@ -765,12 +778,12 @@ function ListingCard({ listing, onComprar, onVerDetalhes, isOwnListing, getCorRa
           </div>
 
           {/* Habilidades (preview) */}
-          {avatar.habilidades && avatar.habilidades.length > 0 && (
+          {habilidades.length > 0 && (
             <div className="bg-slate-950/50 rounded px-2 py-1.5 mb-3">
-              <div className="text-[10px] text-purple-400 uppercase mb-1">Habilidades ({avatar.habilidades.length})</div>
+              <div className="text-[10px] text-purple-400 uppercase mb-1">Habilidades ({habilidades.length})</div>
               <div className="text-[10px] text-slate-400 truncate">
-                {avatar.habilidades[0]?.nome}
-                {avatar.habilidades.length > 1 && ` +${avatar.habilidades.length - 1}`}
+                {habilidades[0]?.nome}
+                {habilidades.length > 1 && ` +${habilidades.length - 1}`}
               </div>
             </div>
           )}
@@ -829,6 +842,9 @@ function MyListingCard({ listing, onCancelar, onVerDetalhes, getCorRaridade, get
   const dataExpiracao = new Date(listing.expires_at);
   const diasRestantes = Math.ceil((dataExpiracao - new Date()) / (1000 * 60 * 60 * 24));
   const poderTotal = (avatar.forca || 0) + (avatar.agilidade || 0) + (avatar.resistencia || 0) + (avatar.foco || 0);
+
+  // Garantir que habilidades seja um array
+  const habilidades = Array.isArray(avatar.habilidades) ? avatar.habilidades : [];
 
   return (
     <div className="group relative">
