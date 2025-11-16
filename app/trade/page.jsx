@@ -271,10 +271,17 @@ export default function TradePage() {
               <div className="text-purple-400 font-bold mb-2">MEUS ANÚNCIOS</div>
               <div className="text-white text-sm space-y-1">
                 <div>userId: <span className="text-cyan-400 text-[10px] break-all">{user?.id}</span></div>
-                <div>Listings no estado: <span className="text-cyan-400">{myListings.length}</span></div>
-                <div>Raw count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.rawCount || '?'}</span></div>
-                <div>Join count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.joinCount || '?'}</span></div>
-                <div>Final count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.finalCount || '?'}</span></div>
+                <div>userId type: <span className="text-cyan-400">{debugData.myListings?.debug?.userIdType || '?'}</span></div>
+                <div className="border-t border-purple-400/30 my-2 pt-2">
+                  <div className="text-yellow-300 font-bold">🔍 FILTER TEST:</div>
+                  <div>All active listings: <span className="text-cyan-400">{debugData.myListings?.debug?.allActiveCount || '?'}</span></div>
+                  <div>With seller_id filter: <span className="text-cyan-400">{debugData.myListings?.debug?.rawCount || '?'}</span></div>
+                </div>
+                <div className="border-t border-purple-400/30 my-2 pt-2">
+                  <div>Listings no estado: <span className="text-cyan-400">{myListings.length}</span></div>
+                  <div>Join count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.joinCount || '?'}</span></div>
+                  <div>Final count (API): <span className="text-cyan-400">{debugData.myListings?.debug?.finalCount || '?'}</span></div>
+                </div>
                 {debugData.myListings?.debug?.missingAvatars && (
                   <div className="text-red-400">⚠️ {debugData.myListings.debug.missingAvatars.length} listings SEM avatar!</div>
                 )}
@@ -302,6 +309,12 @@ export default function TradePage() {
                 <div className="text-purple-400 font-bold mb-1">My Listings API Response:</div>
                 <pre className="bg-black p-2 rounded text-xs overflow-auto max-h-60">{JSON.stringify(debugData.myListings, null, 2)}</pre>
               </div>
+              {debugData.myListings?.debug?.allActiveListings && (
+                <div>
+                  <div className="text-red-400 font-bold mb-1">🔍 ALL ACTIVE LISTINGS (sem filtro de seller_id):</div>
+                  <pre className="bg-black p-2 rounded text-xs overflow-auto max-h-60">{JSON.stringify(debugData.myListings.debug.allActiveListings, null, 2)}</pre>
+                </div>
+              )}
               <div>
                 <div className="text-green-400 font-bold mb-1">Avatares:</div>
                 <pre className="bg-black p-2 rounded text-xs overflow-auto max-h-60">{JSON.stringify(debugData.avatares, null, 2)}</pre>
