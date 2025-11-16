@@ -172,14 +172,27 @@ export async function PUT(request) {
 
     // Desativar todos os avatares do usuário
     console.log(`[ATIVAR AVATAR] 1️⃣ Desativando TODOS os avatares do usuário...`);
+
+    // SOLUÇÃO: Tocar em updated_at via SQL RAW para forçar trigger
+    const timestampNow = new Date().toISOString();
     const { data: desativados, error: deactivateError } = await supabase
       .from('avatares')
       .update({
         ativo: false,
-        updated_at: new Date().toISOString()  // FORÇAR updated_at para invalidar cache
+        updated_at: timestampNow  // Tentar forçar (pode ser sobrescrito por trigger)
       })
       .eq('user_id', userId)
       .select();
+
+    console.log(`[ATIVAR AVATAR] 🔧 Tentou definir updated_at=${timestampNow}`);
+
+    // Verificar o que realmente foi salvo
+    if (desativados && desativados.length > 0) {
+      console.log(`[ATIVAR AVATAR] 🔍 Verificando updated_at salvo no banco:`);
+      desativados.forEach(av => {
+        console.log(`  - ${av.nome}: updated_at=${av.updated_at} (esperava ${timestampNow})`);
+      });
+    }
 
     if (deactivateError) {
       console.error("[ATIVAR AVATAR] ❌ Erro ao desativar avatares:", deactivateError);
@@ -193,11 +206,12 @@ export async function PUT(request) {
 
     // Ativar o avatar escolhido
     console.log(`[ATIVAR AVATAR] 2️⃣ Ativando avatar ${avatarToActivate.nome}...`);
+    const timestampAtivacao = new Date().toISOString();
     const { data: avatarAtivado, error: activateError } = await supabase
       .from('avatares')
       .update({
         ativo: true,
-        updated_at: new Date().toISOString()  // FORÇAR updated_at para invalidar cache
+        updated_at: timestampAtivacao  // FORÇAR updated_at para invalidar cache
       })
       .eq('id', avatarId)
       .select()
@@ -212,6 +226,7 @@ export async function PUT(request) {
     }
 
     console.log(`[ATIVAR AVATAR] ✅ Avatar ativado com sucesso! Novo ativo=${avatarAtivado.ativo}`);
+    console.log(`[ATIVAR AVATAR] 🔍 updated_at salvo: ${avatarAtivado.updated_at} (esperava ${timestampAtivacao})`);
 
     // Buscar todos os avatares atualizados
     console.log(`[ATIVAR AVATAR] 3️⃣ Buscando todos os avatares atualizados...`);
