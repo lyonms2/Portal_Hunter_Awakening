@@ -12,6 +12,8 @@ export default function OcultistaPage() {
   const [loading, setLoading] = useState(true);
   const [avatarGerado, setAvatarGerado] = useState(null);
   const [invocando, setInvocando] = useState(false);
+  const [totalAvatares, setTotalAvatares] = useState(0);
+  const [slotsDisponiveis, setSlotsDisponiveis] = useState(15);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -35,6 +37,17 @@ export default function OcultistaPage() {
 
       const data = await response.json();
       setStats(data.stats);
+
+      // Carregar avatares para verificar limite
+      const avatarResponse = await fetch(`/api/meus-avatares?userId=${userId}`);
+      const avatarData = await avatarResponse.json();
+      if (avatarResponse.ok) {
+        const LIMITE_AVATARES = 15;
+        // Contar apenas avatares que não estão no memorial
+        const avataresConta = avatarData.avatares.filter(av => !(av.marca_morte && !av.vivo)).length;
+        setTotalAvatares(avataresConta);
+        setSlotsDisponiveis(LIMITE_AVATARES - avataresConta);
+      }
     } catch (error) {
       console.error("Erro ao carregar stats:", error);
     } finally {
@@ -166,24 +179,32 @@ export default function OcultistaPage() {
                   <div className="bg-slate-900/50 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-slate-400 text-sm font-mono">Custo da Invocação:</span>
-                      <span className="text-xl font-bold">
+                      <span className="text-lg font-bold">
                         {stats?.primeira_invocacao ? (
                           <span className="text-green-400">GRATUITA</span>
                         ) : (
-                          <span className="text-amber-400">100 moedas</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-amber-400">250 💰</span>
+                            <span className="text-slate-600">+</span>
+                            <span className="text-purple-400">5 💎</span>
+                          </div>
                         )}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400 text-sm font-mono">Seus Recursos:</span>
                       <div className="flex gap-4">
-                        <span className="text-amber-400 font-bold">{stats?.moedas || 0} 💰</span>
-                        <span className="text-purple-400 font-bold">{stats?.fragmentos || 0} 💎</span>
+                        <span className={`font-bold ${stats?.moedas >= 250 ? 'text-amber-400' : 'text-red-400'}`}>
+                          {stats?.moedas || 0} 💰
+                        </span>
+                        <span className={`font-bold ${stats?.fragmentos >= 5 ? 'text-purple-400' : 'text-red-400'}`}>
+                          {stats?.fragmentos || 0} 💎
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Aviso */}
+                  {/* Aviso Primeira Invocação */}
                   {stats?.primeira_invocacao && (
                     <div className="bg-purple-950/30 border border-purple-500/30 rounded p-4 mb-6">
                       <p className="text-purple-300 text-sm font-mono text-center">
@@ -192,10 +213,69 @@ export default function OcultistaPage() {
                     </div>
                   )}
 
+                  {/* Aviso de Slots */}
+                  <div className="bg-slate-900/50 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-slate-400 text-sm font-mono">Slots Disponíveis:</span>
+                      <span className={`font-bold text-lg ${
+                        slotsDisponiveis === 0 ? 'text-red-400' :
+                        slotsDisponiveis <= 3 ? 'text-orange-400' :
+                        'text-cyan-400'
+                      }`}>
+                        {slotsDisponiveis}/15
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mb-2">
+                      <div
+                        className={`h-full transition-all ${
+                          slotsDisponiveis === 0 ? 'bg-red-500' :
+                          slotsDisponiveis <= 3 ? 'bg-orange-500' :
+                          slotsDisponiveis <= 7 ? 'bg-yellow-500' :
+                          'bg-cyan-500'
+                        }`}
+                        style={{ width: `${((15 - slotsDisponiveis) / 15) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono text-center">
+                      Você tem {totalAvatares} avatares. Avatares no memorial não ocupam slots.
+                    </p>
+                  </div>
+
+                  {/* Aviso Limite Atingido */}
+                  {slotsDisponiveis === 0 && (
+                    <div className="bg-red-950/30 border border-red-500/30 rounded p-4 mb-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">🚫</span>
+                        <p className="text-red-300 text-sm font-bold">
+                          LIMITE DE AVATARES ATINGIDO
+                        </p>
+                      </div>
+                      <p className="text-red-400/80 text-xs font-mono leading-relaxed">
+                        Você atingiu o limite de 15 avatares. Para invocar novos, você precisa liberar espaço:
+                      </p>
+                      <ul className="text-xs text-red-400/80 mt-2 space-y-1 ml-4">
+                        <li>• Sacrifique avatares inativos (os envia ao Memorial)</li>
+                        <li>• Avatares que morrem em combate vão para o Memorial automaticamente</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Aviso Quase Cheio */}
+                  {slotsDisponiveis > 0 && slotsDisponiveis <= 3 && (
+                    <div className="bg-orange-950/30 border border-orange-500/30 rounded p-4 mb-6">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">⚠️</span>
+                        <p className="text-orange-300 text-sm font-mono">
+                          Você está quase no limite! Apenas {slotsDisponiveis} {slotsDisponiveis === 1 ? 'slot disponível' : 'slots disponíveis'}.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Botão Invocar */}
                   <button
                     onClick={iniciarInvocacao}
-                    disabled={!stats?.primeira_invocacao && stats?.moedas < 100}
+                    disabled={slotsDisponiveis === 0 || (!stats?.primeira_invocacao && (stats?.moedas < 250 || stats?.fragmentos < 5))}
                     className="w-full group/btn relative disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 rounded-lg blur opacity-50 group-hover/btn:opacity-75 transition-all duration-300"></div>

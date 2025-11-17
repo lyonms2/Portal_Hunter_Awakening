@@ -184,18 +184,66 @@ export default function PvPIAPage() {
 
   if (!avatarAtivo) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-red-500 rounded-lg p-8 max-w-md">
-          <h2 className="text-2xl font-black text-red-400 mb-4">⚠️ Sem Avatar Ativo</h2>
-          <p className="text-gray-300 mb-6">
-            Você precisa ter um avatar ativo para entrar na Arena PvP.
-          </p>
-          <button
-            onClick={() => router.push('/painel')}
-            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-lg"
-          >
-            Voltar ao Painel
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-gray-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => router.push('/arena')}
+                className="text-cyan-400 hover:text-cyan-300 flex items-center gap-2"
+              >
+                ← Voltar para Arena
+              </button>
+            </div>
+
+            <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 mb-2">
+              ⚔️ ARENA PVP
+            </h1>
+            <p className="text-gray-400 text-lg">
+              Batalhe contra outros caçadores e prove seu valor
+            </p>
+          </div>
+
+          {/* Sem Avatar Ativo */}
+          <div className="max-w-3xl mx-auto">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-xl blur opacity-75"></div>
+
+              <div className="relative bg-slate-950/90 backdrop-blur-xl border border-red-900/50 rounded-xl overflow-hidden">
+                <div className="p-12 text-center">
+                  <div className="text-8xl mb-6">⚔️</div>
+                  <h2 className="text-3xl font-bold text-red-400 mb-4">
+                    Nenhum Avatar Ativo
+                  </h2>
+                  <p className="text-slate-300 mb-8 text-lg leading-relaxed">
+                    Você precisa ter um avatar ativo para entrar na Arena PvP!<br/>
+                    Vá até a tela de Avatares e selecione seu combatente.
+                  </p>
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={() => router.push("/avatares")}
+                      className="group/btn relative"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded blur opacity-50 group-hover/btn:opacity-75 transition-all"></div>
+                      <div className="relative px-8 py-4 bg-slate-950 rounded border border-cyan-500/50 transition-all">
+                        <span className="font-bold text-cyan-400">Ir para Avatares</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => router.push("/ocultista")}
+                      className="group/btn relative"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded blur opacity-50 group-hover/btn:opacity-75 transition-all"></div>
+                      <div className="relative px-8 py-4 bg-slate-950 rounded border border-purple-500/50 transition-all">
+                        <span className="font-bold text-purple-400">Invocar Novo Avatar</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
