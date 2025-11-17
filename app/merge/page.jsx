@@ -89,6 +89,12 @@ export default function MergePage() {
     };
   };
 
+  const calcularChanceSucesso = () => {
+    if (!avatarBase) return 100;
+    const mergeCount = avatarBase.merge_count || 0;
+    return Math.max(100 - (mergeCount * 7.5), 40);
+  };
+
   const realizarMerge = async () => {
     if (!avatarBase || !avatarSacrificio) {
       mostrarMensagem('Selecione os dois avatares para fusão', 'erro');
@@ -187,8 +193,13 @@ export default function MergePage() {
 
   // Filtrar apenas avatares vivos e não ativos
   const avataresDisponiveis = avatares.filter(av => av.vivo && !av.ativo);
+
+  // Filtrar avatares disponíveis para base (não pode ter 8 merges)
+  const avataresDisponiveisBase = avataresDisponiveis.filter(av => (av.merge_count || 0) < 8);
+
   const custo = calcularCusto();
   const ganhos = calcularGanhos();
+  const chanceSucesso = calcularChanceSucesso();
 
   if (loading) {
     return (
@@ -309,19 +320,32 @@ export default function MergePage() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto custom-scrollbar">
-                    {avataresDisponiveis
+                    {avataresDisponiveisBase
                       .filter(av => !avatarSacrificio || av.id !== avatarSacrificio.id)
-                      .map((avatar) => (
-                        <button
-                          key={avatar.id}
-                          onClick={() => setAvatarBase(avatar)}
-                          className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded transition-all"
-                        >
-                          <AvatarSVG avatar={avatar} tamanho={60} />
-                          <div className="text-xs font-bold text-white mt-1 truncate">{avatar.nome}</div>
-                          <div className="text-xs text-slate-400">Nv.{avatar.nivel}</div>
-                        </button>
-                      ))}
+                      .map((avatar) => {
+                        const merges = avatar.merge_count || 0;
+                        const chance = Math.max(100 - (merges * 7.5), 40);
+                        return (
+                          <button
+                            key={avatar.id}
+                            onClick={() => setAvatarBase(avatar)}
+                            className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded transition-all"
+                          >
+                            <AvatarSVG avatar={avatar} tamanho={60} />
+                            <div className="text-xs font-bold text-white mt-1 truncate">{avatar.nome}</div>
+                            <div className="text-xs text-slate-400">Nv.{avatar.nivel}</div>
+                            {merges > 0 && (
+                              <div className={`text-[10px] mt-1 font-bold ${
+                                chance >= 70 ? 'text-green-400' :
+                                chance >= 50 ? 'text-yellow-400' :
+                                'text-orange-400'
+                              }`}>
+                                🧬{merges} ({chance}%)
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
               )}
@@ -412,6 +436,37 @@ export default function MergePage() {
             <div className="absolute -inset-1 bg-gradient-to-r from-violet-500/20 to-purple-500/20 rounded-lg blur opacity-50"></div>
 
             <div className="relative bg-slate-950/80 backdrop-blur-xl border border-violet-900/50 rounded-lg p-6">
+              {/* Chance de Sucesso */}
+              <div className={`mb-4 p-4 rounded-lg border-2 ${
+                chanceSucesso >= 70 ? 'bg-green-950/30 border-green-500/50' :
+                chanceSucesso >= 50 ? 'bg-yellow-950/30 border-yellow-500/50' :
+                'bg-orange-950/30 border-orange-500/50'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">Chance de Sucesso</div>
+                    <div className={`text-3xl font-black ${
+                      chanceSucesso >= 70 ? 'text-green-400' :
+                      chanceSucesso >= 50 ? 'text-yellow-400' :
+                      'text-orange-400'
+                    }`}>
+                      {chanceSucesso}%
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-400">Merges realizados</div>
+                    <div className="text-2xl font-bold text-violet-300">{avatarBase.merge_count || 0}/8</div>
+                  </div>
+                </div>
+                <div className="mt-3 text-xs text-slate-300">
+                  {chanceSucesso < 100 ? (
+                    <span>⚠️ A cada merge, a chance de sucesso diminui 7.5% (mínimo 40%)</span>
+                  ) : (
+                    <span>✨ Primeira fusão! 100% de chance de sucesso!</span>
+                  )}
+                </div>
+              </div>
+
               <h3 className="text-violet-400 font-bold text-lg mb-4 flex items-center gap-2">
                 <span>📊</span> Preview dos Ganhos
               </h3>
@@ -528,7 +583,7 @@ export default function MergePage() {
       </div>
 
       {/* Modal de Resultado */}
-      {modalResultado && resultado && resultado.avatar && (
+      {modalResultado && resultado && resultado.avatarBase && (
         <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto p-4"
           onClick={() => setModalResultado(false)}
@@ -543,15 +598,28 @@ export default function MergePage() {
 
                 <div className="relative bg-slate-950/95 backdrop-blur-xl border-2 border-indigo-900/50 rounded-lg overflow-hidden">
                   {/* Header */}
-                  <div className="bg-gradient-to-r from-indigo-900/80 to-violet-900/80 p-4 text-center relative overflow-hidden">
+                  <div className={`p-4 text-center relative overflow-hidden ${
+                    resultado.sucesso
+                      ? 'bg-gradient-to-r from-indigo-900/80 to-violet-900/80'
+                      : 'bg-gradient-to-r from-red-900/80 to-orange-900/80'
+                  }`}>
                     <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20"></div>
                     <div className="relative">
-                      <div className="text-5xl mb-2 animate-pulse">✨</div>
-                      <h2 className="text-xl font-black uppercase tracking-wider text-indigo-200">
-                        Fusão Completa!
+                      <div className="text-5xl mb-2 animate-pulse">
+                        {resultado.sucesso ? '✨' : '💥'}
+                      </div>
+                      <h2 className={`text-xl font-black uppercase tracking-wider ${
+                        resultado.sucesso ? 'text-indigo-200' : 'text-red-200'
+                      }`}>
+                        {resultado.sucesso ? 'Fusão Completa!' : 'Fusão Falhou!'}
                       </h2>
-                      <p className="text-xs text-indigo-300/80 font-mono mt-1">
-                        O ritual dimensional foi bem-sucedido
+                      <p className={`text-xs font-mono mt-1 ${
+                        resultado.sucesso ? 'text-indigo-300/80' : 'text-red-300/80'
+                      }`}>
+                        {resultado.sucesso
+                          ? 'O ritual dimensional foi bem-sucedido'
+                          : `Chance era ${resultado.chanceSucesso}% - O ritual falhou!`
+                        }
                       </p>
                     </div>
                   </div>
@@ -577,7 +645,7 @@ export default function MergePage() {
                           <div className="relative">
                             <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500/30 to-violet-500/30 rounded-full blur"></div>
                             <div className="relative">
-                              <AvatarSVG avatar={resultado.avatar} tamanho={200} />
+                              <AvatarSVG avatar={resultado.avatarBase} tamanho={200} />
                             </div>
                           </div>
                         </div>
@@ -585,32 +653,56 @@ export default function MergePage() {
                         {/* Nome e Info */}
                         <div className="text-center">
                           <h3 className="text-2xl font-black mb-2 bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-                            {resultado.avatar?.nome || 'Avatar'}
+                            {resultado.avatarBase?.nome || 'Avatar'}
                           </h3>
                           <div className="flex items-center justify-center gap-2 flex-wrap">
                             <span className="inline-block px-3 py-1 bg-slate-800 rounded-full text-sm font-mono text-indigo-300">
-                              {resultado.avatar?.elemento || 'Neutro'}
+                              {resultado.avatarBase?.elemento || 'Neutro'}
                             </span>
                             <span className="inline-block px-3 py-1 bg-slate-800 rounded-full text-sm font-mono text-violet-300">
-                              {resultado.avatar?.raridade || 'Comum'}
+                              {resultado.avatarBase?.raridade || 'Comum'}
                             </span>
                             <span className="inline-block px-3 py-1 bg-slate-800 rounded-full text-sm font-mono text-purple-300">
-                              Nv.{resultado.avatar?.nivel || 1}
+                              Nv.{resultado.avatarBase?.nivel || 1}
                             </span>
                           </div>
                         </div>
 
                         {/* Lore Text */}
-                        <div className="bg-gradient-to-br from-indigo-950/40 to-violet-950/40 rounded-lg p-4 border border-indigo-900/50">
-                          <div className="text-xs text-indigo-400 font-bold uppercase mb-2 tracking-wider">✨ Resultado da Fusão</div>
-                          <p className="text-sm text-indigo-200/90 leading-relaxed italic">
-                            "O ritual dimensional alcançou seu ápice. As energias se entrelaçaram perfeitamente, fundindo duas almas em uma só.
-                            <span className="block mt-2 font-bold text-indigo-300">
-                              O avatar base absorveu com sucesso a essência do sacrificado, aumentando seu poder dimensional.
-                            </span>
-                            <span className="block mt-2 text-violet-300/80">
-                              A nova forma mantém as memórias e habilidades originais, agora potencializadas pela energia dimensional absorvida.
-                            </span>
+                        <div className={`rounded-lg p-4 border ${
+                          resultado.sucesso
+                            ? 'bg-gradient-to-br from-indigo-950/40 to-violet-950/40 border-indigo-900/50'
+                            : 'bg-gradient-to-br from-red-950/40 to-orange-950/40 border-red-900/50'
+                        }`}>
+                          <div className={`text-xs font-bold uppercase mb-2 tracking-wider ${
+                            resultado.sucesso ? 'text-indigo-400' : 'text-red-400'
+                          }`}>
+                            {resultado.sucesso ? '✨ Resultado da Fusão' : '💥 Falha no Ritual'}
+                          </div>
+                          <p className={`text-sm leading-relaxed italic ${
+                            resultado.sucesso ? 'text-indigo-200/90' : 'text-red-200/90'
+                          }`}>
+                            {resultado.sucesso ? (
+                              <>
+                                "O ritual dimensional alcançou seu ápice. As energias se entrelaçaram perfeitamente, fundindo duas almas em uma só.
+                                <span className="block mt-2 font-bold text-indigo-300">
+                                  O avatar base absorveu com sucesso a essência do sacrificado, aumentando seu poder dimensional.
+                                </span>
+                                <span className="block mt-2 text-violet-300/80">
+                                  A nova forma mantém as memórias e habilidades originais, agora potencializadas pela energia dimensional absorvida.
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                "O ritual dimensional começou, mas as energias se chocaram violentamente. A instabilidade dimensional causou uma explosão de energia.
+                                <span className="block mt-2 font-bold text-red-300">
+                                  O avatar sacrificado foi consumido pelo vazio, mas a essência não pode ser transferida. O avatar base permanece inalterado.
+                                </span>
+                                <span className="block mt-2 text-orange-300/80">
+                                  Quanto mais fusões um avatar sofre, mais instável sua matriz dimensional se torna, reduzindo as chances de sucesso futuro.
+                                </span>
+                              </>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -619,32 +711,36 @@ export default function MergePage() {
                       <div className="space-y-4">
                         {/* Stats Finais */}
                         <div>
-                          <h4 className="text-indigo-400 font-bold text-xs uppercase tracking-wider mb-3">Atributos Finais</h4>
+                          <h4 className={`font-bold text-xs uppercase tracking-wider mb-3 ${
+                            resultado.sucesso ? 'text-indigo-400' : 'text-orange-400'
+                          }`}>
+                            {resultado.sucesso ? 'Atributos Finais' : 'Atributos (Sem Mudanças)'}
+                          </h4>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
                               <div className="text-xs text-slate-500 uppercase mb-1">Força</div>
-                              <div className="text-2xl font-bold text-red-400">{resultado.avatar?.forca || 0}</div>
+                              <div className="text-2xl font-bold text-red-400">{resultado.avatarBase?.forca || 0}</div>
                               {resultado.ganhos?.forca > 0 && (
                                 <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.forca}</div>
                               )}
                             </div>
                             <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
                               <div className="text-xs text-slate-500 uppercase mb-1">Agilidade</div>
-                              <div className="text-2xl font-bold text-green-400">{resultado.avatar?.agilidade || 0}</div>
+                              <div className="text-2xl font-bold text-green-400">{resultado.avatarBase?.agilidade || 0}</div>
                               {resultado.ganhos?.agilidade > 0 && (
                                 <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.agilidade}</div>
                               )}
                             </div>
                             <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
                               <div className="text-xs text-slate-500 uppercase mb-1">Resistência</div>
-                              <div className="text-2xl font-bold text-blue-400">{resultado.avatar?.resistencia || 0}</div>
+                              <div className="text-2xl font-bold text-blue-400">{resultado.avatarBase?.resistencia || 0}</div>
                               {resultado.ganhos?.resistencia > 0 && (
                                 <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.resistencia}</div>
                               )}
                             </div>
                             <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
                               <div className="text-xs text-slate-500 uppercase mb-1">Foco</div>
-                              <div className="text-2xl font-bold text-purple-400">{resultado.avatar?.foco || 0}</div>
+                              <div className="text-2xl font-bold text-purple-400">{resultado.avatarBase?.foco || 0}</div>
                               {resultado.ganhos?.foco > 0 && (
                                 <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.foco}</div>
                               )}
@@ -657,7 +753,7 @@ export default function MergePage() {
                           <div className="text-center">
                             <div className="text-xs text-indigo-400 uppercase mb-1">Poder Total</div>
                             <div className="text-3xl font-black bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-                              {(resultado.avatar?.forca || 0) + (resultado.avatar?.agilidade || 0) + (resultado.avatar?.resistencia || 0) + (resultado.avatar?.foco || 0)}
+                              {(resultado.avatarBase?.forca || 0) + (resultado.avatarBase?.agilidade || 0) + (resultado.avatarBase?.resistencia || 0) + (resultado.avatarBase?.foco || 0)}
                             </div>
                             <div className="text-xs text-green-400 font-bold mt-1">
                               +{(resultado.ganhos?.forca || 0) + (resultado.ganhos?.agilidade || 0) + (resultado.ganhos?.resistencia || 0) + (resultado.ganhos?.foco || 0)} pts ganhos

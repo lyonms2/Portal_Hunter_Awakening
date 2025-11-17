@@ -72,6 +72,26 @@ export async function POST(request) {
       );
     }
 
+    // 3.5. Verificar limite de merges (máximo 8)
+    const mergeCount = avatarBase.merge_count || 0;
+    if (mergeCount >= 8) {
+      return Response.json(
+        { message: "Este avatar atingiu o limite máximo de fusões (8)" },
+        { status: 400 }
+      );
+    }
+
+    // 3.6. Calcular chance de sucesso baseada em merge_count
+    // 0 merges: 100%, 1: 92.5%, 2: 85%, 3: 77.5%, 4: 70%, 5: 62.5%, 6: 55%, 7: 47.5%, 8: 40%
+    const chanceBase = 100;
+    const reducaoPorMerge = 7.5;
+    const chanceMinima = 40;
+    const chanceSucesso = Math.max(chanceBase - (mergeCount * reducaoPorMerge), chanceMinima);
+
+    // 3.7. Rolar para ver se o merge é bem sucedido
+    const roll = Math.random() * 100;
+    const mergeSuccessful = roll <= chanceSucesso;
+
     // 4. Calcular custo
     const nivelTotal = avatarBase.nivel + avatarSacrificio.nivel;
     const multiplicador = avatarBase.raridade === 'Lendário' ? 2 :
@@ -127,22 +147,33 @@ export async function POST(request) {
       }
     }
 
-    // 9. Calcular novos stats do avatar base
-    const novaForca = avatarBase.forca + ganhoForca;
-    const novaAgilidade = avatarBase.agilidade + ganhoAgilidade;
-    const novaResistencia = avatarBase.resistencia + ganhoResistencia;
-    const novoFoco = avatarBase.foco + ganhoFoco;
+    // 9. Preparar dados para atualização
+    let updateData = {
+      merge_count: mergeCount + 1, // Sempre incrementa, mesmo se falhar
+      updated_at: new Date().toISOString()
+    };
 
-    // 10. Atualizar avatar base com novos stats
-    const { error: updateBaseError } = await supabase
-      .from('avatares')
-      .update({
+    // 10. Se o merge foi bem sucedido, aplicar ganhos de stats
+    if (mergeSuccessful) {
+      const novaForca = avatarBase.forca + ganhoForca;
+      const novaAgilidade = avatarBase.agilidade + ganhoAgilidade;
+      const novaResistencia = avatarBase.resistencia + ganhoResistencia;
+      const novoFoco = avatarBase.foco + ganhoFoco;
+
+      updateData = {
+        ...updateData,
         forca: novaForca,
         agilidade: novaAgilidade,
         resistencia: novaResistencia,
         foco: novoFoco,
         elemento: novoElemento
-      })
+      };
+    }
+
+    // 11. Atualizar avatar base
+    const { error: updateBaseError } = await supabase
+      .from('avatares')
+      .update(updateData)
       .eq('id', avatarBaseId);
 
     if (updateBaseError) {
@@ -202,19 +233,27 @@ export async function POST(request) {
 
     // 14. Retornar resultado da fusão
     return Response.json({
-      message: "Fusão realizada com sucesso!",
+      message: mergeSuccessful ? "Fusão realizada com sucesso!" : "A fusão falhou! O avatar sacrificado foi perdido, mas o base está intacto.",
       resultado: {
         avatarBase: avatarAtualizado || avatarBase,
         avatarSacrificio: avatarSacrificio,
-        ganhos: {
+        sucesso: mergeSuccessful,
+        chanceSucesso: chanceSucesso,
+        mergeCount: mergeCount + 1,
+        ganhos: mergeSuccessful ? {
           forca: ganhoForca,
           agilidade: ganhoAgilidade,
           resistencia: ganhoResistencia,
           foco: ganhoFoco
+        } : {
+          forca: 0,
+          agilidade: 0,
+          resistencia: 0,
+          foco: 0
         },
-        elementoTransmutado,
-        elementoAnterior: avatarBase.elemento,
-        elementoNovo: novoElemento,
+        mudouElemento: mergeSuccessful && elementoTransmutado,
+        elementoOriginal: avatarBase.elemento,
+        elementoNovo: mergeSuccessful ? novoElemento : avatarBase.elemento,
         custos: {
           moedas: custoMoedas,
           fragmentos: custoFragmentos
