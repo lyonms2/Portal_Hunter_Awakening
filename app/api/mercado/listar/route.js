@@ -33,7 +33,7 @@ export async function GET(request) {
       `)
       .eq('em_venda', true)
       .eq('vivo', true)
-      .eq('marca_morte', false);
+      .or('marca_morte.is.null,marca_morte.eq.false');
 
     // Excluir avatares do próprio usuário
     if (userId) {
@@ -72,8 +72,9 @@ export async function GET(request) {
 
     if (error) {
       console.error("Erro ao listar avatares:", error);
+      console.error("Detalhes do erro:", JSON.stringify(error, null, 2));
       return Response.json(
-        { message: "Erro ao listar avatares" },
+        { message: "Erro ao listar avatares", error: error.message, details: error.details },
         { status: 500 }
       );
     }
@@ -84,9 +85,10 @@ export async function GET(request) {
     });
 
   } catch (error) {
-    console.error("Erro:", error);
+    console.error("Erro ao processar requisição:", error);
+    console.error("Stack trace:", error.stack);
     return Response.json(
-      { message: "Erro ao processar requisição" },
+      { message: "Erro ao processar requisição", error: error.message, stack: error.stack },
       { status: 500 }
     );
   }
