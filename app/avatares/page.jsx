@@ -236,6 +236,13 @@ export default function AvatarsPage() {
   // Contar avatares caídos (para o botão memorial)
   const avataresCaidos = avatares.filter(av => !av.vivo && av.marca_morte).length;
 
+  // Sistema de limite de avatares (avatares mortos no memorial não contam)
+  const LIMITE_AVATARES = 15;
+  const avataresConta = avatares.filter(av => !(av.marca_morte && !av.vivo)).length;
+  const slotsUsados = avataresConta;
+  const slotsDisponiveis = LIMITE_AVATARES - slotsUsados;
+  const percentualOcupado = (slotsUsados / LIMITE_AVATARES) * 100;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center">
@@ -261,13 +268,50 @@ export default function AvatarsPage() {
       <div className="relative z-10 container mx-auto px-4 py-6 max-w-7xl">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-black bg-gradient-to-r from-cyan-300 via-blue-300 to-purple-300 bg-clip-text text-transparent mb-1">
               MINHA COLEÇÃO
             </h1>
-            <p className="text-slate-400 font-mono text-xs">
+            <p className="text-slate-400 font-mono text-xs mb-2">
               {avatares.length} {avatares.length === 1 ? 'Avatar' : 'Avatares'} | {avatares.filter(a => a.vivo).length} Vivos | {avatares.filter(a => !a.vivo).length} Mortos
             </p>
+
+            {/* Contador de Slots */}
+            <div className="mt-3">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`font-mono text-sm font-bold ${
+                  percentualOcupado >= 100 ? 'text-red-400' :
+                  percentualOcupado >= 80 ? 'text-orange-400' :
+                  'text-cyan-400'
+                }`}>
+                  📦 Slots: {slotsUsados}/{LIMITE_AVATARES}
+                </span>
+                {slotsDisponiveis > 0 && slotsDisponiveis <= 3 && (
+                  <span className="text-[10px] text-orange-400 font-bold animate-pulse">
+                    ⚠️ Quase cheio!
+                  </span>
+                )}
+                {slotsDisponiveis === 0 && (
+                  <span className="text-[10px] text-red-400 font-bold animate-pulse">
+                    🚫 LIMITE ATINGIDO
+                  </span>
+                )}
+              </div>
+              <div className="w-64 bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full transition-all ${
+                    percentualOcupado >= 100 ? 'bg-red-500' :
+                    percentualOcupado >= 80 ? 'bg-orange-500' :
+                    percentualOcupado >= 60 ? 'bg-yellow-500' :
+                    'bg-cyan-500'
+                  }`}
+                  style={{ width: `${Math.min(percentualOcupado, 100)}%` }}
+                ></div>
+              </div>
+              <p className="text-[10px] text-slate-500 font-mono mt-1">
+                * Avatares no memorial não ocupam slots
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-2 flex-wrap">

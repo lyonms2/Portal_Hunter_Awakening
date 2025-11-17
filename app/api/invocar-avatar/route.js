@@ -173,10 +173,44 @@ export async function POST(request) {
     // Verificar recursos
     if (!ehPrimeiraInvocacao && stats.moedas < custoMoedas) {
       return Response.json(
-        { 
+        {
           message: "Moedas insuficientes para invocação",
           recursos_necessarios: { moedas: custoMoedas, fragmentos: custoFragmentos },
           recursos_atuais: { moedas: stats.moedas, fragmentos: stats.fragmentos }
+        },
+        { status: 400 }
+      );
+    }
+
+    // Verificar limite de avatares (avatares no memorial não contam)
+    console.log("Verificando limite de avatares...");
+    const { data: avatares, error: avatarCountError } = await supabase
+      .from('avatares')
+      .select('id, vivo, marca_morte')
+      .eq('user_id', userId);
+
+    if (avatarCountError) {
+      console.error("Erro ao contar avatares:", avatarCountError);
+      return Response.json(
+        { message: "Erro ao verificar limite de avatares" },
+        { status: 500 }
+      );
+    }
+
+    // Contar apenas avatares que não estão no memorial (vivos OU mortos sem marca_morte)
+    const LIMITE_AVATARES = 15;
+    const avataresConta = avatares.filter(av => !(av.marca_morte && !av.vivo)).length;
+
+    console.log(`Avatares contados: ${avataresConta}/${LIMITE_AVATARES}`);
+
+    if (avataresConta >= LIMITE_AVATARES) {
+      console.log("❌ Limite de avatares atingido!");
+      return Response.json(
+        {
+          message: "Você atingiu o limite de 15 avatares! Sacrifique avatares inativos ou espere que morram em combate para liberar espaço.",
+          limite: LIMITE_AVATARES,
+          avatares_atuais: avataresConta,
+          slots_disponiveis: 0
         },
         { status: 400 }
       );
