@@ -792,7 +792,13 @@ export default function BatalhaIAPage() {
   const voltarArena = () => {
     sessionStorage.removeItem('batalha_pvp_ia_dados');
     sessionStorage.removeItem('batalha_pvp_ia_estado'); // Limpar estado salvo também
-    router.push('/arena/pvp-ia');
+
+    // Se avatar morreu, redirecionar para página de avatares
+    if (resultado?.avatarMorreu) {
+      router.push('/avatares');
+    } else {
+      router.push('/arena/pvp-ia');
+    }
   };
 
   if (loading || !dadosPartida) {
