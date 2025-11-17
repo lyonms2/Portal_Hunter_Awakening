@@ -164,17 +164,19 @@ export async function POST(request) {
 
     // Verificar se é primeira invocação
     const ehPrimeiraInvocacao = stats.primeira_invocacao;
-    const custoMoedas = ehPrimeiraInvocacao ? 0 : 100;
-    const custoFragmentos = ehPrimeiraInvocacao ? 0 : 0;
+    const custoMoedas = ehPrimeiraInvocacao ? 0 : 250;
+    const custoFragmentos = ehPrimeiraInvocacao ? 0 : 5;
 
     console.log("Primeira invocação?", ehPrimeiraInvocacao);
     console.log("Custo:", custoMoedas, "moedas");
 
     // Verificar recursos
-    if (!ehPrimeiraInvocacao && stats.moedas < custoMoedas) {
+    if (!ehPrimeiraInvocacao && (stats.moedas < custoMoedas || stats.fragmentos < custoFragmentos)) {
       return Response.json(
         {
-          message: "Moedas insuficientes para invocação",
+          message: stats.moedas < custoMoedas
+            ? "Moedas insuficientes para invocação"
+            : "Fragmentos insuficientes para invocação",
           recursos_necessarios: { moedas: custoMoedas, fragmentos: custoFragmentos },
           recursos_atuais: { moedas: stats.moedas, fragmentos: stats.fragmentos }
         },

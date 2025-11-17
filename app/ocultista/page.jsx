@@ -179,19 +179,27 @@ export default function OcultistaPage() {
                   <div className="bg-slate-900/50 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-slate-400 text-sm font-mono">Custo da Invocação:</span>
-                      <span className="text-xl font-bold">
+                      <span className="text-lg font-bold">
                         {stats?.primeira_invocacao ? (
                           <span className="text-green-400">GRATUITA</span>
                         ) : (
-                          <span className="text-amber-400">100 moedas</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-amber-400">250 💰</span>
+                            <span className="text-slate-600">+</span>
+                            <span className="text-purple-400">5 💎</span>
+                          </div>
                         )}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400 text-sm font-mono">Seus Recursos:</span>
                       <div className="flex gap-4">
-                        <span className="text-amber-400 font-bold">{stats?.moedas || 0} 💰</span>
-                        <span className="text-purple-400 font-bold">{stats?.fragmentos || 0} 💎</span>
+                        <span className={`font-bold ${stats?.moedas >= 250 ? 'text-amber-400' : 'text-red-400'}`}>
+                          {stats?.moedas || 0} 💰
+                        </span>
+                        <span className={`font-bold ${stats?.fragmentos >= 5 ? 'text-purple-400' : 'text-red-400'}`}>
+                          {stats?.fragmentos || 0} 💎
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -267,7 +275,7 @@ export default function OcultistaPage() {
                   {/* Botão Invocar */}
                   <button
                     onClick={iniciarInvocacao}
-                    disabled={slotsDisponiveis === 0 || (!stats?.primeira_invocacao && stats?.moedas < 100)}
+                    disabled={slotsDisponiveis === 0 || (!stats?.primeira_invocacao && (stats?.moedas < 250 || stats?.fragmentos < 5))}
                     className="w-full group/btn relative disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 rounded-lg blur opacity-50 group-hover/btn:opacity-75 transition-all duration-300"></div>
