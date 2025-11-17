@@ -211,6 +211,8 @@ export async function PUT(request) {
       .from('avatares')
       .update({
         ativo: true,
+        em_venda: false,  // Remover da venda ao ativar
+        preco_venda: null,
         updated_at: timestampAtivacao  // FORÇAR updated_at para invalidar cache
       })
       .eq('id', avatarId)

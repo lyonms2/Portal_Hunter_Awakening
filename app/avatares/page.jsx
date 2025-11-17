@@ -15,6 +15,9 @@ export default function AvatarsPage() {
   const [ativando, setAtivando] = useState(false);
   const [modalSacrificar, setModalSacrificar] = useState(null);
   const [sacrificando, setSacrificando] = useState(false);
+  const [modalVender, setModalVender] = useState(null);
+  const [precoVenda, setPrecoVenda] = useState('');
+  const [vendendo, setVendendo] = useState(false);
 
   // Estados de filtros
   const [filtroRaridade, setFiltroRaridade] = useState('Todos');
@@ -130,6 +133,92 @@ export default function AvatarsPage() {
       setTimeout(() => setModalConfirmacao(null), 3000);
     } finally {
       setSacrificando(false);
+    }
+  };
+
+  const venderAvatar = async () => {
+    const preco = parseInt(precoVenda);
+
+    if (!preco || preco < 100 || preco > 10000) {
+      setModalConfirmacao({
+        tipo: 'erro',
+        mensagem: 'Preço deve estar entre 100 e 10.000 moedas'
+      });
+      setTimeout(() => setModalConfirmacao(null), 3000);
+      return;
+    }
+
+    setVendendo(true);
+    try {
+      const response = await fetch("/api/mercado/vender", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          avatarId: modalVender.id,
+          preco
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setModalVender(null);
+        setPrecoVenda('');
+        setModalConfirmacao({
+          tipo: 'sucesso',
+          mensagem: `${modalVender.nome} colocado à venda por ${preco} moedas!`
+        });
+        setTimeout(() => setModalConfirmacao(null), 3000);
+        await carregarAvatares(user.id);
+      } else {
+        setModalConfirmacao({
+          tipo: 'erro',
+          mensagem: data.message || 'Erro ao colocar avatar à venda'
+        });
+        setTimeout(() => setModalConfirmacao(null), 3000);
+      }
+    } catch (error) {
+      console.error("Erro ao vender avatar:", error);
+      setModalConfirmacao({
+        tipo: 'erro',
+        mensagem: 'Erro de conexão'
+      });
+      setTimeout(() => setModalConfirmacao(null), 3000);
+    } finally {
+      setVendendo(false);
+    }
+  };
+
+  const cancelarVenda = async (avatar) => {
+    try {
+      const response = await fetch("/api/mercado/vender", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          avatarId: avatar.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setModalConfirmacao({
+          tipo: 'sucesso',
+          mensagem: `Venda cancelada!`
+        });
+        setTimeout(() => setModalConfirmacao(null), 3000);
+        await carregarAvatares(user.id);
+      } else {
+        setModalConfirmacao({
+          tipo: 'erro',
+          mensagem: data.message || 'Erro ao cancelar venda'
+        });
+        setTimeout(() => setModalConfirmacao(null), 3000);
+      }
+    } catch (error) {
+      console.error("Erro ao cancelar venda:", error);
     }
   };
 
@@ -315,6 +404,15 @@ export default function AvatarsPage() {
           </div>
 
           <div className="flex gap-2 flex-wrap">
+            {/* Botão Mercado */}
+            <button
+              onClick={() => router.push("/mercado")}
+              className="px-4 py-2 bg-gradient-to-r from-amber-900/30 to-yellow-900/30 hover:from-amber-800/40 hover:to-yellow-800/40 border border-amber-500/30 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-amber-400"
+            >
+              <span>🏪</span>
+              <span>MERCADO</span>
+            </button>
+
             {/* Botão Merge */}
             <button
               onClick={() => router.push("/merge")}
@@ -528,6 +626,11 @@ export default function AvatarsPage() {
                           💀 Marca
                         </span>
                       )}
+                      {avatar.em_venda && (
+                        <span className="px-2 py-0.5 bg-amber-900/30 border border-amber-500/30 rounded text-xs text-amber-400 animate-pulse">
+                          🏪 À Venda
+                        </span>
+                      )}
                     </div>
 
                     {/* Botões */}
@@ -551,12 +654,35 @@ export default function AvatarsPage() {
                       </div>
 
                       {/* Botão Sacrificar - Apenas para avatares vivos e inativos */}
-                      {avatar.vivo && !avatar.ativo && (
+                      {avatar.vivo && !avatar.ativo && !avatar.em_venda && (
                         <button
                           onClick={() => setModalSacrificar(avatar)}
                           className="w-full px-2 py-1 bg-red-950/20 hover:bg-red-900/30 border border-red-900/30 hover:border-red-800/50 rounded text-xs font-semibold text-red-500/70 hover:text-red-400 transition-all"
                         >
                           ⚠️ Sacrificar
+                        </button>
+                      )}
+
+                      {/* Botão Vender - Apenas para avatares vivos, inativos, sem marca_morte e não em venda */}
+                      {avatar.vivo && !avatar.ativo && !avatar.marca_morte && !avatar.em_venda && (
+                        <button
+                          onClick={() => {
+                            setModalVender(avatar);
+                            setPrecoVenda('');
+                          }}
+                          className="w-full px-2 py-1 bg-amber-950/20 hover:bg-amber-900/30 border border-amber-900/30 hover:border-amber-800/50 rounded text-xs font-semibold text-amber-500/70 hover:text-amber-400 transition-all"
+                        >
+                          🏪 Vender
+                        </button>
+                      )}
+
+                      {/* Botão Cancelar Venda - Para avatares em venda */}
+                      {avatar.em_venda && (
+                        <button
+                          onClick={() => cancelarVenda(avatar)}
+                          className="w-full px-2 py-1 bg-slate-950/20 hover:bg-slate-900/30 border border-slate-700/30 hover:border-slate-600/50 rounded text-xs font-semibold text-slate-400/70 hover:text-slate-300 transition-all"
+                        >
+                          ✖️ Cancelar Venda
                         </button>
                       )}
                     </div>
@@ -764,6 +890,73 @@ export default function AvatarsPage() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Venda */}
+      {modalVender && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => !vendendo && setModalVender(null)}
+        >
+          <div
+            className="max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/30 to-yellow-500/30 rounded-lg blur opacity-75"></div>
+
+              <div className="relative bg-slate-950/95 backdrop-blur-xl border border-amber-900/50 rounded-lg overflow-hidden">
+                <div className="p-4 text-center font-bold text-lg bg-gradient-to-r from-amber-600 to-yellow-600">
+                  🏪 Colocar à Venda
+                </div>
+
+                <div className="p-6">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold text-white mb-2">{modalVender.nome}</h3>
+                    <p className="text-sm text-slate-400">
+                      {modalVender.raridade} • {modalVender.elemento} • Nv.{modalVender.nivel}
+                    </p>
+                  </div>
+
+                  <div className="mb-6">
+                    <label className="block text-sm font-mono text-slate-400 mb-2">
+                      Preço (moedas)
+                    </label>
+                    <input
+                      type="number"
+                      min="100"
+                      max="10000"
+                      value={precoVenda}
+                      onChange={(e) => setPrecoVenda(e.target.value)}
+                      placeholder="Mínimo: 100 | Máximo: 10.000"
+                      className="w-full px-4 py-3 bg-slate-900 border border-amber-500/30 rounded text-white text-center text-lg font-bold focus:border-amber-500 focus:outline-none"
+                    />
+                    <p className="text-xs text-slate-500 mt-2 text-center font-mono">
+                      O mercado cobra 5% de taxa
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModalVender(null)}
+                      disabled={vendendo}
+                      className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition-all disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={venderAvatar}
+                      disabled={vendendo}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-bold rounded-lg transition-all disabled:opacity-50"
+                    >
+                      {vendendo ? 'Vendendo...' : 'Confirmar'}
+                    </button>
                   </div>
                 </div>
               </div>
