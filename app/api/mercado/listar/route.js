@@ -22,15 +22,10 @@ export async function GET(request) {
     const precoMin = searchParams.get('precoMin');
     const precoMax = searchParams.get('precoMax');
 
-    // Query base
+    // Query base - buscar avatares à venda
     let query = supabase
       .from('avatares')
-      .select(`
-        *,
-        vendedor:user_id (
-          nome
-        )
-      `)
+      .select('*')
       .eq('em_venda', true)
       .eq('vivo', true)
       .or('marca_morte.is.null,marca_morte.eq.false');
@@ -77,6 +72,34 @@ export async function GET(request) {
         { message: "Erro ao listar avatares", error: error.message, details: error.details },
         { status: 500 }
       );
+    }
+
+    // Enriquecer avatares com dados dos vendedores
+    if (avatares && avatares.length > 0) {
+      // Buscar user_ids únicos
+      const userIds = [...new Set(avatares.map(a => a.user_id).filter(Boolean))];
+
+      if (userIds.length > 0) {
+        // Buscar dados dos vendedores
+        const { data: vendedores, error: vendedoresError } = await supabase
+          .from('player_stats')
+          .select('user_id, nome_operacao')
+          .in('user_id', userIds);
+
+        if (!vendedoresError && vendedores) {
+          // Criar mapa de user_id -> nome_operacao
+          const vendedoresMap = new Map(
+            vendedores.map(v => [v.user_id, v.nome_operacao])
+          );
+
+          // Adicionar nome do vendedor a cada avatar
+          avatares.forEach(avatar => {
+            avatar.vendedor = {
+              nome_operacao: vendedoresMap.get(avatar.user_id) || 'Vendedor Desconhecido'
+            };
+          });
+        }
+      }
     }
 
     return Response.json({
