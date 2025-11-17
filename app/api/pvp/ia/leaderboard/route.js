@@ -14,10 +14,25 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
     }
 
-    // Buscar top 100 rankings ordenados por fama
+    // Buscar temporada ativa primeiro
+    const { data: temporadaAtiva, error: errorTemporada } = await supabase
+      .from('pvp_temporadas')
+      .select('temporada_id')
+      .eq('ativa', true)
+      .single();
+
+    if (errorTemporada || !temporadaAtiva) {
+      console.error('[LEADERBOARD] Nenhuma temporada ativa encontrada:', errorTemporada);
+      return NextResponse.json({ error: 'Nenhuma temporada ativa' }, { status: 404 });
+    }
+
+    console.log('[LEADERBOARD] Temporada ativa:', temporadaAtiva.temporada_id);
+
+    // Buscar top 100 rankings ordenados por fama DA TEMPORADA ATIVA
     const { data: rankings, error: rankingsError } = await supabase
       .from('pvp_rankings')
       .select('user_id, fama, vitorias, derrotas, streak')
+      .eq('temporada_id', temporadaAtiva.temporada_id)
       .order('fama', { ascending: false })
       .limit(100);
 

@@ -305,7 +305,7 @@ export default function PurificadorPage() {
 
                             <div className="p-4">
                               {/* Avatar */}
-                              <div className="mb-4">
+                              <div className="mb-4 flex justify-center">
                                 <AvatarSVG avatar={avatar} tamanho={150} />
                               </div>
 
