@@ -18,6 +18,7 @@ export default function MergePage() {
   const [mensagem, setMensagem] = useState(null);
   const [modalConfirmacao, setModalConfirmacao] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [modalResultado, setModalResultado] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -128,12 +129,10 @@ export default function MergePage() {
       if (res.ok) {
         setResultado(data.resultado);
         setModalConfirmacao(false);
+        setModalResultado(true);
         setAvatarBase(null);
         setAvatarSacrificio(null);
         await carregarDados(user.id);
-
-        // Scroll to top to show result
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         mostrarMensagem(data.message || 'Erro ao realizar fusão', 'erro');
         setModalConfirmacao(false);
@@ -232,111 +231,6 @@ export default function MergePage() {
           </button>
         </div>
 
-        {/* Resultado da Fusão */}
-        {resultado && resultado.avatar && (
-          <div className="mb-8 relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/30 via-violet-500/30 to-purple-500/30 rounded-lg blur opacity-75 animate-pulse"></div>
-
-            <div className="relative bg-slate-950/90 backdrop-blur-xl border-2 border-indigo-500/50 rounded-lg p-6">
-              <div className="text-center mb-4">
-                <div className="text-6xl mb-3">✨</div>
-                <h2 className="text-3xl font-black text-indigo-300 mb-2">FUSÃO COMPLETA!</h2>
-                <p className="text-slate-400">O ritual dimensional foi bem-sucedido</p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Avatar Resultante */}
-                <div className="bg-gradient-to-br from-indigo-900/30 to-violet-900/30 rounded-lg p-4 border border-indigo-500/30">
-                  <div className="text-center mb-3">
-                    <div className="inline-block">
-                      <AvatarSVG avatar={resultado.avatar} tamanho={120} />
-                    </div>
-                    <h3 className="text-xl font-bold text-indigo-300 mt-2">{resultado.avatar?.nome || 'Avatar'}</h3>
-                    <div className="text-sm text-slate-400">
-                      {resultado.avatar?.raridade || 'Comum'} • {resultado.avatar?.elemento || 'Neutro'} • Nv.{resultado.avatar?.nivel || 1}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="bg-slate-900/50 rounded p-2">
-                      <div className="text-xs text-slate-500">Força</div>
-                      <div className="text-lg font-bold text-red-400">{resultado.avatar?.forca || 0}</div>
-                      {resultado.ganhos?.forca > 0 && (
-                        <div className="text-xs text-green-400">+{resultado.ganhos.forca}</div>
-                      )}
-                    </div>
-                    <div className="bg-slate-900/50 rounded p-2">
-                      <div className="text-xs text-slate-500">Agilidade</div>
-                      <div className="text-lg font-bold text-green-400">{resultado.avatar?.agilidade || 0}</div>
-                      {resultado.ganhos?.agilidade > 0 && (
-                        <div className="text-xs text-green-400">+{resultado.ganhos.agilidade}</div>
-                      )}
-                    </div>
-                    <div className="bg-slate-900/50 rounded p-2">
-                      <div className="text-xs text-slate-500">Resistência</div>
-                      <div className="text-lg font-bold text-blue-400">{resultado.avatar?.resistencia || 0}</div>
-                      {resultado.ganhos?.resistencia > 0 && (
-                        <div className="text-xs text-green-400">+{resultado.ganhos.resistencia}</div>
-                      )}
-                    </div>
-                    <div className="bg-slate-900/50 rounded p-2">
-                      <div className="text-xs text-slate-500">Foco</div>
-                      <div className="text-lg font-bold text-purple-400">{resultado.avatar?.foco || 0}</div>
-                      {resultado.ganhos?.foco > 0 && (
-                        <div className="text-xs text-green-400">+{resultado.ganhos.foco}</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Benefícios */}
-                <div>
-                  <h4 className="text-indigo-400 font-bold mb-3">Benefícios Obtidos:</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2 p-3 bg-indigo-950/30 rounded border border-indigo-500/30">
-                      <span className="text-2xl">💪</span>
-                      <div>
-                        <div className="font-bold text-indigo-300 text-sm">Stats Aumentados</div>
-                        <div className="text-xs text-slate-400">
-                          +{resultado.ganhos?.forca || 0} FOR, +{resultado.ganhos?.agilidade || 0} AGI, +{resultado.ganhos?.resistencia || 0} RES, +{resultado.ganhos?.foco || 0} FOC
-                        </div>
-                      </div>
-                    </div>
-
-                    {resultado?.mudouElemento && (
-                      <div className="flex items-start gap-2 p-3 bg-violet-950/30 rounded border border-violet-500/30">
-                        <span className="text-2xl">✨</span>
-                        <div>
-                          <div className="font-bold text-violet-300 text-sm">Elemento Transmutado!</div>
-                          <div className="text-xs text-slate-400">
-                            O avatar absorveu o elemento {resultado.elementoOriginal || ''}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-start gap-2 p-3 bg-purple-950/30 rounded border border-purple-500/30">
-                      <span className="text-2xl">🔮</span>
-                      <div>
-                        <div className="font-bold text-purple-300 text-sm">Experiência Acumulada</div>
-                        <div className="text-xs text-slate-400">
-                          O avatar preservou suas memórias e conhecimentos
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setResultado(null)}
-                    className="w-full mt-4 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-lg hover:from-indigo-500 hover:to-violet-500 transition-all"
-                  >
-                    Nova Fusão
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Lore Introduction */}
         <div className="mb-8 bg-gradient-to-r from-indigo-950/50 to-violet-950/50 rounded-lg p-6 border border-indigo-900/50">
@@ -632,6 +526,212 @@ export default function MergePage() {
           </div>
         )}
       </div>
+
+      {/* Modal de Resultado */}
+      {modalResultado && resultado && resultado.avatar && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto p-4"
+          onClick={() => setModalResultado(false)}
+        >
+          <div className="min-h-full flex items-center justify-center py-8">
+            <div
+              className="max-w-4xl w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/40 via-violet-500/40 to-purple-500/40 rounded-lg blur opacity-75 animate-pulse"></div>
+
+                <div className="relative bg-slate-950/95 backdrop-blur-xl border-2 border-indigo-900/50 rounded-lg overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-indigo-900/80 to-violet-900/80 p-4 text-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20"></div>
+                    <div className="relative">
+                      <div className="text-5xl mb-2 animate-pulse">✨</div>
+                      <h2 className="text-xl font-black uppercase tracking-wider text-indigo-200">
+                        Fusão Completa!
+                      </h2>
+                      <p className="text-xs text-indigo-300/80 font-mono mt-1">
+                        O ritual dimensional foi bem-sucedido
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botão Fechar */}
+                  <button
+                    onClick={() => {
+                      setModalResultado(false);
+                      setResultado(null);
+                    }}
+                    className="absolute top-3 right-3 w-8 h-8 bg-slate-900/80 hover:bg-indigo-900/80 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-all z-20 border border-slate-700/50 hover:border-indigo-500/50"
+                  >
+                    ✕
+                  </button>
+
+                  <div className="p-6">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {/* Coluna Esquerda - Avatar */}
+                      <div className="space-y-4">
+                        {/* Avatar Preview */}
+                        <div className="bg-slate-900/70 rounded-lg p-6 aspect-square border-2 border-indigo-900/50 flex items-center justify-center relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-violet-500/5"></div>
+                          <div className="relative">
+                            <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500/30 to-violet-500/30 rounded-full blur"></div>
+                            <div className="relative">
+                              <AvatarSVG avatar={resultado.avatar} tamanho={200} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Nome e Info */}
+                        <div className="text-center">
+                          <h3 className="text-2xl font-black mb-2 bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
+                            {resultado.avatar?.nome || 'Avatar'}
+                          </h3>
+                          <div className="flex items-center justify-center gap-2 flex-wrap">
+                            <span className="inline-block px-3 py-1 bg-slate-800 rounded-full text-sm font-mono text-indigo-300">
+                              {resultado.avatar?.elemento || 'Neutro'}
+                            </span>
+                            <span className="inline-block px-3 py-1 bg-slate-800 rounded-full text-sm font-mono text-violet-300">
+                              {resultado.avatar?.raridade || 'Comum'}
+                            </span>
+                            <span className="inline-block px-3 py-1 bg-slate-800 rounded-full text-sm font-mono text-purple-300">
+                              Nv.{resultado.avatar?.nivel || 1}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Lore Text */}
+                        <div className="bg-gradient-to-br from-indigo-950/40 to-violet-950/40 rounded-lg p-4 border border-indigo-900/50">
+                          <div className="text-xs text-indigo-400 font-bold uppercase mb-2 tracking-wider">✨ Resultado da Fusão</div>
+                          <p className="text-sm text-indigo-200/90 leading-relaxed italic">
+                            "O ritual dimensional alcançou seu ápice. As energias se entrelaçaram perfeitamente, fundindo duas almas em uma só.
+                            <span className="block mt-2 font-bold text-indigo-300">
+                              O avatar base absorveu com sucesso a essência do sacrificado, aumentando seu poder dimensional.
+                            </span>
+                            <span className="block mt-2 text-violet-300/80">
+                              A nova forma mantém as memórias e habilidades originais, agora potencializadas pela energia dimensional absorvida.
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Coluna Direita - Stats e Ganhos */}
+                      <div className="space-y-4">
+                        {/* Stats Finais */}
+                        <div>
+                          <h4 className="text-indigo-400 font-bold text-xs uppercase tracking-wider mb-3">Atributos Finais</h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
+                              <div className="text-xs text-slate-500 uppercase mb-1">Força</div>
+                              <div className="text-2xl font-bold text-red-400">{resultado.avatar?.forca || 0}</div>
+                              {resultado.ganhos?.forca > 0 && (
+                                <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.forca}</div>
+                              )}
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
+                              <div className="text-xs text-slate-500 uppercase mb-1">Agilidade</div>
+                              <div className="text-2xl font-bold text-green-400">{resultado.avatar?.agilidade || 0}</div>
+                              {resultado.ganhos?.agilidade > 0 && (
+                                <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.agilidade}</div>
+                              )}
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
+                              <div className="text-xs text-slate-500 uppercase mb-1">Resistência</div>
+                              <div className="text-2xl font-bold text-blue-400">{resultado.avatar?.resistencia || 0}</div>
+                              {resultado.ganhos?.resistencia > 0 && (
+                                <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.resistencia}</div>
+                              )}
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-indigo-500/30">
+                              <div className="text-xs text-slate-500 uppercase mb-1">Foco</div>
+                              <div className="text-2xl font-bold text-purple-400">{resultado.avatar?.foco || 0}</div>
+                              {resultado.ganhos?.foco > 0 && (
+                                <div className="text-xs text-green-400 font-bold">+{resultado.ganhos.foco}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Poder Total */}
+                        <div className="bg-gradient-to-r from-indigo-950/50 to-violet-950/50 rounded-lg p-4 border border-indigo-600/50">
+                          <div className="text-center">
+                            <div className="text-xs text-indigo-400 uppercase mb-1">Poder Total</div>
+                            <div className="text-3xl font-black bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
+                              {(resultado.avatar?.forca || 0) + (resultado.avatar?.agilidade || 0) + (resultado.avatar?.resistencia || 0) + (resultado.avatar?.foco || 0)}
+                            </div>
+                            <div className="text-xs text-green-400 font-bold mt-1">
+                              +{(resultado.ganhos?.forca || 0) + (resultado.ganhos?.agilidade || 0) + (resultado.ganhos?.resistencia || 0) + (resultado.ganhos?.foco || 0)} pts ganhos
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Benefícios */}
+                        <div>
+                          <h4 className="text-indigo-400 font-bold text-xs uppercase tracking-wider mb-3">Benefícios Obtidos</h4>
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2 p-3 bg-indigo-950/30 rounded border border-indigo-900/50">
+                              <span className="text-xl">💪</span>
+                              <div className="flex-1">
+                                <div className="font-bold text-indigo-300 text-xs">Stats Aumentados</div>
+                                <div className="text-[10px] text-indigo-400/80">
+                                  +{resultado.ganhos?.forca || 0} FOR, +{resultado.ganhos?.agilidade || 0} AGI, +{resultado.ganhos?.resistencia || 0} RES, +{resultado.ganhos?.foco || 0} FOC
+                                </div>
+                              </div>
+                            </div>
+
+                            {resultado?.mudouElemento && (
+                              <div className="flex items-start gap-2 p-3 bg-violet-950/30 rounded border border-violet-900/50">
+                                <span className="text-xl">✨</span>
+                                <div className="flex-1">
+                                  <div className="font-bold text-violet-300 text-xs">Elemento Transmutado!</div>
+                                  <div className="text-[10px] text-violet-400/80">
+                                    Absorveu o elemento {resultado.elementoOriginal || ''}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex items-start gap-2 p-3 bg-purple-950/30 rounded border border-purple-900/50">
+                              <span className="text-xl">🔮</span>
+                              <div className="flex-1">
+                                <div className="font-bold text-purple-300 text-xs">Experiência Preservada</div>
+                                <div className="text-[10px] text-purple-400/80">
+                                  Memórias e conhecimentos mantidos
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-2 p-3 bg-indigo-950/30 rounded border border-indigo-900/50">
+                              <span className="text-xl">🎯</span>
+                              <div className="flex-1">
+                                <div className="font-bold text-indigo-300 text-xs">Vínculo Intacto</div>
+                                <div className="text-[10px] text-indigo-400/80">
+                                  Conexão com o avatar fortalecida
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Button */}
+                        <button
+                          onClick={() => {
+                            setModalResultado(false);
+                            setResultado(null);
+                          }}
+                          className="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-lg transition-all shadow-lg shadow-indigo-900/50"
+                        >
+                          🧬 Nova Fusão
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Confirmação */}
       {modalConfirmacao && (
