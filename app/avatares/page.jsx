@@ -16,7 +16,8 @@ export default function AvatarsPage() {
   const [modalSacrificar, setModalSacrificar] = useState(null);
   const [sacrificando, setSacrificando] = useState(false);
   const [modalVender, setModalVender] = useState(null);
-  const [precoVenda, setPrecoVenda] = useState('');
+  const [precoVendaMoedas, setPrecoVendaMoedas] = useState('');
+  const [precoVendaFragmentos, setPrecoVendaFragmentos] = useState('');
   const [vendendo, setVendendo] = useState(false);
 
   // Estados de filtros
@@ -137,12 +138,33 @@ export default function AvatarsPage() {
   };
 
   const venderAvatar = async () => {
-    const preco = parseInt(precoVenda);
+    const moedas = parseInt(precoVendaMoedas) || 0;
+    const fragmentos = parseInt(precoVendaFragmentos) || 0;
 
-    if (!preco || preco < 100 || preco > 10000) {
+    // Validar que pelo menos um preço foi definido
+    if (moedas === 0 && fragmentos === 0) {
       setModalConfirmacao({
         tipo: 'erro',
-        mensagem: 'Preço deve estar entre 100 e 10.000 moedas'
+        mensagem: 'Defina um preço em moedas e/ou fragmentos'
+      });
+      setTimeout(() => setModalConfirmacao(null), 3000);
+      return;
+    }
+
+    // Validar limites
+    if (moedas < 0 || moedas > 10000) {
+      setModalConfirmacao({
+        tipo: 'erro',
+        mensagem: 'Moedas devem estar entre 0 e 10.000'
+      });
+      setTimeout(() => setModalConfirmacao(null), 3000);
+      return;
+    }
+
+    if (fragmentos < 0 || fragmentos > 500) {
+      setModalConfirmacao({
+        tipo: 'erro',
+        mensagem: 'Fragmentos devem estar entre 0 e 500'
       });
       setTimeout(() => setModalConfirmacao(null), 3000);
       return;
@@ -156,7 +178,8 @@ export default function AvatarsPage() {
         body: JSON.stringify({
           userId: user.id,
           avatarId: modalVender.id,
-          preco
+          precoMoedas: moedas,
+          precoFragmentos: fragmentos
         }),
       });
 
@@ -164,10 +187,16 @@ export default function AvatarsPage() {
 
       if (response.ok) {
         setModalVender(null);
-        setPrecoVenda('');
+        setPrecoVendaMoedas('');
+        setPrecoVendaFragmentos('');
+
+        const precoTexto = [];
+        if (moedas > 0) precoTexto.push(`${moedas} 💰`);
+        if (fragmentos > 0) precoTexto.push(`${fragmentos} 💎`);
+
         setModalConfirmacao({
           tipo: 'sucesso',
-          mensagem: `${modalVender.nome} colocado à venda por ${preco} moedas!`
+          mensagem: `${modalVender.nome} colocado à venda por ${precoTexto.join(' + ')}!`
         });
         setTimeout(() => setModalConfirmacao(null), 3000);
         await carregarAvatares(user.id);
@@ -668,7 +697,8 @@ export default function AvatarsPage() {
                         <button
                           onClick={() => {
                             setModalVender(avatar);
-                            setPrecoVenda('');
+                            setPrecoVendaMoedas('');
+                            setPrecoVendaFragmentos('');
                           }}
                           className="w-full px-2 py-1 bg-amber-950/20 hover:bg-amber-900/30 border border-amber-900/30 hover:border-amber-800/50 rounded text-xs font-semibold text-amber-500/70 hover:text-amber-400 transition-all"
                         >
@@ -924,21 +954,39 @@ export default function AvatarsPage() {
                     </p>
                   </div>
 
-                  <div className="mb-6">
-                    <label className="block text-sm font-mono text-slate-400 mb-2">
-                      Preço (moedas)
-                    </label>
-                    <input
-                      type="number"
-                      min="100"
-                      max="10000"
-                      value={precoVenda}
-                      onChange={(e) => setPrecoVenda(e.target.value)}
-                      placeholder="Mínimo: 100 | Máximo: 10.000"
-                      className="w-full px-4 py-3 bg-slate-900 border border-amber-500/30 rounded text-white text-center text-lg font-bold focus:border-amber-500 focus:outline-none"
-                    />
-                    <p className="text-xs text-slate-500 mt-2 text-center font-mono">
-                      O mercado cobra 5% de taxa
+                  <div className="mb-6 space-y-4">
+                    <div>
+                      <label className="block text-sm font-mono text-slate-400 mb-2">
+                        Preço em Moedas (opcional)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10000"
+                        value={precoVendaMoedas}
+                        onChange={(e) => setPrecoVendaMoedas(e.target.value)}
+                        placeholder="0 a 10.000 moedas"
+                        className="w-full px-4 py-3 bg-slate-900 border border-amber-500/30 rounded text-white text-center text-lg font-bold focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-mono text-slate-400 mb-2">
+                        Preço em Fragmentos (opcional)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="500"
+                        value={precoVendaFragmentos}
+                        onChange={(e) => setPrecoVendaFragmentos(e.target.value)}
+                        placeholder="0 a 500 fragmentos"
+                        className="w-full px-4 py-3 bg-slate-900 border border-purple-500/30 rounded text-white text-center text-lg font-bold focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <p className="text-xs text-slate-500 text-center font-mono">
+                      O mercado cobra 5% de taxa nas moedas (sem taxa nos fragmentos)
                     </p>
                   </div>
 

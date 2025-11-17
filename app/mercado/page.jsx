@@ -188,6 +188,11 @@ export default function MercadoPage() {
                 <div className="text-xl font-bold text-amber-400">{stats?.moedas || 0} 💰</div>
               </div>
 
+              <div className="px-4 py-2 bg-slate-900/50 border border-cyan-500/30 rounded-lg">
+                <span className="text-xs text-slate-500 font-mono">Seus Fragmentos</span>
+                <div className="text-xl font-bold text-cyan-400">{stats?.fragmentos || 0} 💎</div>
+              </div>
+
               <button
                 onClick={() => router.push("/avatares")}
                 className="px-4 py-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700/50 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-cyan-400"
@@ -316,7 +321,14 @@ export default function MercadoPage() {
                     {/* Preço */}
                     <div className="mb-3 p-2 bg-amber-950/30 rounded border border-amber-500/30">
                       <div className="text-xs text-amber-400 text-center font-mono">PREÇO</div>
-                      <div className="text-xl font-black text-amber-300 text-center">{avatar.preco_venda} 💰</div>
+                      <div className="flex flex-col gap-1 items-center">
+                        {avatar.preco_venda > 0 && (
+                          <div className="text-lg font-black text-amber-300">{avatar.preco_venda} 💰</div>
+                        )}
+                        {avatar.preco_fragmentos > 0 && (
+                          <div className="text-lg font-black text-cyan-300">{avatar.preco_fragmentos} 💎</div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Stats Preview */}
@@ -342,10 +354,15 @@ export default function MercadoPage() {
                     {/* Botão Comprar */}
                     <button
                       onClick={() => setModalCompra(avatar)}
-                      disabled={stats?.moedas < avatar.preco_venda}
+                      disabled={
+                        (avatar.preco_venda > 0 && stats?.moedas < avatar.preco_venda) ||
+                        (avatar.preco_fragmentos > 0 && stats?.fragmentos < avatar.preco_fragmentos)
+                      }
                       className="w-full px-3 py-2 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-bold text-sm rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {stats?.moedas < avatar.preco_venda ? '💰 Sem Moedas' : '🛒 COMPRAR'}
+                      {(avatar.preco_venda > 0 && stats?.moedas < avatar.preco_venda) ? '💰 Sem Moedas' :
+                       (avatar.preco_fragmentos > 0 && stats?.fragmentos < avatar.preco_fragmentos) ? '💎 Sem Fragmentos' :
+                       '🛒 COMPRAR'}
                     </button>
                   </div>
                 </div>
@@ -385,17 +402,53 @@ export default function MercadoPage() {
                   </div>
 
                   <div className="space-y-3 mb-6">
-                    <div className="flex justify-between p-3 bg-slate-900 rounded">
-                      <span className="text-slate-400">Preço:</span>
-                      <span className="text-amber-400 font-bold">{modalCompra.preco_venda} moedas</span>
+                    {/* Preço */}
+                    <div className="p-3 bg-slate-900 rounded">
+                      <div className="text-slate-400 mb-2 font-bold">💰 Preço:</div>
+                      <div className="space-y-1">
+                        {modalCompra.preco_venda > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-300">Moedas:</span>
+                            <span className="text-amber-400 font-bold">{modalCompra.preco_venda} 💰</span>
+                          </div>
+                        )}
+                        {modalCompra.preco_fragmentos > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-300">Fragmentos:</span>
+                            <span className="text-cyan-400 font-bold">{modalCompra.preco_fragmentos} 💎</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex justify-between p-3 bg-slate-900 rounded">
-                      <span className="text-slate-400">Seu saldo atual:</span>
-                      <span className="text-white font-bold">{stats?.moedas} moedas</span>
+
+                    {/* Saldo Atual */}
+                    <div className="p-3 bg-slate-900 rounded">
+                      <div className="text-slate-400 mb-2 font-bold">📊 Seu saldo atual:</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-slate-300">Moedas:</span>
+                          <span className="text-white font-bold">{stats?.moedas || 0} 💰</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-300">Fragmentos:</span>
+                          <span className="text-white font-bold">{stats?.fragmentos || 0} 💎</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between p-3 bg-amber-950/30 rounded border border-amber-500/30">
-                      <span className="text-amber-400 font-bold">Saldo após compra:</span>
-                      <span className="text-amber-300 font-bold">{stats?.moedas - modalCompra.preco_venda} moedas</span>
+
+                    {/* Saldo Após Compra */}
+                    <div className="p-3 bg-amber-950/30 rounded border border-amber-500/30">
+                      <div className="text-amber-400 mb-2 font-bold">✨ Saldo após compra:</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-amber-300">Moedas:</span>
+                          <span className="text-amber-300 font-bold">{(stats?.moedas || 0) - (modalCompra.preco_venda || 0)} 💰</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-cyan-300">Fragmentos:</span>
+                          <span className="text-cyan-300 font-bold">{(stats?.fragmentos || 0) - (modalCompra.preco_fragmentos || 0)} 💎</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

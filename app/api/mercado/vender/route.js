@@ -10,19 +10,34 @@ export async function POST(request) {
       );
     }
 
-    const { userId, avatarId, preco } = await request.json();
+    const { userId, avatarId, precoMoedas, precoFragmentos } = await request.json();
 
-    if (!userId || !avatarId || !preco) {
+    if (!userId || !avatarId) {
       return Response.json(
         { message: "Dados incompletos" },
         { status: 400 }
       );
     }
 
-    // Validar preço
-    if (preco < 100 || preco > 10000) {
+    // Validar que pelo menos um preço foi definido
+    if ((!precoMoedas || precoMoedas === 0) && (!precoFragmentos || precoFragmentos === 0)) {
       return Response.json(
-        { message: "Preço deve estar entre 100 e 10.000 moedas" },
+        { message: "Defina um preço em moedas e/ou fragmentos" },
+        { status: 400 }
+      );
+    }
+
+    // Validar limites
+    if (precoMoedas && (precoMoedas < 0 || precoMoedas > 10000)) {
+      return Response.json(
+        { message: "Moedas devem estar entre 0 e 10.000" },
+        { status: 400 }
+      );
+    }
+
+    if (precoFragmentos && (precoFragmentos < 0 || precoFragmentos > 500)) {
+      return Response.json(
+        { message: "Fragmentos devem estar entre 0 e 500" },
         { status: 400 }
       );
     }
@@ -76,7 +91,8 @@ export async function POST(request) {
       .from('avatares')
       .update({
         em_venda: true,
-        preco_venda: preco
+        preco_venda: precoMoedas || 0,
+        preco_fragmentos: precoFragmentos || 0
       })
       .eq('id', avatarId);
 
@@ -91,7 +107,8 @@ export async function POST(request) {
     return Response.json({
       message: "Avatar colocado à venda com sucesso!",
       avatar_id: avatarId,
-      preco
+      preco_moedas: precoMoedas || 0,
+      preco_fragmentos: precoFragmentos || 0
     });
 
   } catch (error) {
@@ -128,7 +145,8 @@ export async function DELETE(request) {
       .from('avatares')
       .update({
         em_venda: false,
-        preco_venda: null
+        preco_venda: null,
+        preco_fragmentos: null
       })
       .eq('id', avatarId)
       .eq('user_id', userId);

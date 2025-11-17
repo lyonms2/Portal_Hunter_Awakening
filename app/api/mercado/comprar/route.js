@@ -79,10 +79,20 @@ export async function POST(request) {
       );
     }
 
-    // Verificar se comprador tem moedas suficientes
-    if (statsComprador.moedas < avatar.preco_venda) {
+    // Verificar se comprador tem recursos suficientes
+    const precoMoedas = avatar.preco_venda || 0;
+    const precoFragmentos = avatar.preco_fragmentos || 0;
+
+    if (statsComprador.moedas < precoMoedas) {
       return Response.json(
-        { message: "Moedas insuficientes para comprar este avatar" },
+        { message: `Moedas insuficientes! Necessário: ${precoMoedas}, Você tem: ${statsComprador.moedas}` },
+        { status: 400 }
+      );
+    }
+
+    if (statsComprador.fragmentos < precoFragmentos) {
+      return Response.json(
+        { message: `Fragmentos insuficientes! Necessário: ${precoFragmentos}, Você tem: ${statsComprador.fragmentos}` },
         { status: 400 }
       );
     }
@@ -101,9 +111,10 @@ export async function POST(request) {
       );
     }
 
-    // Taxa do mercado (5%)
-    const taxaMercado = Math.floor(avatar.preco_venda * 0.05);
-    const valorVendedor = avatar.preco_venda - taxaMercado;
+    // Taxa do mercado (5% para moedas, nenhuma para fragmentos)
+    const taxaMoedas = Math.floor(precoMoedas * 0.05);
+    const valorVendedorMoedas = precoMoedas - taxaMoedas;
+    const valorVendedorFragmentos = precoFragmentos; // Sem taxa para fragmentos
 
     // Realizar transação
     // 1. Transferir avatar para comprador
@@ -113,6 +124,7 @@ export async function POST(request) {
         user_id: compradorId,
         em_venda: false,
         preco_venda: null,
+        preco_fragmentos: null,
         ativo: false,
         vinculo: 0, // Resetar vínculo com novo dono
         exaustao: 0 // Resetar exaustão
@@ -127,21 +139,25 @@ export async function POST(request) {
       );
     }
 
-    // 2. Deduzir moedas do comprador
+    // 2. Deduzir recursos do comprador
     const { error: compradorError } = await supabase
       .from('player_stats')
-      .update({ moedas: statsComprador.moedas - avatar.preco_venda })
+      .update({
+        moedas: statsComprador.moedas - precoMoedas,
+        fragmentos: statsComprador.fragmentos - precoFragmentos
+      })
       .eq('user_id', compradorId);
 
     if (compradorError) {
-      console.error("Erro ao atualizar moedas do comprador:", compradorError);
+      console.error("Erro ao atualizar recursos do comprador:", compradorError);
       // Reverter transferência
       await supabase
         .from('avatares')
         .update({
           user_id: avatar.user_id,
           em_venda: true,
-          preco_venda: avatar.preco_venda
+          preco_venda: precoMoedas,
+          preco_fragmentos: precoFragmentos
         })
         .eq('id', avatarId);
 
@@ -151,14 +167,17 @@ export async function POST(request) {
       );
     }
 
-    // 3. Adicionar moedas ao vendedor
+    // 3. Adicionar recursos ao vendedor
     const { error: vendedorError } = await supabase
       .from('player_stats')
-      .update({ moedas: statsVendedor.moedas + valorVendedor })
+      .update({
+        moedas: statsVendedor.moedas + valorVendedorMoedas,
+        fragmentos: statsVendedor.fragmentos + valorVendedorFragmentos
+      })
       .eq('user_id', avatar.user_id);
 
     if (vendedorError) {
-      console.error("Erro ao atualizar moedas do vendedor:", vendedorError);
+      console.error("Erro ao atualizar recursos do vendedor:", vendedorError);
     }
 
     // Registrar transação no histórico (se existir tabela)
@@ -169,9 +188,11 @@ export async function POST(request) {
           avatar_id: avatarId,
           vendedor_id: avatar.user_id,
           comprador_id: compradorId,
-          preco: avatar.preco_venda,
-          taxa_mercado: taxaMercado,
-          valor_vendedor: valorVendedor
+          preco_moedas: precoMoedas,
+          preco_fragmentos: precoFragmentos,
+          taxa_moedas: taxaMoedas,
+          valor_vendedor_moedas: valorVendedorMoedas,
+          valor_vendedor_fragmentos: valorVendedorFragmentos
         });
     } catch (error) {
       console.log("Erro ao registrar transação (ignorado):", error.message);
@@ -185,9 +206,11 @@ export async function POST(request) {
         elemento: avatar.elemento,
         nivel: avatar.nivel
       },
-      preco: avatar.preco_venda,
-      taxa: taxaMercado,
-      saldo_restante: statsComprador.moedas - avatar.preco_venda
+      preco_moedas: precoMoedas,
+      preco_fragmentos: precoFragmentos,
+      taxa_moedas: taxaMoedas,
+      saldo_moedas_restante: statsComprador.moedas - precoMoedas,
+      saldo_fragmentos_restante: statsComprador.fragmentos - precoFragmentos
     });
 
   } catch (error) {
