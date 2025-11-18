@@ -1,11 +1,7 @@
-import { getSupabaseAnonClient } from "@/lib/supabase/serverClient";
-
-// MOVIDO PARA DENTRO DA FUNÇÃO: const supabase = getSupabaseAnonClient();
+import { loginUser } from "@/lib/firebase/auth";
 
 export async function POST(request) {
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseAnonClient();
     const { email, senha } = await request.json();
 
     // Validação básica
@@ -16,16 +12,12 @@ export async function POST(request) {
       );
     }
 
-    // Tentar fazer login
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
-    });
+    // Tentar fazer login com Firebase
+    const result = await loginUser(email, senha);
 
-    if (error) {
-      console.error("Erro no login:", error);
+    if (!result.success) {
       return Response.json(
-        { message: "Credenciais inválidas. Verifique email e senha." },
+        { message: result.error || "Credenciais inválidas. Verifique email e senha." },
         { status: 401 }
       );
     }
@@ -34,10 +26,10 @@ export async function POST(request) {
     return Response.json({
       message: "Portal aberto com sucesso, caçador!",
       user: {
-        id: data.user.id,
-        email: data.user.email,
-      },
-      session: data.session,
+        id: result.user.id,
+        email: result.user.email,
+        displayName: result.user.displayName
+      }
     });
 
   } catch (error) {

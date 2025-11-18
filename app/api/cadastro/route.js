@@ -1,11 +1,8 @@
-import { getSupabaseAnonClient } from "@/lib/supabase/serverClient";
-
-// MOVIDO PARA DENTRO DA FUNÇÃO: const supabase = getSupabaseAnonClient();
+import { registerUser } from "@/lib/firebase/auth";
+import { createDocument } from "@/lib/firebase/firestore";
 
 export async function POST(request) {
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseAnonClient();
     const { email, senha, confirmaSenha } = await request.json();
 
     // Validações
@@ -39,39 +36,42 @@ export async function POST(request) {
       );
     }
 
-    // Criar usuário
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: senha,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/login`,
-      }
-    });
+    // Criar usuário no Firebase Auth
+    const result = await registerUser(email, senha);
 
-    if (error) {
-      console.error("Erro no cadastro:", error);
-      
-      // Tratar erros específicos
-      if (error.message.includes('already registered')) {
-        return Response.json(
-          { message: "Este email já está cadastrado" },
-          { status: 409 }
-        );
-      }
-      
+    if (!result.success) {
       return Response.json(
-        { message: "Erro ao criar conta: " + error.message },
+        { message: result.error || "Erro ao criar conta" },
         { status: 400 }
       );
     }
 
+    // Criar documento do jogador no Firestore
+    try {
+      await createDocument('player_stats', {
+        user_id: result.user.id,
+        email: result.user.email,
+        moedas: 5000,
+        fragmentos: 500,
+        divida: 0,
+        ranking: 'F',
+        missoes_completadas: 0,
+        primeira_invocacao: false,
+        nome_operacao: null
+      }, result.user.id);
+    } catch (firestoreError) {
+      console.error("Erro ao criar player_stats:", firestoreError);
+      // Usuário foi criado no Auth, mas falhou ao criar documento
+      // Não retornar erro pois o usuário existe
+    }
+
     // Cadastro bem-sucedido
     return Response.json({
-      message: "Caçador registrado com sucesso! Verifique seu email para confirmar a conta.",
+      message: "Caçador registrado com sucesso!",
       user: {
-        id: data.user.id,
-        email: data.user.email,
-      },
+        id: result.user.id,
+        email: result.user.email
+      }
     });
 
   } catch (error) {
