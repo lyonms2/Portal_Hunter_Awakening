@@ -14,18 +14,35 @@ export async function POST(request) {
       );
     }
 
-    // Delete the user's story progress
-    const { error } = await supabase
+    // Delete all story data for this user
+    // 1. Delete progress
+    const { error: progressError } = await supabase
       .from("story_progress")
       .delete()
       .eq("user_id", userId);
 
-    if (error) {
-      console.error("Erro ao resetar progresso:", error);
-      return NextResponse.json(
-        { error: "Erro ao resetar progresso", details: error.message },
-        { status: 500 }
-      );
+    if (progressError) {
+      console.error("Erro ao deletar progresso:", progressError);
+    }
+
+    // 2. Delete avatar
+    const { error: avatarError } = await supabase
+      .from("story_avatars")
+      .delete()
+      .eq("user_id", userId);
+
+    if (avatarError) {
+      console.error("Erro ao deletar avatar:", avatarError);
+    }
+
+    // 3. Delete achievements
+    const { error: achievementsError } = await supabase
+      .from("story_achievements")
+      .delete()
+      .eq("user_id", userId);
+
+    if (achievementsError) {
+      console.error("Erro ao deletar conquistas:", achievementsError);
     }
 
     return NextResponse.json({
