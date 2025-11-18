@@ -5,7 +5,16 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/pvp/ranking?userId=xxx
- * Busca o ranking do jogador na temporada ativa
+ *
+ * 📊 RANKING PVP UNIFICADO
+ *
+ * Busca o ranking do jogador na temporada ativa.
+ * Este ranking conta para AMBOS os modos PvP:
+ *
+ * - ⚔️ TREINO PVP (Assíncrono): Batalhas locais contra avatares de outros jogadores
+ * - 🔥 ARENA PVP (Tempo Real): Batalhas ao vivo, jogador vs jogador
+ *
+ * Ambos os modos ganham/perdem FAMA no mesmo ranking!
  */
 export async function GET(request) {
   try {
@@ -69,8 +78,13 @@ export async function GET(request) {
 
 /**
  * POST /api/pvp/ranking
- * Atualiza o ranking do jogador após uma batalha
+ *
+ * 📊 Atualiza ranking após batalha (ambos os modos PvP)
+ *
  * Body: { userId, venceu, famaGanho }
+ *
+ * NOTA: Este endpoint é usado tanto para Treino PvP quanto Arena PvP.
+ * Ambos compartilham o mesmo sistema de ranking e fama!
  */
 export async function POST(request) {
   try {

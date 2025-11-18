@@ -5,7 +5,18 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/pvp/ia/oponentes?poder=X&userId=Y
- * Busca avatares de outros players com poder similar para batalhas IA
+ *
+ * 🎯 TREINO PVP (Assíncrono) - NÃO é tempo real!
+ *
+ * Busca avatares REAIS de outros jogadores para você batalhar LOCALMENTE.
+ * A batalha acontece no seu cliente, com IA controlando o avatar do oponente.
+ *
+ * Diferença dos sistemas PvP:
+ * - ⚔️ TREINO PVP (este endpoint): Batalha local contra avatar de outro jogador
+ * - 🔥 ARENA PVP: Batalha em tempo real, jogador vs jogador ao vivo
+ *
+ * Por que "IA"? Porque você luta contra avatares reais, mas a IA controla eles.
+ * É como lutar contra o "fantasma" de outro jogador!
  */
 export async function GET(request) {
   try {

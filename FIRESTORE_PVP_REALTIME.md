@@ -1,6 +1,33 @@
 # 🔥 Sistema PvP em Tempo Real com Firestore
 
-## 🎯 O que foi Implementado
+## ⚔️ IMPORTANTE: Existem DOIS Sistemas PvP Diferentes!
+
+Este jogo possui **dois modos PvP completamente diferentes**:
+
+### 1. 🎯 **TREINO PVP** (Assíncrono - Offline)
+- **Como funciona**: Você luta contra avatares REAIS de outros jogadores, mas **controlados por IA no seu cliente**
+- **Localização**: `/api/pvp/ia/oponentes` e `/api/pvp/ia/finalizar`
+- **O oponente está online?** ❌ NÃO! A IA controla o avatar dele localmente
+- **Latência**: 0ms (tudo acontece no seu navegador)
+- **Uso**: Treinar, ganhar fama, testar estratégias sem pressão
+- **Analogia**: É como lutar contra o "fantasma" de outro jogador, tipo Mario Kart ghost racing!
+
+### 2. 🔥 **ARENA PVP** (Síncrono - Tempo Real)
+- **Como funciona**: Batalha AO VIVO entre dois jogadores conectados simultaneamente
+- **Localização**: `/api/pvp/queue/*` e `/api/pvp/battle/*` (este documento)
+- **O oponente está online?** ✅ SIM! Vocês jogam juntos em tempo real
+- **Latência**: 50-200ms (atualização instantânea via Firestore listeners)
+- **Uso**: PvP competitivo, rank sério, batalhas épicas
+- **Analogia**: Igual um jogo de luta ou MOBA - você vs outro player ao vivo!
+
+### 📊 Ambos Compartilham:
+- ✅ Mesmo sistema de **ranking e fama**
+- ✅ Mesma collection `pvp_rankings`
+- ✅ Mesma temporada ativa
+
+---
+
+## 🎯 O que foi Implementado (ARENA PVP - Tempo Real)
 
 Migrei completamente o sistema PvP para **Firestore com Real-time Listeners**! Isso é **MUITO melhor** que polling porque:
 

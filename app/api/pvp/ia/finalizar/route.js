@@ -5,7 +5,18 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/pvp/ia/finalizar
- * Finaliza batalha PVP IA e atualiza stats do jogador
+ *
+ * 🎯 TREINO PVP (Assíncrono) - Finalizar batalha
+ *
+ * Registra resultado de uma batalha LOCAL contra avatar de outro jogador.
+ * Atualiza fama, ranking, vínculo e exaustão do avatar.
+ *
+ * IMPORTANTE: Esta é uma batalha ASSÍNCRONA (não ao vivo)
+ * - Você lutou contra o avatar de outro jogador
+ * - A IA controlou o oponente no seu cliente
+ * - O outro jogador NÃO estava online durante a luta
+ *
+ * Para batalhas AO VIVO em tempo real, use /api/pvp/battle/action
  */
 export async function POST(request) {
   try {
