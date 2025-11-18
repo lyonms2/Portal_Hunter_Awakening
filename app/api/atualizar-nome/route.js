@@ -1,22 +1,20 @@
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
-
-// MOVIDO PARA DENTRO DA FUNÇÃO: const supabase = getSupabaseClientSafe();
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * PUT /api/atualizar-nome
+ * Atualiza nome de operação do jogador (hunter name)
+ *
+ * Body: {
+ *   userId: string,
+ *   nomeOperacao: string
+ * }
+ */
 export async function PUT(request) {
   console.log("=== ATUALIZAR NOME DE OPERAÇÃO ===");
 
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const { userId, nomeOperacao } = await request.json();
 
     if (!userId) {
@@ -52,34 +50,31 @@ export async function PUT(request) {
 
     console.log(`Atualizando nome para usuário ${userId}: "${nomeOperacao}"`);
 
-    const { data, error } = await supabase
-      .from('player_stats')
-      .update({ nome_operacao: nomeOperacao.trim() })
-      .eq('user_id', userId)
-      .select()
-      .single();
+    // Verificar se jogador existe no Firestore
+    const playerStats = await getDocument('player_stats', userId);
 
-    if (error) {
-      console.error("Erro ao atualizar nome:", error);
-      return Response.json(
-        { message: "Erro ao atualizar nome: " + error.message },
-        { status: 500 }
-      );
-    }
-
-    if (!data) {
+    if (!playerStats) {
       return Response.json(
         { message: "Jogador não encontrado" },
         { status: 404 }
       );
     }
 
-    console.log("✅ Nome atualizado com sucesso:", data.nome_operacao);
+    // Atualizar nome no Firestore
+    await updateDocument('player_stats', userId, {
+      nome_operacao: nomeOperacao.trim(),
+      updated_at: new Date().toISOString()
+    });
+
+    // Buscar stats atualizados
+    const statsAtualizados = await getDocument('player_stats', userId);
+
+    console.log("✅ Nome atualizado com sucesso:", statsAtualizados.nome_operacao);
 
     return Response.json({
       success: true,
       message: "Nome de operação atualizado com sucesso!",
-      stats: data
+      stats: statsAtualizados
     });
 
   } catch (error) {

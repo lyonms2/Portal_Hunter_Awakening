@@ -2,8 +2,10 @@
 // Arquivo: /app/api/descansar-avatar/route.js
 
 import { NextResponse } from 'next/server';
-import { getSupabaseServiceClient } from '@/lib/supabase/serverClient';
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 import { processarRecuperacao, getNivelExaustao } from '@/app/avatares/sistemas/exhaustionSystem';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   console.log("=== AVATAR DESCANSANDO ===");
@@ -18,18 +20,11 @@ export async function POST(request) {
       );
     }
 
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseServiceClient();
+    // Buscar avatar atual no Firestore
+    const avatar = await getDocument('avatares', avatarId);
 
-    // Buscar avatar atual
-    const { data: avatar, error: fetchError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .single();
-
-    if (fetchError || !avatar) {
-      console.error('Erro ao buscar avatar:', fetchError);
+    if (!avatar) {
+      console.error('Avatar não encontrado:', avatarId);
       return NextResponse.json(
         { message: 'Avatar não encontrado' },
         { status: 404 }
@@ -72,24 +67,14 @@ export async function POST(request) {
       nivel_depois: resultado.nivel_novo.nome
     });
 
-    // Atualizar avatar no banco
-    const { data: avatarAtualizado, error: updateError } = await supabase
-      .from('avatares')
-      .update({
-        exaustao: resultado.exaustao_nova,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', avatarId)
-      .select()
-      .single();
+    // Atualizar avatar no Firestore
+    await updateDocument('avatares', avatarId, {
+      exaustao: resultado.exaustao_nova,
+      updated_at: new Date().toISOString()
+    });
 
-    if (updateError) {
-      console.error('❌ Erro ao atualizar avatar:', updateError);
-      return NextResponse.json(
-        { message: 'Erro ao atualizar avatar', erro: updateError.message },
-        { status: 500 }
-      );
-    }
+    // Buscar avatar atualizado
+    const avatarAtualizado = await getDocument('avatares', avatarId);
 
     console.log('✅ Avatar descansou com sucesso!');
 

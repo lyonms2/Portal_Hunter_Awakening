@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, getDocuments } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +9,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     const { searchParams } = new URL(request.url);
     const avatarId = searchParams.get('avatarId');
     const userId = searchParams.get('userId');
@@ -28,34 +23,28 @@ export async function GET(request) {
     let avatar;
 
     if (avatarId) {
-      // Buscar por ID do avatar
-      const { data, error } = await supabase
-        .from('avatares')
-        .select('*')
-        .eq('id', avatarId)
-        .single();
+      // Buscar por ID do avatar no Firestore
+      avatar = await getDocument('avatares', avatarId);
 
-      if (error) {
-        console.error('Erro ao buscar avatar por ID:', error);
+      if (!avatar) {
+        console.error('Avatar não encontrado:', avatarId);
         return NextResponse.json({ error: 'Avatar não encontrado' }, { status: 404 });
       }
-
-      avatar = data;
     } else {
-      // Buscar avatar ativo do usuário
-      const { data, error } = await supabase
-        .from('avatares')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('ativo', true)
-        .single();
+      // Buscar avatar ativo do usuário no Firestore
+      const avatares = await getDocuments('avatares', {
+        where: [
+          ['user_id', '==', userId],
+          ['ativo', '==', true]
+        ]
+      });
 
-      if (error) {
-        console.error('Erro ao buscar avatar ativo:', error);
+      if (!avatares || avatares.length === 0) {
+        console.error('Avatar ativo não encontrado para usuário:', userId);
         return NextResponse.json({ error: 'Avatar ativo não encontrado' }, { status: 404 });
       }
 
-      avatar = data;
+      avatar = avatares[0];
     }
 
     return NextResponse.json({
