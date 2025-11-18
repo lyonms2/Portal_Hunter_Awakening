@@ -19,25 +19,45 @@ export async function POST(request) {
       );
     }
 
-    // Validar que pelo menos um preço foi definido
-    if ((!precoMoedas || precoMoedas === 0) && (!precoFragmentos || precoFragmentos === 0)) {
+    // Normalizar valores (undefined/null/0 para 0)
+    const moedasValor = parseInt(precoMoedas) || 0;
+    const fragmentosValor = parseInt(precoFragmentos) || 0;
+
+    // Validar que pelo menos um preço foi definido e é maior que zero
+    if (moedasValor === 0 && fragmentosValor === 0) {
       return Response.json(
-        { message: "Defina um preço em moedas e/ou fragmentos" },
+        { message: "Defina um preço em moedas e/ou fragmentos (mínimo 1)" },
         { status: 400 }
       );
     }
 
-    // Validar limites
-    if (precoMoedas && (precoMoedas < 0 || precoMoedas > 10000)) {
+    // Validar limites de moedas (1 a 10.000)
+    if (moedasValor < 0 || moedasValor > 10000) {
       return Response.json(
         { message: "Moedas devem estar entre 0 e 10.000" },
         { status: 400 }
       );
     }
 
-    if (precoFragmentos && (precoFragmentos < 0 || precoFragmentos > 500)) {
+    // Validar limites de fragmentos (0 a 500)
+    if (fragmentosValor < 0 || fragmentosValor > 500) {
       return Response.json(
         { message: "Fragmentos devem estar entre 0 e 500" },
+        { status: 400 }
+      );
+    }
+
+    // Validar preço mínimo (se definido, deve ser >= 1)
+    if (moedasValor > 0 && moedasValor < 1) {
+      return Response.json(
+        { message: "Preço mínimo em moedas: 1" },
+        { status: 400 }
+      );
+    }
+
+    if (fragmentosValor > 0 && fragmentosValor < 1) {
+      return Response.json(
+        { message: "Preço mínimo em fragmentos: 1" },
         { status: 400 }
       );
     }
@@ -91,8 +111,8 @@ export async function POST(request) {
       .from('avatares')
       .update({
         em_venda: true,
-        preco_venda: precoMoedas || 0,
-        preco_fragmentos: precoFragmentos || 0
+        preco_venda: moedasValor > 0 ? moedasValor : null,
+        preco_fragmentos: fragmentosValor > 0 ? fragmentosValor : null
       })
       .eq('id', avatarId);
 
@@ -107,8 +127,8 @@ export async function POST(request) {
     return Response.json({
       message: "Avatar colocado à venda com sucesso!",
       avatar_id: avatarId,
-      preco_moedas: precoMoedas || 0,
-      preco_fragmentos: precoFragmentos || 0
+      preco_moedas: moedasValor,
+      preco_fragmentos: fragmentosValor
     });
 
   } catch (error) {

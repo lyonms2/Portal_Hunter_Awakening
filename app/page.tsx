@@ -78,14 +78,14 @@ export default function HomePage() {
                   <span className="text-cyan-400">{'>'}</span> Iniciando transmissão...
                 </p>
                 <p className="text-slate-300 leading-relaxed">
-                  O colapso aconteceu há 15 anos. Anomalias dimensionais — <span className="text-cyan-400">os Portais</span> — 
-                  rasgaram a realidade, trazendo entidades do Vazio. A humanidade se refugiou em <span className="text-purple-400">zonas seguras</span>, 
-                  enquanto o mundo lá fora se tornou um cemitério de civilizações.
+                  O colapso aconteceu há 15 anos. Anomalias dimensionais — <span className="text-cyan-400">os Portais</span> —
+                  rasgaram a realidade, liberando o acesso a dimensões paralelas. A <span className="text-purple-400">Organização de Caçadores Dimensionais</span>
+                  foi fundada para explorar essas fendas e estabelecer contratos com entidades de outros planos.
                 </p>
                 <p className="text-slate-300 leading-relaxed">
-                  Você é um <span className="text-blue-400 font-semibold">Portal Hunter</span> — treinado para adentrar as fendas, 
-                  coletar artefatos pré-colapso e enfrentar o desconhecido. Cada missão é um jogo de sobrevivência. 
-                  <span className="text-cyan-400"> Cada escolha tem consequências.</span>
+                  Você é um <span className="text-blue-400 font-semibold">Invocador</span> — capaz de convocar <span className="text-amber-400">Avatares</span> de
+                  dimensões distantes para lutar ao seu lado. Treine seus guerreiros, domine as arenas e construa uma
+                  reputação que ecoe através dos planos. <span className="text-cyan-400">Cada vínculo forjado é uma arma. Cada batalha, um teste.</span>
                 </p>
                 <p className="text-cyan-400/40 mt-4">
                   <span className="text-cyan-400">{'>'}</span> Transmissão concluída.
@@ -110,33 +110,6 @@ export default function HomePage() {
               </div>
             </div>
           </button>
-
-          {/* Dashboard de status */}
-          <div className="flex gap-8 text-sm font-mono">
-            <div className="flex flex-col items-center gap-2 px-6 py-3 bg-slate-950/50 backdrop-blur border border-slate-800/50 rounded">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse shadow-lg shadow-cyan-400/50"></div>
-                <span className="text-slate-500 uppercase text-xs tracking-wider">Portais Ativos</span>
-              </div>
-              <span className="text-2xl font-bold text-cyan-400">47</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-2 px-6 py-3 bg-slate-950/50 backdrop-blur border border-slate-800/50 rounded">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse shadow-lg shadow-purple-400/50"></div>
-                <span className="text-slate-500 uppercase text-xs tracking-wider">Hunters Online</span>
-              </div>
-              <span className="text-2xl font-bold text-purple-400">23</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-2 px-6 py-3 bg-slate-950/50 backdrop-blur border border-slate-800/50 rounded">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse shadow-lg shadow-amber-400/50"></div>
-                <span className="text-slate-500 uppercase text-xs tracking-wider">Zonas Críticas</span>
-              </div>
-              <span className="text-2xl font-bold text-amber-400">08</span>
-            </div>
-          </div>
         </div>
       </div>
 

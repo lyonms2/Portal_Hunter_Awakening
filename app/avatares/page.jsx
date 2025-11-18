@@ -988,6 +988,15 @@ export default function AvatarsPage() {
                     <p className="text-xs text-slate-500 text-center font-mono">
                       O mercado cobra 5% de taxa nas moedas (sem taxa nos fragmentos)
                     </p>
+
+                    {/* Aviso sobre reset de vínculo */}
+                    {modalVender.vinculo > 0 && (
+                      <div className="mt-4 p-3 bg-orange-950/30 border border-orange-900/30 rounded-lg">
+                        <p className="text-xs text-orange-400 font-mono text-center">
+                          ⚠️ <span className="font-bold">Aviso:</span> Ao ser vendido, o avatar terá seu vínculo resetado de {modalVender.vinculo} para 0
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-3">
