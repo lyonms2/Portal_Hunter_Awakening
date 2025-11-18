@@ -1,11 +1,10 @@
-import { getSupabaseAnonClient } from "@/lib/supabase/serverClient";
+import { deleteDocument, getDocuments } from "@/lib/firebase/firestore";
 import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   try {
-    const supabase = getSupabaseAnonClient();
     const body = await request.json();
     const { userId } = body;
 
@@ -16,35 +15,39 @@ export async function POST(request) {
       );
     }
 
-    // Delete all story data for this user
-    // 1. Delete progress
-    const { error: progressError } = await supabase
-      .from("story_progress")
-      .delete()
-      .eq("user_id", userId);
+    // Delete all story data for this user from Firestore
 
-    if (progressError) {
-      console.error("Erro ao deletar progresso:", progressError);
+    // 1. Delete progress (all chapters)
+    try {
+      const progressDocs = await getDocuments('story_progress', {
+        where: [['user_id', '==', userId]]
+      });
+
+      for (const doc of progressDocs) {
+        await deleteDocument('story_progress', doc.id);
+      }
+    } catch (error) {
+      console.error("Erro ao deletar progresso:", error);
     }
 
     // 2. Delete avatar
-    const { error: avatarError } = await supabase
-      .from("story_avatars")
-      .delete()
-      .eq("user_id", userId);
-
-    if (avatarError) {
-      console.error("Erro ao deletar avatar:", avatarError);
+    try {
+      await deleteDocument('story_avatars', userId);
+    } catch (error) {
+      console.error("Erro ao deletar avatar:", error);
     }
 
     // 3. Delete achievements
-    const { error: achievementsError } = await supabase
-      .from("story_achievements")
-      .delete()
-      .eq("user_id", userId);
+    try {
+      const achievementDocs = await getDocuments('story_achievements', {
+        where: [['user_id', '==', userId]]
+      });
 
-    if (achievementsError) {
-      console.error("Erro ao deletar conquistas:", achievementsError);
+      for (const doc of achievementDocs) {
+        await deleteDocument('story_achievements', doc.id);
+      }
+    } catch (error) {
+      console.error("Erro ao deletar conquistas:", error);
     }
 
     return NextResponse.json({
@@ -60,4 +63,3 @@ export async function POST(request) {
     );
   }
 }
-
