@@ -1,15 +1,19 @@
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/sacrificar-avatar
+ *
+ * Sacrifica um avatar permanentemente, enviando-o ao Memorial Eterno.
+ * O avatar é marcado como morto COM marca da morte.
+ *
+ * Validações:
+ * - Avatar deve pertencer ao usuário
+ * - Avatar não pode estar ativo
+ */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const { userId, avatarId } = await request.json();
 
     if (!userId || !avatarId) {
@@ -19,15 +23,10 @@ export async function POST(request) {
       );
     }
 
-    // Verificar se o avatar pertence ao usuário
-    const { data: avatar, error: avatarError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .eq('user_id', userId)
-      .single();
+    // Verificar se o avatar pertence ao usuário no Firestore
+    const avatar = await getDocument('avatares', avatarId);
 
-    if (avatarError || !avatar) {
+    if (!avatar || avatar.user_id !== userId) {
       return Response.json(
         { message: "Avatar não encontrado ou não pertence a você" },
         { status: 404 }
@@ -43,23 +42,13 @@ export async function POST(request) {
     }
 
     // Sacrificar avatar: marcar como morto COM marca da morte (vai pro memorial)
-    const { error: updateError } = await supabase
-      .from('avatares')
-      .update({
-        vivo: false,
-        hp_atual: 0,
-        marca_morte: true, // Marca da morte - vai pro memorial
-        ativo: false
-      })
-      .eq('id', avatarId);
-
-    if (updateError) {
-      console.error("Erro ao sacrificar avatar:", updateError);
-      return Response.json(
-        { message: "Erro ao sacrificar avatar" },
-        { status: 500 }
-      );
-    }
+    await updateDocument('avatares', avatarId, {
+      vivo: false,
+      hp_atual: 0,
+      marca_morte: true, // Marca da morte - vai pro memorial
+      ativo: false,
+      updated_at: new Date().toISOString()
+    });
 
     return Response.json({
       message: `${avatar.nome} foi sacrificado e enviado ao Memorial Eterno...`

@@ -1,15 +1,23 @@
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/merge-avatares
+ *
+ * Funde dois avatares: base recebe 30% dos stats do sacrifício.
+ * Avatar sacrificado é destruído permanentemente.
+ *
+ * Mecânicas:
+ * - Chance de sucesso diminui com cada merge (100% → 40% no 8º merge)
+ * - 30% chance de transmutação de elemento (se diferentes)
+ * - Custo baseado em níveis e raridade
+ * - Máximo 8 merges por avatar
+ *
+ * Se falhar: Avatar sacrificado é perdido, base permanece intacto
+ */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const { userId, avatarBaseId, avatarSacrificioId } = await request.json();
 
     // Validações básicas
@@ -27,30 +35,20 @@ export async function POST(request) {
       );
     }
 
-    // 1. Buscar avatar base
-    const { data: avatarBase, error: baseError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarBaseId)
-      .eq('user_id', userId)
-      .single();
+    // 1. Buscar avatar base no Firestore
+    const avatarBase = await getDocument('avatares', avatarBaseId);
 
-    if (baseError || !avatarBase) {
+    if (!avatarBase || avatarBase.user_id !== userId) {
       return Response.json(
         { message: "Avatar base não encontrado ou não pertence a você" },
         { status: 404 }
       );
     }
 
-    // 2. Buscar avatar sacrifício
-    const { data: avatarSacrificio, error: sacrificioError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarSacrificioId)
-      .eq('user_id', userId)
-      .single();
+    // 2. Buscar avatar sacrifício no Firestore
+    const avatarSacrificio = await getDocument('avatares', avatarSacrificioId);
 
-    if (sacrificioError || !avatarSacrificio) {
+    if (!avatarSacrificio || avatarSacrificio.user_id !== userId) {
       return Response.json(
         { message: "Avatar de sacrifício não encontrado ou não pertence a você" },
         { status: 404 }
@@ -100,14 +98,10 @@ export async function POST(request) {
     const custoMoedas = Math.floor(nivelTotal * 100 * multiplicador);
     const custoFragmentos = Math.floor(nivelTotal * 10 * multiplicador);
 
-    // 5. Buscar stats do player
-    const { data: playerStats, error: statsError } = await supabase
-      .from('player_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // 5. Buscar stats do player no Firestore
+    const playerStats = await getDocument('player_stats', userId);
 
-    if (statsError || !playerStats) {
+    if (!playerStats) {
       return Response.json(
         { message: "Erro ao carregar estatísticas do jogador" },
         { status: 500 }
@@ -140,8 +134,8 @@ export async function POST(request) {
     let novoElemento = avatarBase.elemento;
 
     if (avatarBase.elemento !== avatarSacrificio.elemento) {
-      const roll = Math.random();
-      if (roll < 0.3) { // 30% de chance
+      const rollElemento = Math.random();
+      if (rollElemento < 0.3) { // 30% de chance
         elementoTransmutado = true;
         novoElemento = avatarSacrificio.elemento;
       }
@@ -170,72 +164,33 @@ export async function POST(request) {
       };
     }
 
-    // 11. Atualizar avatar base
-    const { error: updateBaseError } = await supabase
-      .from('avatares')
-      .update(updateData)
-      .eq('id', avatarBaseId);
+    // 11. Atualizar avatar base no Firestore
+    await updateDocument('avatares', avatarBaseId, updateData);
 
-    if (updateBaseError) {
-      console.error("Erro ao atualizar avatar base:", updateBaseError);
-      return Response.json(
-        { message: "Erro ao atualizar avatar base" },
-        { status: 500 }
-      );
-    }
+    // 12. Marcar avatar de sacrifício como morto no Firestore
+    await updateDocument('avatares', avatarSacrificioId, {
+      vivo: false,
+      hp_atual: 0,
+      marca_morte: true,
+      ativo: false,
+      updated_at: new Date().toISOString()
+    });
 
-    // 11. Marcar avatar de sacrifício como morto
-    const { error: killSacrificeError } = await supabase
-      .from('avatares')
-      .update({
-        vivo: false,
-        hp_atual: 0,
-        marca_morte: true,
-        ativo: false
-      })
-      .eq('id', avatarSacrificioId);
+    // 13. Deduzir custos do player no Firestore
+    await updateDocument('player_stats', userId, {
+      moedas: playerStats.moedas - custoMoedas,
+      fragmentos: playerStats.fragmentos - custoFragmentos,
+      updated_at: new Date().toISOString()
+    });
 
-    if (killSacrificeError) {
-      console.error("Erro ao sacrificar avatar:", killSacrificeError);
-      return Response.json(
-        { message: "Erro ao processar sacrifício" },
-        { status: 500 }
-      );
-    }
+    // 14. Buscar avatar base atualizado para retornar
+    const avatarAtualizado = await getDocument('avatares', avatarBaseId);
 
-    // 12. Deduzir custos do player
-    const { error: updateStatsError } = await supabase
-      .from('player_stats')
-      .update({
-        moedas: playerStats.moedas - custoMoedas,
-        fragmentos: playerStats.fragmentos - custoFragmentos
-      })
-      .eq('user_id', userId);
-
-    if (updateStatsError) {
-      console.error("Erro ao deduzir custos:", updateStatsError);
-      return Response.json(
-        { message: "Erro ao processar pagamento" },
-        { status: 500 }
-      );
-    }
-
-    // 13. Buscar avatar base atualizado para retornar
-    const { data: avatarAtualizado, error: finalError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarBaseId)
-      .single();
-
-    if (finalError) {
-      console.error("Erro ao buscar avatar atualizado:", finalError);
-    }
-
-    // 14. Retornar resultado da fusão
+    // 15. Retornar resultado da fusão
     return Response.json({
       message: mergeSuccessful ? "Fusão realizada com sucesso!" : "A fusão falhou! O avatar sacrificado foi perdido, mas o base está intacto.",
       resultado: {
-        avatarBase: avatarAtualizado || avatarBase,
+        avatarBase: avatarAtualizado,
         avatarSacrificio: avatarSacrificio,
         sucesso: mergeSuccessful,
         chanceSucesso: chanceSucesso,

@@ -1,26 +1,24 @@
-import { getSupabaseAnonClient } from '@/lib/supabase/serverClient';
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 import { validarStats } from '../../avatares/sistemas/statsSystem';
 
-// MOVIDO PARA DENTRO DA FUNÇÃO: const supabase = getSupabaseAnonClient();
+export const dynamic = 'force-dynamic';
 
 /**
+ * POST /api/ressuscitar-avatar
+ *
  * Sistema de Ressurreição Balanceado
- * 
+ *
  * Penalidades:
  * - Stats reduzidos em 30% (não 50%)
  * - Vínculo reduzido em 50% (não zerado)
  * - XP reduzida em 30%
  * - Exaustão aumentada para 60 (Exausto)
- * - Marca da Morte permanente
+ * - Marca da Morte permanente (não pode ser ressuscitado novamente)
  */
-
 export async function POST(request) {
   console.log("=== INICIANDO RITUAL DE RESSURREIÇÃO ===");
 
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseAnonClient();
-
     const { userId, avatarId } = await request.json();
     console.log("Dados recebidos:", { userId, avatarId });
 
@@ -32,26 +30,12 @@ export async function POST(request) {
       );
     }
 
-    // 1. Buscar avatar morto
+    // 1. Buscar avatar morto no Firestore
     console.log("Buscando avatar morto...");
-    const { data: avatar, error: avatarError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .eq('user_id', userId)
-      .eq('vivo', false)
-      .single();
+    const avatar = await getDocument('avatares', avatarId);
 
-    if (avatarError) {
-      console.error("❌ Erro ao buscar avatar:", avatarError);
-      return Response.json(
-        { message: "Erro ao buscar avatar: " + avatarError.message },
-        { status: 404 }
-      );
-    }
-
-    if (!avatar) {
-      console.log("❌ Avatar não encontrado");
+    if (!avatar || avatar.user_id !== userId || avatar.vivo) {
+      console.error("❌ Avatar inválido");
       return Response.json(
         { message: "Avatar não encontrado ou não está morto" },
         { status: 404 }
@@ -64,7 +48,7 @@ export async function POST(request) {
     if (avatar.marca_morte) {
       console.log("⚠️ Avatar já possui Marca da Morte");
       return Response.json(
-        { 
+        {
           message: "Este avatar já foi ressuscitado uma vez e carrega a Marca da Morte. Não pode ser ressuscitado novamente.",
           aviso: "A morte é permanente para aqueles marcados pelo Necromante."
         },
@@ -82,21 +66,9 @@ export async function POST(request) {
     const custo = custos[avatar.raridade] || custos['Comum'];
     console.log("Custo do ritual:", custo);
 
-    // 3. Verificar se jogador tem recursos
+    // 3. Verificar se jogador tem recursos no Firestore
     console.log("Buscando recursos do jogador...");
-    const { data: stats, error: statsError } = await supabase
-      .from('player_stats')
-      .select('moedas, fragmentos')
-      .eq('user_id', userId)
-      .single();
-
-    if (statsError) {
-      console.error("❌ Erro ao buscar stats:", statsError);
-      return Response.json(
-        { message: "Erro ao buscar recursos: " + statsError.message },
-        { status: 500 }
-      );
-    }
+    const stats = await getDocument('player_stats', userId);
 
     if (!stats) {
       console.log("❌ Stats não encontrados");
@@ -111,7 +83,7 @@ export async function POST(request) {
     if (stats.moedas < custo.moedas || stats.fragmentos < custo.fragmentos) {
       console.log("❌ Recursos insuficientes");
       return Response.json(
-        { 
+        {
           message: "Recursos insuficientes para o ritual de ressurreição",
           necessario: custo,
           atual: { moedas: stats.moedas, fragmentos: stats.fragmentos }
@@ -122,7 +94,7 @@ export async function POST(request) {
 
     // 4. CALCULAR PENALIDADES BALANCEADAS
     console.log("Calculando penalidades do ritual...");
-    
+
     // Stats: -30% (mais justo que -50%)
     const statsReduzidos = {
       forca: Math.floor(avatar.forca * 0.7),
@@ -142,7 +114,7 @@ export async function POST(request) {
         'Lendário': { min: 16 }
       };
       const minimo = RANGES[avatar.raridade].min;
-      
+
       Object.keys(statsReduzidos).forEach(stat => {
         if (statsReduzidos[stat] < minimo) {
           statsReduzidos[stat] = minimo;
@@ -164,100 +136,45 @@ export async function POST(request) {
     const novaExaustao = 60;
     console.log(`Exaustão: ${avatar.exaustao || 0} → ${novaExaustao} (EXAUSTO)`);
 
-    // 5. Aplicar ressurreição
+    // 5. Aplicar ressurreição no Firestore
     console.log("Aplicando ritual de ressurreição...");
-    const { error: updateAvatarError } = await supabase
-      .from('avatares')
-      .update({
-        // Status
-        vivo: true,
-        ativo: false, // Não ativa automaticamente
-        
-        // Stats reduzidos
-        forca: statsReduzidos.forca,
-        agilidade: statsReduzidos.agilidade,
-        resistencia: statsReduzidos.resistencia,
-        foco: statsReduzidos.foco,
-        
-        // Penalidades
-        vinculo: novoVinculo,
-        experiencia: novaXP,
-        exaustao: novaExaustao,
-        
-        // Marca permanente
-        marca_morte: true
-      })
-      .eq('id', avatarId);
+    await updateDocument('avatares', avatarId, {
+      // Status
+      vivo: true,
+      ativo: false, // Não ativa automaticamente
 
-    if (updateAvatarError) {
-      console.error("❌ Erro ao atualizar avatar:", updateAvatarError);
-      return Response.json(
-        { message: "Erro ao ressuscitar avatar: " + updateAvatarError.message },
-        { status: 500 }
-      );
-    }
+      // Stats reduzidos
+      forca: statsReduzidos.forca,
+      agilidade: statsReduzidos.agilidade,
+      resistencia: statsReduzidos.resistencia,
+      foco: statsReduzidos.foco,
+
+      // Penalidades
+      vinculo: novoVinculo,
+      experiencia: novaXP,
+      exaustao: novaExaustao,
+
+      // Marca permanente
+      marca_morte: true,
+      updated_at: new Date().toISOString()
+    });
 
     console.log("✅ Avatar ressuscitado!");
 
-    // 6. Deduzir recursos do jogador
+    // 6. Deduzir recursos do jogador no Firestore
     console.log("Deduzindo recursos do jogador...");
-    const { error: updateStatsError } = await supabase
-      .from('player_stats')
-      .update({
-        moedas: stats.moedas - custo.moedas,
-        fragmentos: stats.fragmentos - custo.fragmentos
-      })
-      .eq('user_id', userId);
-
-    if (updateStatsError) {
-      console.error("❌ Erro ao deduzir recursos:", updateStatsError);
-      return Response.json(
-        { message: "Erro ao deduzir recursos: " + updateStatsError.message },
-        { status: 500 }
-      );
-    }
+    await updateDocument('player_stats', userId, {
+      moedas: stats.moedas - custo.moedas,
+      fragmentos: stats.fragmentos - custo.fragmentos,
+      updated_at: new Date().toISOString()
+    });
 
     console.log("✅ Recursos deduzidos!");
 
-    // 7. Registrar no histórico (se a tabela existir)
-    try {
-      await supabase
-        .from('ressurreicoes_historico')
-        .insert([{
-          user_id: userId,
-          avatar_id: avatarId,
-          custo_moedas: custo.moedas,
-          custo_fragmentos: custo.fragmentos,
-          stats_antes: {
-            forca: avatar.forca,
-            agilidade: avatar.agilidade,
-            resistencia: avatar.resistencia,
-            foco: avatar.foco
-          },
-          stats_depois: statsReduzidos,
-          vinculo_antes: avatar.vinculo,
-          vinculo_depois: novoVinculo,
-          xp_antes: avatar.experiencia,
-          xp_depois: novaXP
-        }]);
-      console.log("✅ Histórico registrado");
-    } catch (error) {
-      console.log("⚠️ Histórico não registrado (tabela pode não existir)");
-    }
-
-    // 8. Buscar dados atualizados
+    // 7. Buscar dados atualizados
     console.log("Buscando dados atualizados...");
-    const { data: statsAtualizados } = await supabase
-      .from('player_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    const { data: avatarRessuscitado } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .single();
+    const statsAtualizados = await getDocument('player_stats', userId);
+    const avatarRessuscitado = await getDocument('avatares', avatarId);
 
     console.log("✅ RITUAL DE RESSURREIÇÃO COMPLETO!");
 
@@ -302,9 +219,9 @@ export async function POST(request) {
     console.error("❌ ERRO CRÍTICO NO RITUAL:", error);
     console.error("Stack:", error.stack);
     return Response.json(
-      { 
+      {
         message: "O ritual falhou catastroficamente. Energias sombrias escaparam do controle.",
-        erro_tecnico: error.message 
+        erro_tecnico: error.message
       },
       { status: 500 }
     );
