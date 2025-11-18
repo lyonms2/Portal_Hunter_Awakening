@@ -27,7 +27,7 @@ export async function GET(request) {
       .from('avatares')
       .select(`
         *,
-        vendedor:player_stats!avatares_user_id_fkey(nome_operacao)
+        vendedor:player_stats!fk_avatares_player_stats(nome_operacao)
       `)
       .eq('em_venda', true)
       .eq('vivo', true)

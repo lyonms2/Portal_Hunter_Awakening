@@ -46,7 +46,21 @@
 
 Acesse o **Supabase SQL Editor** e execute os seguintes arquivos **NA ORDEM**:
 
-#### a) Adicionar Constraints e Triggers
+#### a) Adicionar Foreign Key para JOIN
+
+```bash
+# Arquivo: database/ADD_FK_AVATARES_PLAYER_STATS.sql
+```
+
+Este arquivo adiciona:
+- ✅ Foreign key de `avatares.user_id` → `player_stats.user_id`
+- ✅ Permite JOIN direto entre as tabelas
+- ✅ Índices para performance
+- ✅ Query de teste do JOIN
+
+**Copie e cole o conteúdo do arquivo no SQL Editor e execute.**
+
+#### b) Adicionar Constraints e Triggers
 
 ```bash
 # Arquivo: database/ADD_MERCADO_CONSTRAINTS.sql
@@ -60,7 +74,7 @@ Este arquivo adiciona:
 
 **Copie e cole o conteúdo do arquivo no SQL Editor e execute.**
 
-#### b) Criar RPC Function Atômica
+#### c) Criar RPC Function Atômica
 
 ```bash
 # Arquivo: database/RPC_COMPRA_ATOMICA.sql
