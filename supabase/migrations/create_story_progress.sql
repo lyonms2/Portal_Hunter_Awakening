@@ -1,7 +1,7 @@
 -- Create story_progress table to save player progress in Story Mode
 CREATE TABLE IF NOT EXISTS story_progress (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES player_stats(user_id) ON DELETE CASCADE,
   story_phase TEXT NOT NULL DEFAULT 'prologo',
   scene_index INTEGER NOT NULL DEFAULT 0,
   player_choices JSONB DEFAULT '[]'::jsonb,
