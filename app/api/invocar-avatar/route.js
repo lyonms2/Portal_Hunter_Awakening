@@ -1,12 +1,10 @@
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, getDocuments, createDocument, updateDocument } from "@/lib/firebase/firestore";
 
 // Importar sistemas
 import { ELEMENTOS, aplicarBonusElemental } from '../../avatares/sistemas/elementalSystem';
 import { gerarStatsBalanceados } from '../../avatares/sistemas/statsSystem';
 import { selecionarHabilidadesIniciais } from '../../avatares/sistemas/abilitiesSystem';
 import { gerarNomeCompleto, gerarDescricaoNarrativa } from '../../avatares/sistemas/loreSystem';
-
-// MOVIDO PARA DENTRO DA FUNÇÃO: const supabase = getSupabaseClientSafe();
 
 // ==================== FUNÇÕES DE GERAÇÃO ====================
 
@@ -125,15 +123,6 @@ export async function POST(request) {
   console.log("=== INICIANDO INVOCAÇÃO COM SISTEMAS INTEGRADOS ===");
 
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const { userId } = await request.json();
 
     if (!userId) {
@@ -145,15 +134,11 @@ export async function POST(request) {
 
     console.log("Buscando stats do jogador:", userId);
 
-    // Buscar stats do jogador
-    const { data: stats, error: statsError } = await supabase
-      .from('player_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // Buscar stats do jogador do Firestore
+    const stats = await getDocument('player_stats', userId);
 
-    if (statsError || !stats) {
-      console.error("Erro ao buscar stats:", statsError);
+    if (!stats) {
+      console.error("Jogador não encontrado");
       return Response.json(
         { message: "Jogador não encontrado. Inicialize o jogador primeiro." },
         { status: 404 }
@@ -186,13 +171,12 @@ export async function POST(request) {
 
     // Verificar limite de avatares (avatares no memorial não contam)
     console.log("Verificando limite de avatares...");
-    const { data: avatares, error: avatarCountError } = await supabase
-      .from('avatares')
-      .select('id, vivo, marca_morte')
-      .eq('user_id', userId);
+    const avatares = await getDocuments('avatares', {
+      where: [['user_id', '==', userId]]
+    });
 
-    if (avatarCountError) {
-      console.error("Erro ao contar avatares:", avatarCountError);
+    if (!avatares) {
+      console.error("Erro ao contar avatares");
       return Response.json(
         { message: "Erro ao verificar limite de avatares" },
         { status: 500 }
@@ -238,56 +222,49 @@ export async function POST(request) {
       habilidades: avatarGerado.habilidades.length
     });
 
-    // Inserir avatar no banco
-    const { data: avatar, error: avatarError } = await supabase
-      .from('avatares')
-      .insert([avatarGerado])
-      .select()
-      .single();
+    // Inserir avatar no Firestore (sem especificar ID, deixar Firestore gerar)
+    const avatarId = await createDocument('avatares', avatarGerado);
 
-    if (avatarError) {
-      console.error("Erro ao inserir avatar:", avatarError);
+    if (!avatarId) {
+      console.error("Erro ao inserir avatar");
       return Response.json(
-        { message: "Erro ao criar avatar: " + avatarError.message },
+        { message: "Erro ao criar avatar" },
         { status: 500 }
       );
     }
 
+    const avatar = { id: avatarId, ...avatarGerado };
+
     console.log("Avatar inserido no banco com ID:", avatar.id);
 
-    // Atualizar recursos do jogador
+    // Atualizar recursos do jogador no Firestore
     const novosMoedas = stats.moedas - custoMoedas;
     const novosFragmentos = stats.fragmentos - custoFragmentos;
 
-    const { error: updateError } = await supabase
-      .from('player_stats')
-      .update({
+    try {
+      await updateDocument('player_stats', userId, {
         moedas: novosMoedas,
         fragmentos: novosFragmentos,
         primeira_invocacao: false
-      })
-      .eq('user_id', userId);
-
-    if (updateError) {
+      });
+    } catch (updateError) {
       console.error("Erro ao atualizar stats:", updateError);
       // Não retornar erro aqui, avatar já foi criado
     }
 
     console.log("Stats atualizados. Novas moedas:", novosMoedas);
 
-    // Registrar no histórico (se a tabela existir)
+    // Registrar no histórico (se a coleção existir)
     try {
-      await supabase
-        .from('invocacoes_historico')
-        .insert([{
-          user_id: userId,
-          avatar_id: avatar.id,
-          custo_moedas: custoMoedas,
-          custo_fragmentos: custoFragmentos,
-          gratuita: ehPrimeiraInvocacao,
-          raridade: avatar.raridade,
-          elemento: avatar.elemento
-        }]);
+      await createDocument('invocacoes_historico', {
+        user_id: userId,
+        avatar_id: avatar.id,
+        custo_moedas: custoMoedas,
+        custo_fragmentos: custoFragmentos,
+        gratuita: ehPrimeiraInvocacao,
+        raridade: avatar.raridade,
+        elemento: avatar.elemento
+      });
     } catch (error) {
       console.log("Erro ao registrar histórico (ignorado):", error.message);
       // Não bloqueia a invocação se histórico falhar

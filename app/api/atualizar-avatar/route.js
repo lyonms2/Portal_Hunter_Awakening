@@ -2,7 +2,7 @@
 // Arquivo: /app/api/atualizar-avatar/route.js
 
 import { NextResponse } from 'next/server';
-import { getSupabaseServiceClient } from '@/lib/supabase/serverClient';
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 import { processarGanhoXP } from '@/app/avatares/sistemas/progressionSystem';
 import { getNivelVinculo } from '@/app/avatares/sistemas/bondSystem';
 
@@ -17,18 +17,11 @@ export async function POST(request) {
       );
     }
 
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseServiceClient();
+    // Buscar avatar atual do Firestore
+    const avatarAtual = await getDocument('avatares', avatarId);
 
-    // Buscar avatar atual
-    const { data: avatarAtual, error: fetchError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .single();
-
-    if (fetchError || !avatarAtual) {
-      console.error('Erro ao buscar avatar:', fetchError);
+    if (!avatarAtual) {
+      console.error('Avatar não encontrado');
       return NextResponse.json(
         { message: 'Avatar não encontrado' },
         { status: 404 }
@@ -59,16 +52,13 @@ export async function POST(request) {
 
         // Atualizar stats se subiu de nível
         const { forca, agilidade, resistencia, foco } = resultadoXP.statsNovos;
-        
-        await supabase
-          .from('avatares')
-          .update({
-            forca,
-            agilidade,
-            resistencia,
-            foco
-          })
-          .eq('id', avatarId);
+
+        await updateDocument('avatares', avatarId, {
+          forca,
+          agilidade,
+          resistencia,
+          foco
+        });
       }
     }
 
@@ -124,26 +114,18 @@ export async function POST(request) {
       ganhoVinculo: vinculo
     });
 
-    const { data: avatarAtualizado, error: updateError } = await supabase
-      .from('avatares')
-      .update(updates)
-      .eq('id', avatarId)
-      .select()
-      .single();
-
-    if (updateError) {
+    try {
+      await updateDocument('avatares', avatarId, updates);
+    } catch (updateError) {
       console.error('❌ Erro ao atualizar avatar:', updateError);
-      console.error('Detalhes do erro:', {
-        message: updateError.message,
-        details: updateError.details,
-        hint: updateError.hint,
-        code: updateError.code
-      });
       return NextResponse.json(
         { message: 'Erro ao atualizar avatar', erro: updateError.message },
         { status: 500 }
       );
     }
+
+    // Buscar avatar atualizado
+    const avatarAtualizado = await getDocument('avatares', avatarId);
 
     console.log('✅ Avatar atualizado com sucesso:', {
       id: avatarAtualizado.id,
