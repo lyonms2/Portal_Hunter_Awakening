@@ -450,6 +450,13 @@ export default function MercadoPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Aviso sobre reset de vínculo e exaustão */}
+                    <div className="p-3 bg-cyan-950/30 border border-cyan-900/30 rounded-lg">
+                      <p className="text-xs text-cyan-400 font-mono text-center">
+                        ℹ️ <span className="font-bold">Importante:</span> Este avatar terá vínculo e exaustão resetados para 0 ao ser adquirido
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex gap-3">
