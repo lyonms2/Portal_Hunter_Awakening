@@ -7,6 +7,8 @@ export default function StoryModePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // Story progression state
   const [storyPhase, setStoryPhase] = useState('prologo');
@@ -79,18 +81,50 @@ export default function StoryModePage() {
   };
 
   useEffect(() => {
-    const userData = localStorage.getItem("user");
-    if (!userData) {
-      router.push("/login");
-      return;
-    }
+    const init = async () => {
+      const userData = localStorage.getItem("user");
+      if (!userData) {
+        router.push("/login");
+        return;
+      }
 
-    const parsedUser = JSON.parse(userData);
-    setUser(parsedUser);
-    setLoading(false);
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
 
-    addToLog("Sistema de Modo História inicializado.");
-    addToLog("Capítulo 1: O Despertar do Vínculo carregado.");
+      // Load saved progress
+      try {
+        const response = await fetch(`/api/story/load?userId=${parsedUser.id}`);
+        const data = await response.json();
+
+        if (data.progress) {
+          // Restore progress from database
+          setStoryPhase(data.progress.story_phase);
+          setSceneIndex(data.progress.scene_index);
+          setPlayerChoices(data.progress.player_choices || []);
+
+          if (data.progress.selected_element) {
+            const element = elements.find(el => el.id === data.progress.selected_element.id);
+            setSelectedElement(element);
+          }
+
+          setAvatarName(data.progress.avatar_name || '');
+          setAvatarStats(data.progress.avatar_stats);
+
+          addToLog("Progresso carregado do banco de dados.", 'success');
+          addToLog(`Fase atual: ${data.progress.story_phase}`, 'info');
+        } else {
+          addToLog("Sistema de Modo História inicializado.", 'info');
+          addToLog("Capítulo 1: O Despertar do Vínculo carregado.", 'info');
+        }
+      } catch (error) {
+        console.error("Erro ao carregar progresso:", error);
+        addToLog("Erro ao carregar progresso. Iniciando do começo.", 'error');
+      }
+
+      setLoading(false);
+    };
+
+    init();
   }, [router]);
 
   const addToLog = (message, type = 'info') => {
@@ -98,21 +132,111 @@ export default function StoryModePage() {
     setActionLog(prev => [...prev, { timestamp, message, type }]);
   };
 
+  const saveProgress = async (updates = {}) => {
+    if (!user) return;
+
+    setSaving(true);
+    try {
+      const progressData = {
+        userId: user.id,
+        storyPhase: updates.storyPhase ?? storyPhase,
+        sceneIndex: updates.sceneIndex ?? sceneIndex,
+        playerChoices: updates.playerChoices ?? playerChoices,
+        selectedElement: updates.selectedElement ?? selectedElement,
+        avatarName: updates.avatarName ?? avatarName,
+        avatarStats: updates.avatarStats ?? avatarStats,
+        completed: updates.completed ?? (storyPhase === 'conclusao')
+      };
+
+      const response = await fetch('/api/story/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(progressData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao salvar progresso');
+      }
+
+      addToLog('Progresso salvo automaticamente.', 'success');
+    } catch (error) {
+      console.error('Erro ao salvar progresso:', error);
+      addToLog('Erro ao salvar progresso.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!user) return;
+
+    const confirmReset = confirm(
+      'Tem certeza que deseja resetar o Modo História?\n\nTodo o progresso será perdido e você começará do início.'
+    );
+
+    if (!confirmReset) return;
+
+    setResetting(true);
+    try {
+      const response = await fetch('/api/story/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao resetar progresso');
+      }
+
+      // Reset all state
+      setStoryPhase('prologo');
+      setSceneIndex(0);
+      setPlayerChoices([]);
+      setSelectedElement(null);
+      setAvatarName('');
+      setAvatarStats(null);
+      setActionLog([]);
+
+      addToLog('Modo História resetado. Começando do início.', 'important');
+      addToLog('Capítulo 1: O Despertar do Vínculo carregado.', 'info');
+    } catch (error) {
+      console.error('Erro ao resetar:', error);
+      addToLog('Erro ao resetar progresso.', 'error');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const handleChoice = (choice) => {
-    setPlayerChoices(prev => [...prev, choice.id]);
+    const newChoices = [...playerChoices, choice.id];
+    setPlayerChoices(newChoices);
     addToLog(`Escolha: ${choice.text}`, 'choice');
 
+    let newPhase = storyPhase;
+    let newSceneIndex = sceneIndex;
+
     if (choice.next === 'element_selection') {
+      newPhase = 'element_selection';
       setStoryPhase('element_selection');
     } else if (typeof choice.next === 'number') {
+      newSceneIndex = choice.next;
       setSceneIndex(choice.next);
     } else if (choice.id === 'continuar') {
       // Move to next phase
       if (storyPhase === 'prologo') {
+        newPhase = 'cena1';
+        newSceneIndex = 0;
         setStoryPhase('cena1');
         setSceneIndex(0);
       }
     }
+
+    // Save progress automatically
+    saveProgress({
+      storyPhase: newPhase,
+      sceneIndex: newSceneIndex,
+      playerChoices: newChoices
+    });
   };
 
   const handleElementSelection = (element) => {
@@ -120,6 +244,13 @@ export default function StoryModePage() {
     addToLog(`Elemento selecionado: ${element.nome} ${element.emoji}`, 'important');
     setStoryPhase('vinculo');
     setSceneIndex(0);
+
+    // Save progress automatically
+    saveProgress({
+      selectedElement: element,
+      storyPhase: 'vinculo',
+      sceneIndex: 0
+    });
   };
 
   const handleAvatarNaming = () => {
@@ -163,6 +294,14 @@ export default function StoryModePage() {
     addToLog(`Stats: HP ${finalStats.vida} | ATK ${finalStats.ataque} | DEF ${finalStats.defesa} | SPD ${finalStats.velocidade}`, 'stats');
 
     setStoryPhase('conclusao');
+
+    // Save progress automatically (chapter completed)
+    saveProgress({
+      avatarName: avatarName,
+      avatarStats: finalStats,
+      storyPhase: 'conclusao',
+      completed: true
+    });
   };
 
   const voltarDashboard = () => {
@@ -226,10 +365,29 @@ export default function StoryModePage() {
             <span>RETORNAR</span>
           </button>
 
-          <div className="flex items-center gap-2 text-xs text-cyan-400/50 font-mono">
-            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>
-            <span>MODO HISTÓRIA ATIVO</span>
-            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-xs text-cyan-400/50 font-mono">
+              <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>
+              <span>MODO HISTÓRIA ATIVO</span>
+              <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>
+            </div>
+
+            {saving && (
+              <div className="text-xs text-green-400/70 font-mono flex items-center gap-1">
+                <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
+                <span>Salvando...</span>
+              </div>
+            )}
+
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="text-red-400/70 hover:text-red-400 transition-colors flex items-center gap-2 font-mono text-xs group disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Resetar Modo História"
+            >
+              <span className="group-hover:rotate-180 transition-transform duration-500">🔄</span>
+              <span>{resetting ? 'RESETANDO...' : 'RESETAR'}</span>
+            </button>
           </div>
         </div>
 
