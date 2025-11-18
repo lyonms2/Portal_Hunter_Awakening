@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, getDocuments, createDocument, updateDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +23,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
     const body = await request.json();
     const {
       jogador1Id,
@@ -57,49 +53,34 @@ export async function POST(request) {
       );
     }
 
-    // Buscar temporada ativa
-    const { data: temporadaAtiva, error: errorTemporada } = await supabase
-      .from('pvp_temporadas')
-      .select('temporada_id')
-      .eq('ativa', true)
-      .single();
+    // Buscar temporada ativa no Firestore
+    const temporadas = await getDocuments('pvp_temporadas', {
+      where: [['ativa', '==', true]]
+    });
 
-    if (errorTemporada || !temporadaAtiva) {
+    if (!temporadas || temporadas.length === 0) {
       return NextResponse.json({ error: 'Nenhuma temporada ativa' }, { status: 404 });
     }
 
+    const temporadaAtiva = temporadas[0];
     const temporadaId = temporadaAtiva.temporada_id;
 
-    // Atualizar ranking do jogador 1
+    // Atualizar rankings no Firestore
     const venceuJ1 = vencedorId === jogador1Id;
-    const { data: ranking1, error: errorRank1 } = await supabase
-      .rpc('atualizar_ranking_apos_batalha', {
-        p_temporada_id: temporadaId,
-        p_jogador1_id: jogador1Id,
-        p_jogador2_id: jogador2Id,
-        p_vencedor_id: vencedorId,
-        p_jogador1_fama_ganho: jogador1FamaGanho,
-        p_jogador2_fama_ganho: jogador2FamaGanho
-      });
 
-    if (errorRank1) {
-      console.error('Erro ao atualizar rankings:', errorRank1);
-      // Tentar atualização manual se a função RPC não existir
-      await atualizarRankingManual(
-        supabase,
-        temporadaId,
-        jogador1Id,
-        venceuJ1,
-        jogador1FamaGanho
-      );
-      await atualizarRankingManual(
-        supabase,
-        temporadaId,
-        jogador2Id,
-        !venceuJ1,
-        jogador2FamaGanho
-      );
-    }
+    await atualizarRankingManual(
+      temporadaId,
+      jogador1Id,
+      venceuJ1,
+      jogador1FamaGanho
+    );
+
+    await atualizarRankingManual(
+      temporadaId,
+      jogador2Id,
+      !venceuJ1,
+      jogador2FamaGanho
+    );
 
     // Salvar no log (opcional)
     if (salvarLog) {
@@ -107,9 +88,8 @@ export async function POST(request) {
       const foiUpset = (vencedorId === jogador1Id && jogador1FamaAntes < jogador2FamaAntes) ||
                        (vencedorId === jogador2Id && jogador2FamaAntes < jogador1FamaAntes);
 
-      const { error: errorLog } = await supabase
-        .from('pvp_batalhas_log')
-        .insert({
+      try {
+        await createDocument('pvp_batalhas_log', {
           temporada_id: temporadaId,
           jogador1_id: jogador1Id,
           jogador2_id: jogador2Id,
@@ -125,27 +105,15 @@ export async function POST(request) {
           diferenca_fama: diferencaFama,
           data_batalha: new Date().toISOString()
         });
-
-      if (errorLog) {
+      } catch (errorLog) {
         console.error('Erro ao salvar log de batalha:', errorLog);
         // Não retornar erro, pois o log é opcional
       }
     }
 
     // Buscar rankings atualizados
-    const { data: ranking1Atualizado } = await supabase
-      .from('pvp_rankings')
-      .select('*')
-      .eq('user_id', jogador1Id)
-      .eq('temporada_id', temporadaId)
-      .single();
-
-    const { data: ranking2Atualizado } = await supabase
-      .from('pvp_rankings')
-      .select('*')
-      .eq('user_id', jogador2Id)
-      .eq('temporada_id', temporadaId)
-      .single();
+    const ranking1Atualizado = await getDocument('pvp_rankings', `${jogador1Id}_${temporadaId}`);
+    const ranking2Atualizado = await getDocument('pvp_rankings', `${jogador2Id}_${temporadaId}`);
 
     return NextResponse.json({
       success: true,
@@ -159,49 +127,43 @@ export async function POST(request) {
 }
 
 /**
- * Função auxiliar para atualizar ranking manualmente
+ * Função auxiliar para atualizar ranking manualmente no Firestore
  */
-async function atualizarRankingManual(supabase, temporadaId, userId, venceu, famaGanho) {
+async function atualizarRankingManual(temporadaId, userId, venceu, famaGanho) {
+  const rankingId = `${userId}_${temporadaId}`;
+
   // Buscar ranking atual
-  const { data: rankingAtual } = await supabase
-    .from('pvp_rankings')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('temporada_id', temporadaId)
-    .single();
+  const rankingAtual = await getDocument('pvp_rankings', rankingId);
 
   if (!rankingAtual) {
     // Criar se não existe
-    await supabase
-      .from('pvp_rankings')
-      .insert({
-        user_id: userId,
-        temporada_id: temporadaId,
-        fama: Math.max(0, 1000 + famaGanho),
-        vitorias: venceu ? 1 : 0,
-        derrotas: venceu ? 0 : 1,
-        streak: venceu ? 1 : 0,
-        streak_maximo: venceu ? 1 : 0,
-        ultima_batalha: new Date().toISOString()
-      });
+    await createDocument('pvp_rankings', {
+      user_id: userId,
+      temporada_id: temporadaId,
+      fama: Math.max(0, 1000 + famaGanho),
+      vitorias: venceu ? 1 : 0,
+      derrotas: venceu ? 0 : 1,
+      streak: venceu ? 1 : 0,
+      streak_maximo: venceu ? 1 : 0,
+      ultima_batalha: new Date().toISOString(),
+      recompensas_recebidas: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }, rankingId);
   } else {
     // Atualizar
     const novaFama = Math.max(0, rankingAtual.fama + famaGanho);
     const novoStreak = venceu ? rankingAtual.streak + 1 : 0;
     const novoStreakMaximo = Math.max(rankingAtual.streak_maximo, novoStreak);
 
-    await supabase
-      .from('pvp_rankings')
-      .update({
-        fama: novaFama,
-        vitorias: venceu ? rankingAtual.vitorias + 1 : rankingAtual.vitorias,
-        derrotas: venceu ? rankingAtual.derrotas : rankingAtual.derrotas + 1,
-        streak: novoStreak,
-        streak_maximo: novoStreakMaximo,
-        ultima_batalha: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('temporada_id', temporadaId);
+    await updateDocument('pvp_rankings', rankingId, {
+      fama: novaFama,
+      vitorias: venceu ? rankingAtual.vitorias + 1 : rankingAtual.vitorias,
+      derrotas: venceu ? rankingAtual.derrotas : rankingAtual.derrotas + 1,
+      streak: novoStreak,
+      streak_maximo: novoStreakMaximo,
+      ultima_batalha: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
   }
 }
