@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments, getDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +9,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     const { searchParams } = new URL(request.url);
     const poder = parseInt(searchParams.get('poder'));
     const userId = searchParams.get('userId');
@@ -36,35 +31,34 @@ export async function GET(request) {
     console.log(`[OPONENTES IA] Buscando avatares com poder entre ${poderMin} e ${poderMax}`);
     console.log(`[OPONENTES IA] EXCLUINDO avatares do userId: ${userId}`);
 
-    // Buscar avatares de outros usuários
-    // Calculamos poder total = forca + agilidade + resistencia + foco
-    const { data: avatares, error } = await supabase
-      .from('avatares')
-      .select('id, user_id, nome, nivel, elemento, raridade, forca, agilidade, resistencia, foco, habilidades, vivo, experiencia')
-      .neq('user_id', userId) // EXCLUIR PRÓPRIO USUÁRIO
-      .eq('vivo', true) // Apenas avatares vivos
-      .gte('nivel', 1) // Apenas avatares com nível
-      .limit(50); // Pegar 50 para filtrar depois
+    // Buscar TODOS os avatares vivos do Firestore
+    const avatares = await getDocuments('avatares', {
+      where: [
+        ['vivo', '==', true],
+        ['user_id', '!=', userId] // Excluir próprio usuário
+      ]
+    });
 
-    console.log(`[OPONENTES IA] Avatares encontrados no banco: ${avatares?.length || 0}`);
+    console.log(`[OPONENTES IA] Avatares encontrados no Firestore: ${avatares?.length || 0}`);
 
-    if (avatares && avatares.length > 0) {
-      console.log('[OPONENTES IA] Primeiros 3 avatares:', avatares.slice(0, 3).map(a => ({
-        nome: a.nome,
-        user_id: a.user_id,
-        userId_eh_igual: a.user_id === userId
-      })));
+    if (!avatares || avatares.length === 0) {
+      console.log('[OPONENTES IA] Nenhum avatar encontrado no Firestore');
+      return NextResponse.json({
+        success: true,
+        oponentes: [],
+        filtros: {
+          poderMin,
+          poderMax,
+          encontrados: 0,
+          seuUserId: userId
+        }
+      });
     }
 
-    if (error) {
-      console.error('[OPONENTES IA] Erro ao buscar avatares:', error);
-      return NextResponse.json({ error: 'Erro ao buscar oponentes' }, { status: 500 });
-    }
-
-    // Calcular poder total e filtrar
+    // Calcular poder total e filtrar por range
     const avataresFiltrados = avatares
       .map(avatar => {
-        const poderTotal = avatar.forca + avatar.agilidade + avatar.resistencia + avatar.foco;
+        const poderTotal = (avatar.forca || 0) + (avatar.agilidade || 0) + (avatar.resistencia || 0) + (avatar.foco || 0);
         return { ...avatar, poderTotal };
       })
       .filter(avatar => {
@@ -80,29 +74,22 @@ export async function GET(request) {
 
     console.log(`[OPONENTES IA] Encontrados ${avataresFiltrados.length} oponentes após filtro`);
 
-    // Buscar nomes dos caçadores da tabela player_stats (coluna nome_operacao)
+    // Buscar nomes dos caçadores da collection player_stats
     const userIds = [...new Set(avataresFiltrados.map(a => a.user_id))];
 
-    const { data: playerStats } = await supabase
-      .from('player_stats')
-      .select('user_id, nome_operacao')
-      .in('user_id', userIds);
-
-    console.log('[OPONENTES IA] Player stats encontrados:', playerStats?.length || 0);
-
-    // Criar mapa de userId -> nome
     const nomesMap = {};
-    if (playerStats && playerStats.length > 0) {
-      playerStats.forEach(stats => {
-        nomesMap[stats.user_id] = stats.nome_operacao || 'Caçador Misterioso';
-      });
+    for (const uid of userIds) {
+      const playerStats = await getDocument('player_stats', uid);
+      if (playerStats) {
+        nomesMap[uid] = playerStats.nome_operacao || 'Caçador Misterioso';
+      }
     }
 
     console.log('[OPONENTES IA] Nomes mapeados:', Object.keys(nomesMap).length);
 
     const oponentesFormatados = avataresFiltrados
       .filter(avatar => avatar.user_id !== userId) // VERIFICAÇÃO TRIPLA
-      .map((avatar, index) => ({
+      .map((avatar) => ({
         avatar: {
           id: avatar.id,
           nome: avatar.nome,
@@ -130,7 +117,7 @@ export async function GET(request) {
         poderMin,
         poderMax,
         encontrados: oponentesFormatados.length,
-        seuUserId: userId // Para debug
+        seuUserId: userId
       }
     });
 
