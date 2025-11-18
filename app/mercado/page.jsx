@@ -15,12 +15,6 @@ export default function MercadoPage() {
   const [comprando, setComprando] = useState(false);
   const [modalConfirmacao, setModalConfirmacao] = useState(null);
 
-  // Filtros
-  const [filtroRaridade, setFiltroRaridade] = useState('Todos');
-  const [filtroElemento, setFiltroElemento] = useState('Todos');
-  const [precoMin, setPrecoMin] = useState('');
-  const [precoMax, setPrecoMax] = useState('');
-
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -51,15 +45,7 @@ export default function MercadoPage() {
   const carregarAvatares = async (userId) => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        userId,
-        ...(filtroRaridade !== 'Todos' && { raridade: filtroRaridade }),
-        ...(filtroElemento !== 'Todos' && { elemento: filtroElemento }),
-        ...(precoMin && { precoMin }),
-        ...(precoMax && { precoMax }),
-      });
-
-      const response = await fetch(`/api/mercado/listar?${params}`);
+      const response = await fetch(`/api/mercado/listar?userId=${userId}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -216,67 +202,10 @@ export default function MercadoPage() {
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="mb-6 bg-slate-900/50 border border-slate-700/50 rounded-lg p-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <select
-              value={filtroRaridade}
-              onChange={(e) => {
-                setFiltroRaridade(e.target.value);
-                setTimeout(() => carregarAvatares(user.id), 100);
-              }}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-            >
-              <option value="Todos">Todas Raridades</option>
-              <option value="Comum">Comum</option>
-              <option value="Raro">Raro</option>
-              <option value="Lendário">Lendário</option>
-            </select>
-
-            <select
-              value={filtroElemento}
-              onChange={(e) => {
-                setFiltroElemento(e.target.value);
-                setTimeout(() => carregarAvatares(user.id), 100);
-              }}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-            >
-              <option value="Todos">Todos Elementos</option>
-              <option value="Fogo">🔥 Fogo</option>
-              <option value="Água">💧 Água</option>
-              <option value="Terra">🪨 Terra</option>
-              <option value="Vento">💨 Vento</option>
-              <option value="Eletricidade">⚡ Eletricidade</option>
-              <option value="Sombra">🌑 Sombra</option>
-              <option value="Luz">✨ Luz</option>
-            </select>
-
-            <input
-              type="number"
-              placeholder="Preço Mín"
-              value={precoMin}
-              onChange={(e) => setPrecoMin(e.target.value)}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-            />
-
-            <input
-              type="number"
-              placeholder="Preço Máx"
-              value={precoMax}
-              onChange={(e) => setPrecoMax(e.target.value)}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
-            />
-
-            <button
-              onClick={() => carregarAvatares(user.id)}
-              className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-sm font-semibold transition-all"
-            >
-              🔍 Filtrar
-            </button>
-          </div>
-
-          <div className="mt-3 text-xs text-slate-500 font-mono">
-            {avatares.length} {avatares.length === 1 ? 'avatar disponível' : 'avatares disponíveis'}
+        {/* Contador de Avatares */}
+        <div className="mb-6">
+          <div className="text-center text-sm text-slate-400 font-mono">
+            {loading ? 'Carregando...' : `${avatares.length} ${avatares.length === 1 ? 'avatar disponível' : 'avatares disponíveis'}`}
           </div>
         </div>
 
@@ -289,7 +218,7 @@ export default function MercadoPage() {
           <div className="text-center py-20">
             <div className="text-6xl mb-4 opacity-20">🏪</div>
             <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar à venda</h3>
-            <p className="text-slate-500 text-sm">Tente ajustar os filtros ou volte mais tarde</p>
+            <p className="text-slate-500 text-sm">O mercado está vazio no momento. Volte mais tarde!</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
