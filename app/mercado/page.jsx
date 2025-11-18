@@ -20,7 +20,6 @@ export default function MercadoPage() {
   const [filtroElemento, setFiltroElemento] = useState('Todos');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
-  const [mostrarVendidos, setMostrarVendidos] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -276,20 +275,8 @@ export default function MercadoPage() {
             </button>
           </div>
 
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-xs text-slate-500 font-mono">
-              {avatares.filter(a => mostrarVendidos || a.em_venda !== false).length} {avatares.filter(a => mostrarVendidos || a.em_venda !== false).length === 1 ? 'avatar disponível' : 'avatares disponíveis'}
-            </div>
-            <button
-              onClick={() => setMostrarVendidos(!mostrarVendidos)}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
-                mostrarVendidos
-                  ? 'bg-green-900/30 border border-green-500/50 text-green-400'
-                  : 'bg-slate-800/50 border border-slate-600/50 text-slate-400'
-              }`}
-            >
-              {mostrarVendidos ? '👁️ Mostrar Vendidos: SIM' : '👁️‍🗨️ Mostrar Vendidos: NÃO'}
-            </button>
+          <div className="mt-3 text-xs text-slate-500 font-mono">
+            {avatares.length} {avatares.length === 1 ? 'avatar disponível' : 'avatares disponíveis'}
           </div>
         </div>
 
@@ -298,7 +285,7 @@ export default function MercadoPage() {
           <div className="text-center py-20">
             <div className="text-cyan-400 animate-pulse text-lg">Buscando avatares...</div>
           </div>
-        ) : avatares.filter(a => mostrarVendidos || a.em_venda !== false).length === 0 ? (
+        ) : avatares.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4 opacity-20">🏪</div>
             <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar à venda</h3>
@@ -306,32 +293,14 @@ export default function MercadoPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {avatares.filter(a => mostrarVendidos || a.em_venda !== false).map((avatar) => {
-              const estaVendido = avatar.em_venda === false;
-              return (
+            {avatares.map((avatar) => (
               <div
                 key={avatar.id}
-                className={`group relative ${estaVendido ? 'opacity-40' : ''}`}
+                className="group relative"
               >
                 <div className={`absolute -inset-0.5 bg-gradient-to-r ${getCorRaridade(avatar.raridade)} rounded-lg blur opacity-20 group-hover:opacity-40 transition-all`}></div>
 
                 <div className="relative bg-slate-900/80 backdrop-blur-xl border border-amber-500/30 rounded-lg overflow-hidden group-hover:border-amber-400/50 transition-all">
-                  {/* Badge VENDIDO */}
-                  {estaVendido && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                      <div className="transform -rotate-12">
-                        <div className="bg-red-600/95 border-4 border-red-800 px-8 py-4 rounded-lg shadow-2xl">
-                          <div className="text-3xl font-black text-white uppercase tracking-wider">
-                            VENDIDO
-                          </div>
-                          <div className="text-xs text-red-200 text-center mt-1">
-                            ❌ Indisponível
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Badge Raridade */}
                   <div className={`px-3 py-1.5 text-center font-bold text-xs bg-gradient-to-r ${getCorRaridade(avatar.raridade)}`}>
                     {avatar.raridade.toUpperCase()}
@@ -386,23 +355,20 @@ export default function MercadoPage() {
                     {/* Botões */}
                     <div className="space-y-2">
                       <button
-                        onClick={() => !estaVendido && setModalDetalhes(avatar)}
-                        disabled={estaVendido}
-                        className="w-full px-3 py-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600/50 hover:border-cyan-500/50 text-cyan-400 hover:text-cyan-300 font-bold text-sm rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => setModalDetalhes(avatar)}
+                        className="w-full px-3 py-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600/50 hover:border-cyan-500/50 text-cyan-400 hover:text-cyan-300 font-bold text-sm rounded transition-all"
                       >
                         👁️ VER DETALHES
                       </button>
                       <button
-                        onClick={() => !estaVendido && setModalCompra(avatar)}
+                        onClick={() => setModalCompra(avatar)}
                         disabled={
-                          estaVendido ||
                           (avatar.preco_venda > 0 && stats?.moedas < avatar.preco_venda) ||
                           (avatar.preco_fragmentos > 0 && stats?.fragmentos < avatar.preco_fragmentos)
                         }
                         className="w-full px-3 py-2 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-bold text-sm rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {estaVendido ? '❌ VENDIDO' :
-                         (avatar.preco_venda > 0 && stats?.moedas < avatar.preco_venda) ? '💰 Sem Moedas' :
+                        {(avatar.preco_venda > 0 && stats?.moedas < avatar.preco_venda) ? '💰 Sem Moedas' :
                          (avatar.preco_fragmentos > 0 && stats?.fragmentos < avatar.preco_fragmentos) ? '💎 Sem Fragmentos' :
                          '🛒 COMPRAR'}
                       </button>
@@ -410,8 +376,7 @@ export default function MercadoPage() {
                   </div>
                 </div>
               </div>
-              );
-            })}
+            ))}
           </div>
         )}
       </div>
