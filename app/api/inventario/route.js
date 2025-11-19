@@ -84,6 +84,9 @@ export async function POST(request) {
     // Buscar informações do item no Firestore
     const item = await getDocument('items', itemId);
 
+    console.log('[INVENTARIO] Dados recebidos:', { userId, itemId, inventoryItemId });
+    console.log('[INVENTARIO] Item encontrado:', item);
+
     if (!item) {
       return Response.json(
         { message: "Item não encontrado" },
@@ -93,6 +96,7 @@ export async function POST(request) {
 
     // Itens consumíveis requerem avatar ativo
     const requerAvatar = item.tipo === 'consumivel';
+    console.log('[INVENTARIO] Tipo do item:', item.tipo, '| Requer avatar:', requerAvatar);
 
     // Verificar se o item requer avatar ativo
     if (requerAvatar) {
