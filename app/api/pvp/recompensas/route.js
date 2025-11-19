@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments, getDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +9,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
@@ -21,25 +16,31 @@ export async function GET(request) {
       return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
-    // Buscar recompensas pendentes (não coletadas)
-    const { data: recompensas, error } = await supabase
-      .from('pvp_recompensas_pendentes')
-      .select(`
-        *,
-        temporada:pvp_temporadas!pvp_recompensas_pendentes_temporada_id_fkey(
-          temporada_id,
-          nome,
-          data_fim
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('coletada', false)
-      .order('created_at', { ascending: false });
+    // Buscar recompensas pendentes (não coletadas) no Firestore
+    const recompensasItems = await getDocuments('pvp_recompensas_pendentes', {
+      where: [
+        ['user_id', '==', userId],
+        ['coletada', '==', false]
+      ],
+      orderBy: [['created_at', 'desc']]
+    });
 
-    if (error) {
-      console.error('[RECOMPENSAS] Erro ao buscar:', error);
-      return NextResponse.json({ error: 'Erro ao buscar recompensas' }, { status: 500 });
-    }
+    // Para cada recompensa, buscar detalhes da temporada
+    // (Firestore não suporta JOIN, então fazemos queries separadas)
+    const recompensas = await Promise.all(
+      (recompensasItems || []).map(async (recompensa) => {
+        const temporada = await getDocument('pvp_temporadas', recompensa.temporada_id);
+
+        return {
+          ...recompensa,
+          temporada: temporada ? {
+            temporada_id: temporada.temporada_id,
+            nome: temporada.nome,
+            data_fim: temporada.data_fim
+          } : null
+        };
+      })
+    );
 
     return NextResponse.json({
       success: true,
@@ -48,6 +49,6 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('[RECOMPENSAS] Erro interno:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }

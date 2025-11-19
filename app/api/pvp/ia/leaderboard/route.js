@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments, getDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,59 +9,48 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     // Buscar temporada ativa primeiro
-    const { data: temporadaAtiva, error: errorTemporada } = await supabase
-      .from('pvp_temporadas')
-      .select('temporada_id')
-      .eq('ativa', true)
-      .single();
+    const temporadas = await getDocuments('pvp_temporadas', {
+      where: [['ativa', '==', true]]
+    });
 
-    if (errorTemporada || !temporadaAtiva) {
-      console.error('[LEADERBOARD] Nenhuma temporada ativa encontrada:', errorTemporada);
+    if (!temporadas || temporadas.length === 0) {
+      console.error('[LEADERBOARD] Nenhuma temporada ativa encontrada');
       return NextResponse.json({ error: 'Nenhuma temporada ativa' }, { status: 404 });
     }
 
+    const temporadaAtiva = temporadas[0];
     console.log('[LEADERBOARD] Temporada ativa:', temporadaAtiva.temporada_id);
 
     // Buscar top 100 rankings ordenados por fama DA TEMPORADA ATIVA
-    const { data: rankings, error: rankingsError } = await supabase
-      .from('pvp_rankings')
-      .select('user_id, fama, vitorias, derrotas, streak')
-      .eq('temporada_id', temporadaAtiva.temporada_id)
-      .order('fama', { ascending: false })
-      .limit(100);
+    const rankings = await getDocuments('pvp_rankings', {
+      where: [['temporada_id', '==', temporadaAtiva.temporada_id]],
+      orderBy: [['fama', 'desc']],
+      limit: 100
+    });
 
-    if (rankingsError) {
-      console.error('[LEADERBOARD] Erro ao buscar rankings:', rankingsError);
-      return NextResponse.json({ error: 'Erro ao buscar rankings' }, { status: 500 });
-    }
-
-    // Buscar nomes dos usuários da tabela player_stats (coluna nome_operacao)
-    const userIds = rankings.map(r => r.user_id);
-
-    const { data: playerStats } = await supabase
-      .from('player_stats')
-      .select('user_id, nome_operacao')
-      .in('user_id', userIds);
-
-    // Criar mapa de userId -> nome
-    const nomesMap = {};
-    if (playerStats && playerStats.length > 0) {
-      playerStats.forEach(stats => {
-        nomesMap[stats.user_id] = stats.nome_operacao || 'Caçador Misterioso';
+    if (!rankings || rankings.length === 0) {
+      return NextResponse.json({
+        success: true,
+        rankings: []
       });
     }
 
-    // Adicionar nomes aos rankings
-    const rankingsComNomes = rankings.map(rank => ({
-      ...rank,
-      nome: nomesMap[rank.user_id] || 'Caçador Misterioso'
-    }));
+    // Buscar nomes dos usuários da tabela player_stats (coluna nome_operacao)
+    const rankingsComNomes = await Promise.all(
+      rankings.map(async (rank) => {
+        const playerStats = await getDocument('player_stats', rank.user_id);
+
+        return {
+          user_id: rank.user_id,
+          fama: rank.fama,
+          vitorias: rank.vitorias,
+          derrotas: rank.derrotas,
+          streak: rank.streak,
+          nome: playerStats?.nome_operacao || 'Caçador Misterioso'
+        };
+      })
+    );
 
     return NextResponse.json({
       success: true,
@@ -70,6 +59,6 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('[LEADERBOARD] Erro:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }

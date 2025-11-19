@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,53 +9,78 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '100');
     const userId = searchParams.get('userId');
 
-    // Buscar leaderboard da view
-    const { data: leaderboard, error: errorLeaderboard } = await supabase
-      .from('leaderboard_atual')
-      .select('*')
-      .limit(limit);
+    // 1. Buscar temporada ativa
+    const temporadas = await getDocuments('pvp_temporadas', {
+      where: [['ativa', '==', true]]
+    });
 
-    if (errorLeaderboard) {
-      console.error('Erro ao buscar leaderboard:', errorLeaderboard);
-      return NextResponse.json({ error: 'Erro ao buscar leaderboard' }, { status: 500 });
+    if (!temporadas || temporadas.length === 0) {
+      return NextResponse.json({ error: 'Nenhuma temporada ativa' }, { status: 404 });
     }
 
-    // Buscar títulos ativos dos jogadores no leaderboard
-    if (leaderboard && leaderboard.length > 0) {
+    const temporadaAtiva = temporadas[0];
+
+    // 2. Buscar todos os rankings da temporada ativa
+    const rankings = await getDocuments('pvp_rankings', {
+      where: [['temporada_id', '==', temporadaAtiva.temporada_id]]
+    });
+
+    // 3. Calcular win_rate e preparar dados do leaderboard
+    let leaderboardData = (rankings || []).map(ranking => {
+      const totalBatalhas = ranking.vitorias + ranking.derrotas;
+      const win_rate = totalBatalhas > 0 ? (ranking.vitorias / totalBatalhas) * 100 : 0;
+
+      return {
+        user_id: ranking.user_id,
+        fama: ranking.fama || 0,
+        vitorias: ranking.vitorias || 0,
+        derrotas: ranking.derrotas || 0,
+        streak: ranking.streak || 0,
+        win_rate: Math.round(win_rate * 100) / 100
+      };
+    });
+
+    // 4. Ordenar por fama (descendente)
+    leaderboardData.sort((a, b) => b.fama - a.fama);
+
+    // 5. Adicionar posições e limitar resultados
+    const leaderboard = leaderboardData
+      .map((jogador, index) => ({
+        ...jogador,
+        posicao: index + 1
+      }))
+      .slice(0, limit);
+
+    // 6. Buscar títulos ativos dos jogadores no leaderboard
+    if (leaderboard.length > 0) {
       const userIds = leaderboard.map(p => p.user_id);
 
-      const { data: titulos, error: errorTitulos } = await supabase
-        .from('pvp_titulos')
-        .select('user_id, titulo_nome, titulo_icone')
-        .in('user_id', userIds)
-        .eq('ativo', true);
+      const titulos = await getDocuments('pvp_titulos', {
+        where: [['ativo', '==', true]]
+      });
 
-      if (!errorTitulos && titulos) {
-        // Criar mapa de userId -> título
-        const titulosMap = {};
-        titulos.forEach(titulo => {
+      // Criar mapa de userId -> título
+      const titulosMap = {};
+      (titulos || []).forEach(titulo => {
+        if (userIds.includes(titulo.user_id)) {
           titulosMap[titulo.user_id] = {
             nome: titulo.titulo_nome,
             icone: titulo.titulo_icone
           };
-        });
+        }
+      });
 
-        // Adicionar título a cada jogador
-        leaderboard.forEach(jogador => {
-          jogador.titulo = titulosMap[jogador.user_id] || null;
-        });
-      }
+      // Adicionar título a cada jogador
+      leaderboard.forEach(jogador => {
+        jogador.titulo = titulosMap[jogador.user_id] || null;
+      });
     }
 
-    // Se userId foi fornecido, buscar posição do jogador
+    // 7. Se userId foi fornecido, buscar posição do jogador
     let posicaoJogador = null;
     let jogadorNoTop = false;
 
@@ -67,15 +92,11 @@ export async function GET(request) {
         posicaoJogador = leaderboard[jogadorIndex].posicao;
         jogadorNoTop = true;
       } else {
-        // Buscar posição exata do jogador na view completa
-        const { data: jogadorData, error: errorJogador } = await supabase
-          .from('leaderboard_atual')
-          .select('posicao, fama, vitorias, derrotas, streak, win_rate')
-          .eq('user_id', userId)
-          .single();
+        // Buscar posição exata do jogador no leaderboard completo
+        const jogadorIndexCompleto = leaderboardData.findIndex(p => p.user_id === userId);
 
-        if (!errorJogador && jogadorData) {
-          posicaoJogador = jogadorData.posicao;
+        if (jogadorIndexCompleto !== -1) {
+          posicaoJogador = jogadorIndexCompleto + 1;
           jogadorNoTop = false;
         }
       }
@@ -90,6 +111,6 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('Erro no GET /api/pvp/leaderboard:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }

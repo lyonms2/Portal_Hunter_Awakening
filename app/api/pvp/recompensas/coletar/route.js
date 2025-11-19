@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,11 +10,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     const body = await request.json();
     const { userId, recompensaId } = body;
 
@@ -22,16 +17,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'userId e recompensaId são obrigatórios' }, { status: 400 });
     }
 
-    // Buscar recompensa
-    const { data: recompensa, error: errorBuscar } = await supabase
-      .from('pvp_recompensas_pendentes')
-      .select('*')
-      .eq('id', recompensaId)
-      .eq('user_id', userId)
-      .eq('coletada', false)
-      .single();
+    // Buscar recompensa no Firestore
+    const recompensa = await getDocument('pvp_recompensas_pendentes', recompensaId);
 
-    if (errorBuscar || !recompensa) {
+    if (!recompensa || recompensa.user_id !== userId || recompensa.coletada) {
       return NextResponse.json({ error: 'Recompensa não encontrada ou já coletada' }, { status: 404 });
     }
 
@@ -43,14 +32,10 @@ export async function POST(request) {
     });
 
     // Buscar stats atuais do jogador
-    const { data: stats, error: errorStats } = await supabase
-      .from('player_stats')
-      .select('moedas, fragmentos')
-      .eq('user_id', userId)
-      .single();
+    const stats = await getDocument('player_stats', userId);
 
-    if (errorStats) {
-      console.error('[COLETAR RECOMPENSA] Erro ao buscar stats:', errorStats);
+    if (!stats) {
+      console.error('[COLETAR RECOMPENSA] Erro ao buscar stats');
       return NextResponse.json({ error: 'Erro ao buscar stats do jogador' }, { status: 500 });
     }
 
@@ -59,32 +44,17 @@ export async function POST(request) {
     const novosFragmentos = (stats.fragmentos || 0) + (recompensa.fragmentos || 0);
 
     // Atualizar moedas e fragmentos do jogador
-    const { error: errorAtualizar } = await supabase
-      .from('player_stats')
-      .update({
-        moedas: novasMoedas,
-        fragmentos: novosFragmentos
-      })
-      .eq('user_id', userId);
-
-    if (errorAtualizar) {
-      console.error('[COLETAR RECOMPENSA] Erro ao atualizar stats:', errorAtualizar);
-      return NextResponse.json({ error: 'Erro ao atualizar stats' }, { status: 500 });
-    }
+    await updateDocument('player_stats', userId, {
+      moedas: novasMoedas,
+      fragmentos: novosFragmentos,
+      updated_at: new Date().toISOString()
+    });
 
     // Marcar recompensa como coletada
-    const { error: errorMarcar } = await supabase
-      .from('pvp_recompensas_pendentes')
-      .update({
-        coletada: true,
-        data_coleta: new Date().toISOString()
-      })
-      .eq('id', recompensaId);
-
-    if (errorMarcar) {
-      console.error('[COLETAR RECOMPENSA] Erro ao marcar como coletada:', errorMarcar);
-      // Não retornar erro pois recursos já foram dados
-    }
+    await updateDocument('pvp_recompensas_pendentes', recompensaId, {
+      coletada: true,
+      data_coleta: new Date().toISOString()
+    });
 
     // Se ganhou avatar lendário ou raro, retornar flag para mostrar modal
     const ganhouAvatar = recompensa.avatar_lendario || recompensa.avatar_raro;
@@ -109,6 +79,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('[COLETAR RECOMPENSA] Erro interno:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }

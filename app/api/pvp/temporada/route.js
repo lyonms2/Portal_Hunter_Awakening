@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,25 +9,15 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
+    const temporadas = await getDocuments('pvp_temporadas', {
+      where: [['ativa', '==', true]]
+    });
 
-    const { data: temporada, error } = await supabase
-      .from('pvp_temporadas')
-      .select('*')
-      .eq('ativa', true)
-      .single();
-
-    if (error) {
-      console.error('Erro ao buscar temporada:', error);
-      return NextResponse.json({ error: 'Erro ao buscar temporada' }, { status: 500 });
-    }
-
-    if (!temporada) {
+    if (!temporadas || temporadas.length === 0) {
       return NextResponse.json({ error: 'Nenhuma temporada ativa encontrada' }, { status: 404 });
     }
+
+    const temporada = temporadas[0];
 
     // Calcular dias restantes
     const dataFim = new Date(temporada.data_fim);
@@ -47,7 +37,7 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('Erro no GET /api/pvp/temporada:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }
 
