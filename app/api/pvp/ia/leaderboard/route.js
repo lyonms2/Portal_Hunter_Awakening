@@ -25,7 +25,7 @@ export async function GET(request) {
     // Buscar top 100 rankings ordenados por fama DA TEMPORADA ATIVA
     const rankings = await getDocuments('pvp_rankings', {
       where: [['temporada_id', '==', temporadaAtiva.temporada_id]],
-      orderBy: [['fama', 'desc']],
+      orderBy: ['fama', 'desc'],
       limit: 100
     });
 

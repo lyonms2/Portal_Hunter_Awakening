@@ -22,7 +22,7 @@ export async function GET(request) {
         ['user_id', '==', userId],
         ['coletada', '==', false]
       ],
-      orderBy: [['created_at', 'desc']]
+      orderBy: ['created_at', 'desc']
     });
 
     // Para cada recompensa, buscar detalhes da temporada

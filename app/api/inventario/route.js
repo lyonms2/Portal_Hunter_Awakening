@@ -23,7 +23,7 @@ export async function GET(request) {
     // Buscar inventário do jogador no Firestore
     const inventarioItems = await getDocuments('player_inventory', {
       where: [['user_id', '==', userId]],
-      orderBy: [['created_at', 'desc']]
+      orderBy: ['created_at', 'desc']
     });
 
     if (!inventarioItems || inventarioItems.length === 0) {
