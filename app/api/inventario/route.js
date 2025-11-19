@@ -94,8 +94,8 @@ export async function POST(request) {
       );
     }
 
-    // Itens consumíveis requerem avatar ativo
-    const requerAvatar = item.tipo === 'consumivel';
+    // Itens consumíveis requerem avatar ativo (suporta com e sem acento)
+    const requerAvatar = item.tipo === 'consumivel' || item.tipo === 'consumível';
     console.log('[INVENTARIO] Tipo do item:', item.tipo, '| Requer avatar:', requerAvatar);
 
     // Verificar se o item requer avatar ativo
