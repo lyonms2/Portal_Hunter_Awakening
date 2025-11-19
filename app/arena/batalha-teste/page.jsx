@@ -89,7 +89,7 @@ function BatalhaTesteContent() {
       } else {
         addLog(`⚠️ Erro ao marcar como pronto: ${data.error || 'desconhecido'}`);
         // Tentar buscar a sala diretamente para debug
-        addLog(`🔍 Verificando se sala existe no Supabase...`);
+        addLog(`🔍 Verificando se sala existe no Firestore...`);
         const debugResponse = await fetch(`/api/pvp/battle/debug?matchId=${matchId}`);
         const debugData = await debugResponse.json();
         addLog(`🔍 Debug result: ${JSON.stringify(debugData)}`);
