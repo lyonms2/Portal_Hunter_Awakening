@@ -1,7 +1,7 @@
 // ==================== API: COMPRAR ITEM ====================
 // Arquivo: /app/api/inventario/comprar/route.js
 
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, getDocuments, updateDocument, createDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,14 +10,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const body = await request.json();
     const { userId, itemId, quantidade = 1 } = body;
 
@@ -35,14 +27,10 @@ export async function POST(request) {
       );
     }
 
-    // Buscar informações do item
-    const { data: item, error: itemError } = await supabase
-      .from('items')
-      .select('*')
-      .eq('id', itemId)
-      .single();
+    // Buscar informações do item no Firestore
+    const item = await getDocument('items', itemId);
 
-    if (itemError || !item) {
+    if (!item) {
       return Response.json(
         { message: "Item não encontrado" },
         { status: 404 }
@@ -52,14 +40,10 @@ export async function POST(request) {
     // Calcular custo total
     const custoTotal = item.preco_compra * quantidade;
 
-    // Buscar stats do jogador
-    const { data: stats, error: statsError } = await supabase
-      .from('player_stats')
-      .select('moedas')
-      .eq('user_id', userId)
-      .single();
+    // Buscar stats do jogador no Firestore
+    const stats = await getDocument('player_stats', userId);
 
-    if (statsError || !stats) {
+    if (!stats) {
       return Response.json(
         { message: "Stats do jogador não encontradas" },
         { status: 404 }
@@ -80,20 +64,14 @@ export async function POST(request) {
     }
 
     // Verificar se já tem o item no inventário
-    const { data: inventoryItem, error: invError } = await supabase
-      .from('player_inventory')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('item_id', itemId)
-      .single();
+    const inventoryItems = await getDocuments('player_inventory', {
+      where: [
+        ['user_id', '==', userId],
+        ['item_id', '==', itemId]
+      ]
+    });
 
-    if (invError && invError.code !== 'PGRST116') { // PGRST116 = not found
-      console.error("Erro ao verificar inventário:", invError);
-      return Response.json(
-        { message: "Erro ao verificar inventário" },
-        { status: 500 }
-      );
-    }
+    const inventoryItem = inventoryItems && inventoryItems.length > 0 ? inventoryItems[0] : null;
 
     // Se já tem o item e é empilhável, aumentar quantidade
     if (inventoryItem && item.empilhavel) {
@@ -113,35 +91,16 @@ export async function POST(request) {
       const custoReal = item.preco_compra * quantidadeComprada;
 
       // PRIMEIRO: Deduzir moedas (se falhar aqui, nada aconteceu ainda)
-      const { error: updateStatsError } = await supabase
-        .from('player_stats')
-        .update({ moedas: stats.moedas - custoReal })
-        .eq('user_id', userId);
-
-      if (updateStatsError) {
-        console.error("Erro ao processar pagamento:", updateStatsError);
-        return Response.json(
-          { message: "Erro ao processar pagamento" },
-          { status: 500 }
-        );
-      }
+      await updateDocument('player_stats', userId, {
+        moedas: stats.moedas - custoReal,
+        updated_at: new Date().toISOString()
+      });
 
       // SEGUNDO: Atualizar quantidade no inventário (só depois de pagar!)
-      const { error: updateInvError } = await supabase
-        .from('player_inventory')
-        .update({
-          quantidade: novaQuantidade,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', inventoryItem.id);
-
-      if (updateInvError) {
-        console.error("ERRO CRÍTICO - Moedas foram deduzidas mas item não foi adicionado:", updateInvError);
-        return Response.json(
-          { message: "Erro ao adicionar item. Contate o suporte com esta mensagem." },
-          { status: 500 }
-        );
-      }
+      await updateDocument('player_inventory', inventoryItem.id, {
+        quantidade: novaQuantidade,
+        updated_at: new Date().toISOString()
+      });
 
       return Response.json({
         sucesso: true,
@@ -158,35 +117,19 @@ export async function POST(request) {
 
     } else {
       // PRIMEIRO: Deduzir moedas (se falhar aqui, nada aconteceu ainda)
-      const { error: updateStatsError } = await supabase
-        .from('player_stats')
-        .update({ moedas: stats.moedas - custoTotal })
-        .eq('user_id', userId);
-
-      if (updateStatsError) {
-        console.error("Erro ao processar pagamento:", updateStatsError);
-        return Response.json(
-          { message: "Erro ao processar pagamento" },
-          { status: 500 }
-        );
-      }
+      await updateDocument('player_stats', userId, {
+        moedas: stats.moedas - custoTotal,
+        updated_at: new Date().toISOString()
+      });
 
       // SEGUNDO: Adicionar novo item ao inventário (só depois de pagar!)
-      const { error: insertError } = await supabase
-        .from('player_inventory')
-        .insert({
-          user_id: userId,
-          item_id: itemId,
-          quantidade: quantidade
-        });
-
-      if (insertError) {
-        console.error("ERRO CRÍTICO - Moedas foram deduzidas mas item não foi adicionado:", insertError);
-        return Response.json(
-          { message: "Erro ao adicionar item. Contate o suporte com esta mensagem." },
-          { status: 500 }
-        );
-      }
+      await createDocument('player_inventory', {
+        user_id: userId,
+        item_id: itemId,
+        quantidade: quantidade,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
 
       return Response.json({
         sucesso: true,
@@ -204,7 +147,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("Erro ao comprar item:", error);
     return Response.json(
-      { message: "Erro ao processar compra" },
+      { message: "Erro ao processar compra: " + error.message },
       { status: 500 }
     );
   }
