@@ -1,11 +1,10 @@
-import { getSupabaseAnonClient } from "@/lib/supabase/serverClient";
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    const supabase = getSupabaseAnonClient();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
 
@@ -18,42 +17,25 @@ export async function GET(request) {
 
     const chapter = 1; // Capítulo 1 por enquanto
 
-    // Buscar progresso
-    const { data: progressData, error: progressError } = await supabase
-      .from("story_progress")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("chapter", chapter)
-      .single();
+    // Buscar progresso do Firestore
+    const progressDocId = `${userId}_chapter${chapter}`;
+    const progressData = await getDocument('story_progress', progressDocId);
 
-    // Buscar avatar
-    const { data: avatarData } = await supabase
-      .from("story_avatars")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
+    // Buscar avatar do Firestore
+    const avatarData = await getDocument('story_avatars', userId);
 
-    // Buscar conquistas
-    const { data: achievementsData } = await supabase
-      .from("story_achievements")
-      .select("*")
-      .eq("user_id", userId);
+    // Buscar conquistas do Firestore
+    const achievementsData = await getDocuments('story_achievements', {
+      where: [['user_id', '==', userId]]
+    });
 
-    if (progressError) {
-      // If no progress found, return null (not an error)
-      if (progressError.code === "PGRST116") {
-        return NextResponse.json({
-          progress: null,
-          avatar: null,
-          achievements: []
-        });
-      }
-
-      console.error("Erro ao carregar progresso:", progressError);
-      return NextResponse.json(
-        { error: "Erro ao carregar progresso", details: progressError.message },
-        { status: 500 }
-      );
+    // Se não há progresso, retornar null
+    if (!progressData) {
+      return NextResponse.json({
+        progress: null,
+        avatar: null,
+        achievements: []
+      });
     }
 
     // Montar resposta com dados do progresso e avatar
@@ -90,4 +72,3 @@ export async function GET(request) {
     );
   }
 }
-

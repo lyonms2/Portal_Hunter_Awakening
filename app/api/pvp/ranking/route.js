@@ -1,18 +1,23 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, getDocuments, createDocument, updateDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/pvp/ranking?userId=xxx
- * Busca o ranking do jogador na temporada ativa
+ *
+ * 📊 RANKING PVP UNIFICADO
+ *
+ * Busca o ranking do jogador na temporada ativa.
+ * Este ranking conta para AMBOS os modos PvP:
+ *
+ * - ⚔️ TREINO PVP (Assíncrono): Batalhas locais contra avatares de outros jogadores
+ * - 🔥 ARENA PVP (Tempo Real): Batalhas ao vivo, jogador vs jogador
+ *
+ * Ambos os modos ganham/perdem FAMA no mesmo ranking!
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
@@ -20,61 +25,44 @@ export async function GET(request) {
       return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
-    // Buscar temporada ativa
-    const { data: temporadaAtiva, error: errorTemporada } = await supabase
-      .from('pvp_temporadas')
-      .select('temporada_id')
-      .eq('ativa', true)
-      .single();
+    // Buscar temporada ativa no Firestore
+    const temporadas = await getDocuments('pvp_temporadas', {
+      where: [['ativa', '==', true]]
+    });
 
-    if (errorTemporada) {
-      console.error('Erro ao buscar temporada ativa:', errorTemporada);
-      return NextResponse.json({ error: 'Erro ao buscar temporada ativa' }, { status: 500 });
-    }
-
-    if (!temporadaAtiva) {
+    if (!temporadas || temporadas.length === 0) {
       return NextResponse.json({ error: 'Nenhuma temporada ativa encontrada' }, { status: 404 });
     }
 
+    const temporadaAtiva = temporadas[0];
+
     // Buscar ranking do jogador
-    const { data: ranking, error: errorRanking } = await supabase
-      .from('pvp_rankings')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('temporada_id', temporadaAtiva.temporada_id)
-      .single();
+    const rankingId = `${userId}_${temporadaAtiva.temporada_id}`;
+    const ranking = await getDocument('pvp_rankings', rankingId);
 
     // Se não existe, criar registro inicial
-    if (errorRanking && errorRanking.code === 'PGRST116') {
-      const { data: novoRanking, error: errorCriar } = await supabase
-        .from('pvp_rankings')
-        .insert({
-          user_id: userId,
-          temporada_id: temporadaAtiva.temporada_id,
-          fama: 1000,
-          vitorias: 0,
-          derrotas: 0,
-          streak: 0,
-          streak_maximo: 0
-        })
-        .select()
-        .single();
+    if (!ranking) {
+      const novoRanking = {
+        user_id: userId,
+        temporada_id: temporadaAtiva.temporada_id,
+        fama: 1000,
+        vitorias: 0,
+        derrotas: 0,
+        streak: 0,
+        streak_maximo: 0,
+        ultima_batalha: null,
+        recompensas_recebidas: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
-      if (errorCriar) {
-        console.error('Erro ao criar ranking:', errorCriar);
-        return NextResponse.json({ error: 'Erro ao criar ranking' }, { status: 500 });
-      }
+      await createDocument('pvp_rankings', novoRanking, rankingId);
 
       return NextResponse.json({
         success: true,
-        ranking: novoRanking,
+        ranking: { id: rankingId, ...novoRanking },
         temporada: temporadaAtiva.temporada_id
       });
-    }
-
-    if (errorRanking) {
-      console.error('Erro ao buscar ranking:', errorRanking);
-      return NextResponse.json({ error: 'Erro ao buscar ranking' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -90,15 +78,16 @@ export async function GET(request) {
 
 /**
  * POST /api/pvp/ranking
- * Atualiza o ranking do jogador após uma batalha
+ *
+ * 📊 Atualiza ranking após batalha (ambos os modos PvP)
+ *
  * Body: { userId, venceu, famaGanho }
+ *
+ * NOTA: Este endpoint é usado tanto para Treino PvP quanto Arena PvP.
+ * Ambos compartilham o mesmo sistema de ranking e fama!
  */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
     const body = await request.json();
     const { userId, venceu, famaGanho } = body;
 
@@ -110,26 +99,22 @@ export async function POST(request) {
     }
 
     // Buscar temporada ativa
-    const { data: temporadaAtiva, error: errorTemporada } = await supabase
-      .from('pvp_temporadas')
-      .select('temporada_id')
-      .eq('ativa', true)
-      .single();
+    const temporadas = await getDocuments('pvp_temporadas', {
+      where: [['ativa', '==', true]]
+    });
 
-    if (errorTemporada || !temporadaAtiva) {
+    if (!temporadas || temporadas.length === 0) {
       return NextResponse.json({ error: 'Nenhuma temporada ativa' }, { status: 404 });
     }
 
-    // Buscar ranking atual
-    const { data: rankingAtual, error: errorBuscar } = await supabase
-      .from('pvp_rankings')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('temporada_id', temporadaAtiva.temporada_id)
-      .single();
+    const temporadaAtiva = temporadas[0];
 
-    if (errorBuscar) {
-      console.error('Erro ao buscar ranking:', errorBuscar);
+    // Buscar ranking atual
+    const rankingId = `${userId}_${temporadaAtiva.temporada_id}`;
+    const rankingAtual = await getDocument('pvp_rankings', rankingId);
+
+    if (!rankingAtual) {
+      console.error('Ranking não encontrado');
       return NextResponse.json({ error: 'Ranking não encontrado' }, { status: 404 });
     }
 
@@ -140,27 +125,19 @@ export async function POST(request) {
     const novoStreak = venceu ? rankingAtual.streak + 1 : 0;
     const novoStreakMaximo = Math.max(rankingAtual.streak_maximo, novoStreak);
 
-    // Atualizar ranking
-    const { data: rankingAtualizado, error: errorAtualizar } = await supabase
-      .from('pvp_rankings')
-      .update({
-        fama: novaFama,
-        vitorias: novasVitorias,
-        derrotas: novasDerrotas,
-        streak: novoStreak,
-        streak_maximo: novoStreakMaximo,
-        ultima_batalha: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('temporada_id', temporadaAtiva.temporada_id)
-      .select()
-      .single();
+    // Atualizar ranking no Firestore
+    await updateDocument('pvp_rankings', rankingId, {
+      fama: novaFama,
+      vitorias: novasVitorias,
+      derrotas: novasDerrotas,
+      streak: novoStreak,
+      streak_maximo: novoStreakMaximo,
+      ultima_batalha: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
 
-    if (errorAtualizar) {
-      console.error('Erro ao atualizar ranking:', errorAtualizar);
-      return NextResponse.json({ error: 'Erro ao atualizar ranking' }, { status: 500 });
-    }
+    // Buscar ranking atualizado
+    const rankingAtualizado = await getDocument('pvp_rankings', rankingId);
 
     return NextResponse.json({
       success: true,

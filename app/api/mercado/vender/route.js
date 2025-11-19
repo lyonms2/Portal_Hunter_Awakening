@@ -1,15 +1,7 @@
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocument, updateDocument } from "@/lib/firebase/firestore";
 
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const { userId, avatarId, precoMoedas, precoFragmentos } = await request.json();
 
     if (!userId || !avatarId) {
@@ -62,15 +54,10 @@ export async function POST(request) {
       );
     }
 
-    // Buscar avatar
-    const { data: avatar, error: avatarError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .eq('user_id', userId)
-      .single();
+    // Buscar avatar do Firestore
+    const avatar = await getDocument('avatares', avatarId);
 
-    if (avatarError || !avatar) {
+    if (!avatar || avatar.user_id !== userId) {
       return Response.json(
         { message: "Avatar não encontrado" },
         { status: 404 }
@@ -106,23 +93,12 @@ export async function POST(request) {
       );
     }
 
-    // Colocar à venda
-    const { error: updateError } = await supabase
-      .from('avatares')
-      .update({
-        em_venda: true,
-        preco_venda: moedasValor > 0 ? moedasValor : null,
-        preco_fragmentos: fragmentosValor > 0 ? fragmentosValor : null
-      })
-      .eq('id', avatarId);
-
-    if (updateError) {
-      console.error("Erro ao colocar avatar à venda:", updateError);
-      return Response.json(
-        { message: "Erro ao colocar avatar à venda" },
-        { status: 500 }
-      );
-    }
+    // Colocar à venda no Firestore
+    await updateDocument('avatares', avatarId, {
+      em_venda: true,
+      preco_venda: moedasValor > 0 ? moedasValor : null,
+      preco_fragmentos: fragmentosValor > 0 ? fragmentosValor : null
+    });
 
     return Response.json({
       message: "Avatar colocado à venda com sucesso!",
@@ -143,14 +119,6 @@ export async function POST(request) {
 // Cancelar venda
 export async function DELETE(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const { userId, avatarId } = await request.json();
 
     if (!userId || !avatarId) {
@@ -160,24 +128,22 @@ export async function DELETE(request) {
       );
     }
 
-    // Remover da venda
-    const { error: updateError } = await supabase
-      .from('avatares')
-      .update({
-        em_venda: false,
-        preco_venda: null,
-        preco_fragmentos: null
-      })
-      .eq('id', avatarId)
-      .eq('user_id', userId);
+    // Verificar se o avatar pertence ao usuário
+    const avatar = await getDocument('avatares', avatarId);
 
-    if (updateError) {
-      console.error("Erro ao cancelar venda:", updateError);
+    if (!avatar || avatar.user_id !== userId) {
       return Response.json(
-        { message: "Erro ao cancelar venda" },
-        { status: 500 }
+        { message: "Avatar não encontrado" },
+        { status: 404 }
       );
     }
+
+    // Remover da venda no Firestore
+    await updateDocument('avatares', avatarId, {
+      em_venda: false,
+      preco_venda: null,
+      preco_fragmentos: null
+    });
 
     return Response.json({
       message: "Venda cancelada com sucesso!"

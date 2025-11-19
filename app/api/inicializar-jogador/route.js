@@ -1,18 +1,7 @@
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
-
-// MOVIDO PARA DENTRO DA FUNÇÃO: const supabase = getSupabaseClientSafe();
+import { getDocument, createDocument } from "@/lib/firebase/firestore";
 
 export async function POST(request) {
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const { userId } = await request.json();
 
     if (!userId) {
@@ -24,16 +13,8 @@ export async function POST(request) {
 
     console.log("Inicializando jogador:", userId);
 
-    // Verificar se já existe
-    const { data: existing, error: selectError } = await supabase
-      .from('player_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (selectError) {
-      console.error("Erro ao buscar stats:", selectError);
-    }
+    // Verificar se já existe no Firestore
+    const existing = await getDocument('player_stats', userId);
 
     if (existing) {
       console.log("Jogador já existe:", existing);
@@ -45,28 +26,20 @@ export async function POST(request) {
 
     console.log("Criando novo jogador...");
 
-    // Criar stats iniciais
-    const { data: stats, error } = await supabase
-      .from('player_stats')
-      .insert([{
-        user_id: userId,
-        moedas: 500,
-        fragmentos: 0,
-        divida: 0,
-        ranking: 'F',
-        missoes_completadas: 0,
-        primeira_invocacao: true
-      }])
-      .select()
-      .single();
+    // Criar stats iniciais no Firestore
+    const statsData = {
+      user_id: userId,
+      moedas: 500,
+      fragmentos: 0,
+      divida: 0,
+      ranking: 'F',
+      missoes_completadas: 0,
+      primeira_invocacao: true
+    };
 
-    if (error) {
-      console.error("Erro ao criar stats:", error);
-      return Response.json(
-        { message: "Erro ao inicializar jogador: " + error.message },
-        { status: 500 }
-      );
-    }
+    await createDocument('player_stats', statsData, userId);
+
+    const stats = { id: userId, ...statsData };
 
     console.log("Jogador criado com sucesso:", stats);
 

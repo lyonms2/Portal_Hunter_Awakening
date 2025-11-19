@@ -1,0 +1,114 @@
+# 📋 APIs Restantes que Ainda Usam Supabase
+
+## ⚔️ IMPORTANTE: Dois Sistemas PvP Diferentes!
+- 🎯 **Treino PvP** (antes "PvP IA"): Batalhas assíncronas contra avatares de outros players (controlados por IA localmente)
+- 🔥 **Arena PvP** (tempo real): Batalhas síncronas ao vivo, jogador vs jogador
+
+Ambos usam o mesmo ranking e temporada!
+
+## ✅ Já Migradas para Firestore:
+- ✅ Authentication (login, cadastro)
+- ✅ Story Mode (save, load, reset)
+- ✅ Mercado/Trade (listar, vender, comprar)
+- ✅ Sistema de Avatares (inicializar, invocar, meus-avatares, atualizar)
+- ✅ PvP Ranking (ranking, batalha - usado por ambos os modos)
+- ✅ Treino PvP (oponentes, finalizar - batalhas assíncronas)
+- ✅ Arena PvP (queue, battle/room, battle/action - batalhas tempo real)
+
+---
+
+## ⚠️ AINDA USANDO SUPABASE (20 arquivos):
+
+### 🔴 **PRIORIDADE ALTA** (Funcionalidades Core):
+
+#### 1. **Gestão de Avatar**
+- `/api/atualizar-nome` - Atualizar nome de operação do jogador
+- `/api/buscar-avatar` - Buscar avatar específico
+- `/api/descansar-avatar` - Sistema de descanso (recuperação)
+- `/api/atualizar-stats` - Atualizar stats do jogador
+
+#### 2. **Sistema de Avatar Avançado**
+- `/api/purificar-avatar` - Purificação de avatares (remove marca da morte)
+- `/api/sacrificar-avatar` - Sacrificar avatar por recursos
+- `/api/ressuscitar-avatar` - Ressuscitar avatar morto
+- `/api/merge-avatares` - Fundir avatares
+
+#### 3. **Sistema de Inventário** (4 arquivos)
+- `/api/inventario` (GET) - Ver inventário do jogador
+- `/api/inventario` (POST) - Usar item do inventário
+- `/api/inventario/loja` - Ver loja de itens
+- `/api/inventario/comprar` - Comprar item da loja
+
+---
+
+### 🟡 **PRIORIDADE MÉDIA** (Funcionalidades Secundárias):
+
+#### 4. **PvP - Funcionalidades Extras**
+- `/api/pvp/historico` - Histórico de batalhas
+- `/api/pvp/leaderboard` - Leaderboard geral PvP
+- `/api/pvp/ia/leaderboard` - Leaderboard PvP IA
+- `/api/pvp/titulos` - Sistema de títulos
+- `/api/pvp/recompensas` (GET) - Ver recompensas disponíveis
+- `/api/pvp/recompensas/coletar` (POST) - Coletar recompensas
+
+#### 5. **Gestão de Temporadas**
+- `/api/pvp/temporada` (GET) - Ver temporada ativa
+- `/api/pvp/temporada/encerrar` (POST) - Encerrar temporada
+
+---
+
+### 🟢 **PRIORIDADE BAIXA** (Pode Esperar):
+
+#### 6. **Arena/Treino**
+- `/api/arena/treino/iniciar` - Iniciar treino na arena
+
+---
+
+## 📊 Estatísticas:
+
+- **Total de APIs**: ~50
+- **Já Migradas**: 30 (60%)
+- **Faltam Migrar**: 20 (40%)
+
+---
+
+## 🎯 Sugestão de Ordem de Migração:
+
+### **Fase 7** - Gestão de Avatar (4 APIs)
+1. `/api/atualizar-nome`
+2. `/api/buscar-avatar`
+3. `/api/descansar-avatar`
+4. `/api/atualizar-stats`
+
+### **Fase 8** - Avatar Avançado (4 APIs)
+1. `/api/purificar-avatar`
+2. `/api/sacrificar-avatar`
+3. `/api/ressuscitar-avatar`
+4. `/api/merge-avatares`
+
+### **Fase 9** - Inventário (4 APIs)
+1. `/api/inventario/loja`
+2. `/api/inventario/comprar`
+3. `/api/inventario` (GET/POST)
+
+### **Fase 10** - PvP Extras (8 APIs)
+1. Leaderboards
+2. Histórico
+3. Títulos
+4. Recompensas
+5. Temporadas
+
+### **Fase 11** - Arena/Outros (1 API)
+1. `/api/arena/treino/iniciar`
+
+---
+
+## ✅ Quando Tudo Estiver Migrado:
+
+- 🔥 **100% Firebase/Firestore**
+- ❌ **0% Supabase**
+- 🚀 **Sistema completamente unificado**
+
+---
+
+**Quer que eu continue migrando? Qual fase quer fazer primeiro?**

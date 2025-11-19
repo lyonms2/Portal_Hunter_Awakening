@@ -1,7 +1,11 @@
-import { getSupabaseAnonClient } from '@/lib/supabase/serverClient';
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 import { validarStats } from '../../avatares/sistemas/statsSystem';
 
+export const dynamic = 'force-dynamic';
+
 /**
+ * POST /api/purificar-avatar
+ *
  * Sistema de Purificação - Remove Marca da Morte
  *
  * Benefícios:
@@ -12,12 +16,10 @@ import { validarStats } from '../../avatares/sistemas/statsSystem';
  *
  * Custo: 2x o custo de ressurreição
  */
-
 export async function POST(request) {
   console.log("=== INICIANDO RITUAL DE PURIFICAÇÃO ===");
 
   try {
-    const supabase = getSupabaseAnonClient();
     const { userId, avatarId } = await request.json();
     console.log("Dados recebidos:", { userId, avatarId });
 
@@ -29,19 +31,12 @@ export async function POST(request) {
       );
     }
 
-    // 1. Buscar avatar vivo com marca da morte
+    // 1. Buscar avatar vivo com marca da morte no Firestore
     console.log("Buscando avatar marcado...");
-    const { data: avatar, error: avatarError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .eq('user_id', userId)
-      .eq('vivo', true) // Deve estar vivo
-      .eq('marca_morte', true) // Deve ter marca da morte
-      .single();
+    const avatar = await getDocument('avatares', avatarId);
 
-    if (avatarError || !avatar) {
-      console.error("❌ Erro ao buscar avatar:", avatarError);
+    if (!avatar || avatar.user_id !== userId || !avatar.vivo || !avatar.marca_morte) {
+      console.error("❌ Avatar inválido");
       return Response.json(
         { message: "Avatar não encontrado ou não possui Marca da Morte" },
         { status: 404 }
@@ -60,19 +55,15 @@ export async function POST(request) {
     const custo = custos[avatar.raridade] || custos['Comum'];
     console.log("Custo do ritual:", custo);
 
-    // 3. Verificar se jogador tem recursos
+    // 3. Verificar se jogador tem recursos no Firestore
     console.log("Buscando recursos do jogador...");
-    const { data: stats, error: statsError } = await supabase
-      .from('player_stats')
-      .select('moedas, fragmentos')
-      .eq('user_id', userId)
-      .single();
+    const stats = await getDocument('player_stats', userId);
 
-    if (statsError || !stats) {
-      console.error("❌ Erro ao buscar stats:", statsError);
+    if (!stats) {
+      console.error("❌ Stats não encontrados");
       return Response.json(
-        { message: "Erro ao buscar recursos: " + (statsError?.message || "Stats não encontrados") },
-        { status: 500 }
+        { message: "Jogador não encontrado" },
+        { status: 404 }
       );
     }
 
@@ -129,95 +120,40 @@ export async function POST(request) {
     const novaExaustao = 30;
     console.log(`Exaustão: ${avatar.exaustao || 0} → ${novaExaustao} (CANSADO)`);
 
-    // 5. Aplicar purificação
+    // 5. Aplicar purificação no Firestore
     console.log("Aplicando ritual de purificação...");
-    const { error: updateAvatarError } = await supabase
-      .from('avatares')
-      .update({
-        // Stats restaurados
-        forca: statsRestaurados.forca,
-        agilidade: statsRestaurados.agilidade,
-        resistencia: statsRestaurados.resistencia,
-        foco: statsRestaurados.foco,
+    await updateDocument('avatares', avatarId, {
+      // Stats restaurados
+      forca: statsRestaurados.forca,
+      agilidade: statsRestaurados.agilidade,
+      resistencia: statsRestaurados.resistencia,
+      foco: statsRestaurados.foco,
 
-        // Melhorias
-        vinculo: novoVinculo,
-        exaustao: novaExaustao,
+      // Melhorias
+      vinculo: novoVinculo,
+      exaustao: novaExaustao,
 
-        // Remover marca da morte (PODE SER RESSUSCITADO NOVAMENTE!)
-        marca_morte: false
-      })
-      .eq('id', avatarId);
-
-    if (updateAvatarError) {
-      console.error("❌ Erro ao atualizar avatar:", updateAvatarError);
-      return Response.json(
-        { message: "Erro ao purificar avatar: " + updateAvatarError.message },
-        { status: 500 }
-      );
-    }
+      // Remover marca da morte (PODE SER RESSUSCITADO NOVAMENTE!)
+      marca_morte: false,
+      updated_at: new Date().toISOString()
+    });
 
     console.log("✅ Avatar purificado!");
 
-    // 6. Deduzir recursos do jogador
+    // 6. Deduzir recursos do jogador no Firestore
     console.log("Deduzindo recursos do jogador...");
-    const { error: updateStatsError } = await supabase
-      .from('player_stats')
-      .update({
-        moedas: stats.moedas - custo.moedas,
-        fragmentos: stats.fragmentos - custo.fragmentos
-      })
-      .eq('user_id', userId);
-
-    if (updateStatsError) {
-      console.error("❌ Erro ao deduzir recursos:", updateStatsError);
-      return Response.json(
-        { message: "Erro ao deduzir recursos: " + updateStatsError.message },
-        { status: 500 }
-      );
-    }
+    await updateDocument('player_stats', userId, {
+      moedas: stats.moedas - custo.moedas,
+      fragmentos: stats.fragmentos - custo.fragmentos,
+      updated_at: new Date().toISOString()
+    });
 
     console.log("✅ Recursos deduzidos!");
 
-    // 7. Registrar no histórico (se a tabela existir)
-    try {
-      await supabase
-        .from('purificacoes_historico')
-        .insert([{
-          user_id: userId,
-          avatar_id: avatarId,
-          custo_moedas: custo.moedas,
-          custo_fragmentos: custo.fragmentos,
-          stats_antes: {
-            forca: avatar.forca,
-            agilidade: avatar.agilidade,
-            resistencia: avatar.resistencia,
-            foco: avatar.foco
-          },
-          stats_depois: statsRestaurados,
-          vinculo_antes: avatar.vinculo,
-          vinculo_depois: novoVinculo,
-          exaustao_antes: avatar.exaustao,
-          exaustao_depois: novaExaustao
-        }]);
-      console.log("✅ Histórico registrado");
-    } catch (error) {
-      console.log("⚠️ Histórico não registrado (tabela pode não existir)");
-    }
-
-    // 8. Buscar dados atualizados
+    // 7. Buscar dados atualizados
     console.log("Buscando dados atualizados...");
-    const { data: statsAtualizados } = await supabase
-      .from('player_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    const { data: avatarPurificado } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .single();
+    const statsAtualizados = await getDocument('player_stats', userId);
+    const avatarPurificado = await getDocument('avatares', avatarId);
 
     console.log("✅ RITUAL DE PURIFICAÇÃO COMPLETO!");
 

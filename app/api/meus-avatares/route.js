@@ -1,21 +1,10 @@
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments, getDocument, updateDocument, deleteDocument } from "@/lib/firebase/firestore";
 import { processarRecuperacao } from "@/app/avatares/sistemas/exhaustionSystem";
-
-// MOVIDO PARA DENTRO DA FUNÇÃO: const supabase = getSupabaseClientSafe();
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
 
@@ -26,16 +15,15 @@ export async function GET(request) {
       );
     }
 
-    const { data: avatares, error } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const avatares = await getDocuments('avatares', {
+      where: [['user_id', '==', userId]],
+      orderBy: ['created_at', 'desc']
+    });
 
-    if (error) {
-      console.error("Erro ao buscar avatares:", error);
+    if (!avatares) {
+      console.error("Erro ao buscar avatares");
       return Response.json(
-        { message: "Erro ao buscar avatares: " + error.message },
+        { message: "Erro ao buscar avatares" },
         { status: 500 }
       );
     }
@@ -80,20 +68,16 @@ export async function GET(request) {
           recuperacao_aplicada: recuperacao
         });
 
-        // Atualizar no banco
-        const { data: avatarAtualizado, error: updateError } = await supabase
-          .from('avatares')
-          .update({
+        // Atualizar no Firestore
+        try {
+          await updateDocument('avatares', avatar.id, {
             exaustao: novaExaustao,
             updated_at: agora.toISOString()
-          })
-          .eq('id', avatar.id)
-          .select()
-          .single();
+          });
 
-        if (!updateError && avatarAtualizado) {
-          avataresAtualizados.push(avatarAtualizado);
-        } else {
+          avataresAtualizados.push({ ...avatar, exaustao: novaExaustao, updated_at: agora.toISOString() });
+        } catch (updateError) {
+          console.error("Erro ao atualizar exaustão:", updateError);
           avataresAtualizados.push(avatar);
         }
       } else {
@@ -119,19 +103,6 @@ export async function PUT(request) {
   console.log(`\n[ATIVAR AVATAR] ====== REQUISIÇÃO em ${requestTime} ======`);
 
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
-    // Debug: verificar configuração do Supabase
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    console.log(`[ATIVAR AVATAR] 🔧 Supabase URL: ${supabaseUrl?.substring(0, 30)}...`);
-
     const body = await request.json();
     const { userId, avatarId } = body;
 
@@ -145,14 +116,9 @@ export async function PUT(request) {
     }
 
     // Verificar se o avatar existe, pertence ao usuário e está vivo
-    const { data: avatarToActivate, error: checkError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .eq('user_id', userId)
-      .single();
+    const avatarToActivate = await getDocument('avatares', avatarId);
 
-    if (checkError || !avatarToActivate) {
+    if (!avatarToActivate || avatarToActivate.user_id !== userId) {
       console.log(`[ATIVAR AVATAR] ❌ Avatar não encontrado`);
       return Response.json(
         { message: "Avatar não encontrado ou não pertence ao usuário" },
@@ -173,53 +139,42 @@ export async function PUT(request) {
     // Desativar todos os avatares do usuário
     console.log(`[ATIVAR AVATAR] 1️⃣ Desativando TODOS os avatares do usuário...`);
 
-    // SOLUÇÃO: Tocar em updated_at via SQL RAW para forçar trigger
     const timestampNow = new Date().toISOString();
-    const { data: desativados, error: deactivateError } = await supabase
-      .from('avatares')
-      .update({
-        ativo: false,
-        updated_at: timestampNow  // Tentar forçar (pode ser sobrescrito por trigger)
-      })
-      .eq('user_id', userId)
-      .select();
 
-    console.log(`[ATIVAR AVATAR] 🔧 Tentou definir updated_at=${timestampNow}`);
+    // Buscar todos os avatares do usuário
+    const userAvatares = await getDocuments('avatares', {
+      where: [['user_id', '==', userId]]
+    });
 
-    // Verificar o que realmente foi salvo
-    if (desativados && desativados.length > 0) {
-      console.log(`[ATIVAR AVATAR] 🔍 Verificando updated_at salvo no banco:`);
-      desativados.forEach(av => {
-        console.log(`  - ${av.nome}: updated_at=${av.updated_at} (esperava ${timestampNow})`);
-      });
+    // Desativar todos em batch
+    let desativadosCount = 0;
+    for (const av of userAvatares || []) {
+      try {
+        await updateDocument('avatares', av.id, {
+          ativo: false,
+          updated_at: timestampNow
+        });
+        desativadosCount++;
+      } catch (error) {
+        console.error(`Erro ao desativar avatar ${av.id}:`, error);
+      }
     }
 
-    if (deactivateError) {
-      console.error("[ATIVAR AVATAR] ❌ Erro ao desativar avatares:", deactivateError);
-      return Response.json(
-        { message: "Erro ao desativar avatares: " + deactivateError.message },
-        { status: 500 }
-      );
-    }
-
-    console.log(`[ATIVAR AVATAR] ✅ ${desativados?.length || 0} avatares desativados`);
+    console.log(`[ATIVAR AVATAR] ✅ ${desativadosCount} avatares desativados`);
 
     // Ativar o avatar escolhido
     console.log(`[ATIVAR AVATAR] 2️⃣ Ativando avatar ${avatarToActivate.nome}...`);
     const timestampAtivacao = new Date().toISOString();
-    const { data: avatarAtivado, error: activateError } = await supabase
-      .from('avatares')
-      .update({
+
+    try {
+      await updateDocument('avatares', avatarId, {
         ativo: true,
         em_venda: false,  // Remover da venda ao ativar
         preco_venda: null,
-        updated_at: timestampAtivacao  // FORÇAR updated_at para invalidar cache
-      })
-      .eq('id', avatarId)
-      .select()
-      .single();
-
-    if (activateError || !avatarAtivado) {
+        preco_fragmentos: null,
+        updated_at: timestampAtivacao
+      });
+    } catch (activateError) {
       console.error("[ATIVAR AVATAR] ❌ Erro ao ativar avatar:", activateError);
       return Response.json(
         { message: "Erro ao ativar avatar" },
@@ -227,16 +182,16 @@ export async function PUT(request) {
       );
     }
 
-    console.log(`[ATIVAR AVATAR] ✅ Avatar ativado com sucesso! Novo ativo=${avatarAtivado.ativo}`);
-    console.log(`[ATIVAR AVATAR] 🔍 updated_at salvo: ${avatarAtivado.updated_at} (esperava ${timestampAtivacao})`);
+    console.log(`[ATIVAR AVATAR] ✅ Avatar ativado com sucesso!`);
 
     // Buscar todos os avatares atualizados
     console.log(`[ATIVAR AVATAR] 3️⃣ Buscando todos os avatares atualizados...`);
-    const { data: todosAvatares } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const todosAvatares = await getDocuments('avatares', {
+      where: [['user_id', '==', userId]],
+      orderBy: ['created_at', 'desc']
+    });
+
+    const avatarAtivado = todosAvatares?.find(av => av.id === avatarId);
 
     console.log(`[ATIVAR AVATAR] Estado final dos avatares:`);
     todosAvatares?.forEach(av => {
@@ -263,15 +218,6 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const body = await request.json();
     const { userId, avatarId } = body;
 
@@ -283,27 +229,19 @@ export async function DELETE(request) {
     }
 
     // Verificar se o avatar pertence ao usuário
-    const { data: avatar, error: checkError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .eq('user_id', userId)
-      .single();
+    const avatar = await getDocument('avatares', avatarId);
 
-    if (checkError || !avatar) {
+    if (!avatar || avatar.user_id !== userId) {
       return Response.json(
         { message: "Avatar não encontrado" },
         { status: 404 }
       );
     }
 
-    // Deletar o avatar
-    const { error: deleteError } = await supabase
-      .from('avatares')
-      .delete()
-      .eq('id', avatarId);
-
-    if (deleteError) {
+    // Deletar o avatar do Firestore
+    try {
+      await deleteDocument('avatares', avatarId);
+    } catch (deleteError) {
       console.error("Erro ao deletar avatar:", deleteError);
       return Response.json(
         { message: "Erro ao deletar avatar" },
