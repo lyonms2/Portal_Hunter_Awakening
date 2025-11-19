@@ -15,30 +15,15 @@ Ambos usam o mesmo ranking e temporada!
 - ✅ Treino PvP (oponentes, finalizar - batalhas assíncronas)
 - ✅ Arena PvP (queue, battle/room, battle/action - batalhas tempo real)
 - ✅ Sistema de Inventário (inventário, usar item, loja, comprar)
+- ✅ PvP Extras (leaderboards, histórico, títulos, recompensas, temporadas)
 
 ---
 
-## ⚠️ AINDA USANDO SUPABASE (16 arquivos):
-
-### 🟡 **PRIORIDADE ALTA** (Funcionalidades Secundárias):
-
-#### 1. **PvP - Funcionalidades Extras**
-- `/api/pvp/historico` - Histórico de batalhas
-- `/api/pvp/leaderboard` - Leaderboard geral PvP
-- `/api/pvp/ia/leaderboard` - Leaderboard PvP IA
-- `/api/pvp/titulos` - Sistema de títulos
-- `/api/pvp/recompensas` (GET) - Ver recompensas disponíveis
-- `/api/pvp/recompensas/coletar` (POST) - Coletar recompensas
-
-#### 2. **Gestão de Temporadas**
-- `/api/pvp/temporada` (GET) - Ver temporada ativa
-- `/api/pvp/temporada/encerrar` (POST) - Encerrar temporada
-
----
+## ⚠️ AINDA USANDO SUPABASE (1 arquivo):
 
 ### 🟢 **PRIORIDADE BAIXA** (Pode Esperar):
 
-#### 3. **Arena/Treino**
+#### 1. **Arena/Treino**
 - `/api/arena/treino/iniciar` - Iniciar treino na arena
 
 ---
@@ -46,8 +31,8 @@ Ambos usam o mesmo ranking e temporada!
 ## 📊 Estatísticas:
 
 - **Total de APIs**: ~50
-- **Já Migradas**: 34 (68%)
-- **Faltam Migrar**: 16 (32%)
+- **Já Migradas**: 42 (84%)
+- **Faltam Migrar**: 1 (2%)
 
 ---
 
@@ -56,16 +41,10 @@ Ambos usam o mesmo ranking e temporada!
 ### ✅ **Fase 7** - Gestão de Avatar (4 APIs) - CONCLUÍDA
 ### ✅ **Fase 8** - Avatar Avançado (4 APIs) - CONCLUÍDA
 ### ✅ **Fase 9** - Inventário (4 APIs) - CONCLUÍDA
+### ✅ **Fase 10** - PvP Extras (8 APIs) - CONCLUÍDA
 
-### **Fase 10** - PvP Extras (8 APIs)
-1. Leaderboards
-2. Histórico
-3. Títulos
-4. Recompensas
-5. Temporadas
-
-### **Fase 11** - Arena/Outros (1 API)
-1. `/api/arena/treino/iniciar`
+### **Fase 11** - Arena/Treino (1 API) - PENDENTE
+1. `/api/arena/treino/iniciar` - Treino de arena
 
 ---
 
