@@ -15,6 +15,12 @@ export default function MercadoPage() {
   const [comprando, setComprando] = useState(false);
   const [modalConfirmacao, setModalConfirmacao] = useState(null);
 
+  // Estados de filtros
+  const [filtroRaridade, setFiltroRaridade] = useState('Todos');
+  const [filtroElemento, setFiltroElemento] = useState('Todos');
+  const [ordenacao, setOrdenacao] = useState('recente');
+  const [filtroPrecoMax, setFiltroPrecoMax] = useState('');
+
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -134,6 +140,47 @@ export default function MercadoPage() {
     return emojis[elemento] || '⭐';
   };
 
+  // Aplicar filtros e ordenação nos avatares
+  let avataresFiltrados = [...avatares];
+
+  // Filtro por raridade
+  if (filtroRaridade !== 'Todos') {
+    avataresFiltrados = avataresFiltrados.filter(av => av.raridade === filtroRaridade);
+  }
+
+  // Filtro por elemento
+  if (filtroElemento !== 'Todos') {
+    avataresFiltrados = avataresFiltrados.filter(av => av.elemento === filtroElemento);
+  }
+
+  // Filtro por preço máximo
+  if (filtroPrecoMax && parseInt(filtroPrecoMax) > 0) {
+    const precoMax = parseInt(filtroPrecoMax);
+    avataresFiltrados = avataresFiltrados.filter(av => (av.preco_venda || 0) <= precoMax);
+  }
+
+  // Ordenação
+  avataresFiltrados.sort((a, b) => {
+    switch (ordenacao) {
+      case 'preco_asc':
+        return (a.preco_venda || 0) - (b.preco_venda || 0);
+      case 'preco_desc':
+        return (b.preco_venda || 0) - (a.preco_venda || 0);
+      case 'nivel_desc':
+        return (b.nivel || 1) - (a.nivel || 1);
+      case 'nivel_asc':
+        return (a.nivel || 1) - (b.nivel || 1);
+      case 'raridade':
+        const raridadeOrder = { 'Lendário': 3, 'Raro': 2, 'Comum': 1 };
+        return (raridadeOrder[b.raridade] || 0) - (raridadeOrder[a.raridade] || 0);
+      case 'recente':
+      default:
+        const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+        const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+        return dateB - dateA;
+    }
+  });
+
   if (loading && !stats) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center">
@@ -202,10 +249,76 @@ export default function MercadoPage() {
           </div>
         </div>
 
-        {/* Contador de Avatares */}
-        <div className="mb-6">
-          <div className="text-center text-sm text-slate-400 font-mono">
-            {loading ? 'Carregando...' : `${avatares.length} ${avatares.length === 1 ? 'avatar disponível' : 'avatares disponíveis'}`}
+        {/* Filtros */}
+        <div className="mb-6 bg-slate-900/50 border border-slate-700/50 rounded-lg p-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {/* Raridade */}
+            <select
+              value={filtroRaridade}
+              onChange={(e) => setFiltroRaridade(e.target.value)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
+            >
+              <option value="Todos">Todas Raridades</option>
+              <option value="Comum">Comum</option>
+              <option value="Raro">Raro</option>
+              <option value="Lendário">Lendário</option>
+            </select>
+
+            {/* Elemento */}
+            <select
+              value={filtroElemento}
+              onChange={(e) => setFiltroElemento(e.target.value)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
+            >
+              <option value="Todos">Todos Elementos</option>
+              <option value="Fogo">🔥 Fogo</option>
+              <option value="Água">💧 Água</option>
+              <option value="Terra">🪨 Terra</option>
+              <option value="Vento">💨 Vento</option>
+              <option value="Eletricidade">⚡ Eletricidade</option>
+              <option value="Sombra">🌑 Sombra</option>
+              <option value="Luz">✨ Luz</option>
+            </select>
+
+            {/* Preço Máximo */}
+            <input
+              type="number"
+              placeholder="Preço máx 💰"
+              value={filtroPrecoMax}
+              onChange={(e) => setFiltroPrecoMax(e.target.value)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none placeholder-slate-500"
+            />
+
+            {/* Ordenação */}
+            <select
+              value={ordenacao}
+              onChange={(e) => setOrdenacao(e.target.value)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white focus:border-amber-500 focus:outline-none"
+            >
+              <option value="recente">Mais Recentes</option>
+              <option value="preco_asc">Preço (Menor→Maior)</option>
+              <option value="preco_desc">Preço (Maior→Menor)</option>
+              <option value="nivel_desc">Nível (Maior→Menor)</option>
+              <option value="nivel_asc">Nível (Menor→Maior)</option>
+              <option value="raridade">Raridade</option>
+            </select>
+
+            {/* Limpar Filtros */}
+            <button
+              onClick={() => {
+                setFiltroRaridade('Todos');
+                setFiltroElemento('Todos');
+                setOrdenacao('recente');
+                setFiltroPrecoMax('');
+              }}
+              className="px-3 py-2 bg-red-900/30 hover:bg-red-800/40 border border-red-500/30 rounded text-sm font-semibold text-red-400 transition-all"
+            >
+              LIMPAR
+            </button>
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500 font-mono">
+            {loading ? 'Carregando...' : `Mostrando ${avataresFiltrados.length} de ${avatares.length} avatares`}
           </div>
         </div>
 
@@ -214,15 +327,17 @@ export default function MercadoPage() {
           <div className="text-center py-20">
             <div className="text-cyan-400 animate-pulse text-lg">Buscando avatares...</div>
           </div>
-        ) : avatares.length === 0 ? (
+        ) : avataresFiltrados.length === 0 ? (
           <div className="text-center py-20">
-            <div className="text-6xl mb-4 opacity-20">🏪</div>
-            <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar à venda</h3>
-            <p className="text-slate-500 text-sm">O mercado está vazio no momento. Volte mais tarde!</p>
+            <div className="text-6xl mb-4 opacity-20">🔍</div>
+            <h3 className="text-xl font-bold text-slate-400 mb-2">Nenhum avatar encontrado</h3>
+            <p className="text-slate-500 text-sm">
+              {avatares.length === 0 ? 'O mercado está vazio no momento. Volte mais tarde!' : 'Tente ajustar os filtros para encontrar o avatar ideal!'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {avatares.map((avatar) => (
+            {avataresFiltrados.map((avatar) => (
               <div
                 key={avatar.id}
                 className="group relative"
