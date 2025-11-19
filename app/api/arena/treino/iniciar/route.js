@@ -2,11 +2,13 @@
 // Arquivo: /app/api/arena/treino/iniciar/route.js
 
 import { NextResponse } from 'next/server';
-import { getSupabaseServiceClient } from '@/lib/supabase/serverClient';
+import { getDocument, updateDocument } from '@/lib/firebase/firestore';
 import { inicializarBatalha } from '@/lib/arena/batalhaEngine';
 import { selecionarHabilidadesIniciais } from '@/app/avatares/sistemas/abilitiesSystem';
 import { gerarStatsBalanceados } from '@/app/avatares/sistemas/statsSystem';
 import { aplicarPenalidadesExaustao } from '@/app/avatares/sistemas/exhaustionSystem';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Gera um avatar inimigo para treino
@@ -65,18 +67,10 @@ export async function POST(request) {
       );
     }
 
-    // Inicializar Supabase dentro da função
-    const supabase = getSupabaseServiceClient();
+    // Buscar avatar do jogador no Firestore
+    const avatar = await getDocument('avatares', avatarId);
 
-    // Buscar avatar do jogador
-    const { data: avatar, error: avatarError } = await supabase
-      .from('avatares')
-      .select('*')
-      .eq('id', avatarId)
-      .eq('user_id', userId)
-      .single();
-
-    if (avatarError || !avatar) {
+    if (!avatar || avatar.user_id !== userId) {
       return NextResponse.json(
         { message: 'Avatar não encontrado' },
         { status: 404 }
@@ -109,35 +103,33 @@ export async function POST(request) {
       console.log('⚠️ Habilidades incompletas detectadas. Regenerando...');
       avatar.habilidades = selecionarHabilidadesIniciais(avatar.elemento, avatar.raridade);
 
-      // Atualizar no banco para corrigir permanentemente
-      await supabase
-        .from('avatares')
-        .update({
-          habilidades: avatar.habilidades.map(hab => ({
-            nome: hab.nome,
-            descricao: hab.descricao,
-            tipo: hab.tipo,
-            raridade: hab.raridade,
-            elemento: hab.elemento,
-            custo_energia: hab.custo_energia,
-            cooldown: hab.cooldown,
-            dano_base: hab.dano_base,
-            multiplicador_stat: hab.multiplicador_stat,
-            stat_primario: hab.stat_primario,
-            efeitos_status: hab.efeitos_status || [],
-            alvo: hab.alvo,
-            area: hab.area,
-            num_alvos: hab.num_alvos,
-            chance_acerto: hab.chance_acerto,
-            chance_efeito: hab.chance_efeito,
-            duracao_efeito: hab.duracao_efeito,
-            nivel_minimo: hab.nivel_minimo,
-            vinculo_minimo: hab.vinculo_minimo
-          }))
-        })
-        .eq('id', avatar.id);
+      // Atualizar no Firestore para corrigir permanentemente
+      await updateDocument('avatares', avatar.id, {
+        habilidades: avatar.habilidades.map(hab => ({
+          nome: hab.nome,
+          descricao: hab.descricao,
+          tipo: hab.tipo,
+          raridade: hab.raridade,
+          elemento: hab.elemento,
+          custo_energia: hab.custo_energia,
+          cooldown: hab.cooldown,
+          dano_base: hab.dano_base,
+          multiplicador_stat: hab.multiplicador_stat,
+          stat_primario: hab.stat_primario,
+          efeitos_status: hab.efeitos_status || [],
+          alvo: hab.alvo,
+          area: hab.area,
+          num_alvos: hab.num_alvos,
+          chance_acerto: hab.chance_acerto,
+          chance_efeito: hab.chance_efeito,
+          duracao_efeito: hab.duracao_efeito,
+          nivel_minimo: hab.nivel_minimo,
+          vinculo_minimo: hab.vinculo_minimo
+        })),
+        updated_at: new Date().toISOString()
+      });
 
-      console.log('✅ Habilidades atualizadas no banco:', avatar.habilidades.map(h => h.nome));
+      console.log('✅ Habilidades atualizadas no Firestore:', avatar.habilidades.map(h => h.nome));
     }
 
     // Aplicar penalidades de exaustão aos stats do avatar ANTES de entrar em batalha
