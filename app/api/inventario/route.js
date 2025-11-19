@@ -1,7 +1,7 @@
 // ==================== API: INVENTÁRIO DO JOGADOR ====================
 // Arquivo: /app/api/inventario/route.js
 
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments, getDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,14 +10,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
 
@@ -28,44 +20,41 @@ export async function GET(request) {
       );
     }
 
-    // Buscar inventário do jogador com informações completas dos itens
-    const { data: inventario, error } = await supabase
-      .from('player_inventory')
-      .select(`
-        id,
-        quantidade,
-        created_at,
-        updated_at,
-        items (
-          id,
-          nome,
-          descricao,
-          tipo,
-          efeito,
-          valor_efeito,
-          preco_compra,
-          preco_venda,
-          raridade,
-          icone,
-          empilhavel,
-          max_pilha,
-          requer_avatar_ativo
-        )
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    // Buscar inventário do jogador no Firestore
+    const inventarioItems = await getDocuments('player_inventory', {
+      where: [['user_id', '==', userId]],
+      orderBy: [['created_at', 'desc']]
+    });
 
-    if (error) {
-      console.error("Erro ao buscar inventário:", error);
-      return Response.json(
-        { message: "Erro ao buscar inventário: " + error.message },
-        { status: 500 }
-      );
+    if (!inventarioItems || inventarioItems.length === 0) {
+      return Response.json({
+        inventario: [],
+        total_itens: 0
+      });
     }
 
+    // Para cada item do inventário, buscar detalhes do item
+    // (Firestore não suporta JOIN, então fazemos queries separadas)
+    const inventarioCompleto = await Promise.all(
+      inventarioItems.map(async (invItem) => {
+        const itemDetails = await getDocument('items', invItem.item_id);
+
+        return {
+          id: invItem.id,
+          quantidade: invItem.quantidade,
+          created_at: invItem.created_at,
+          updated_at: invItem.updated_at,
+          items: itemDetails || null
+        };
+      })
+    );
+
+    // Filtrar itens que não têm detalhes (caso o item tenha sido deletado)
+    const inventarioValido = inventarioCompleto.filter(item => item.items !== null);
+
     return Response.json({
-      inventario: inventario || [],
-      total_itens: inventario?.length || 0
+      inventario: inventarioValido,
+      total_itens: inventarioValido.length
     });
 
   } catch (error) {
@@ -82,14 +71,6 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
     const body = await request.json();
     const { userId, itemId, inventoryItemId } = body;
 
@@ -100,14 +81,10 @@ export async function POST(request) {
       );
     }
 
-    // Buscar informações do item
-    const { data: item, error: itemError } = await supabase
-      .from('items')
-      .select('*')
-      .eq('id', itemId)
-      .single();
+    // Buscar informações do item no Firestore
+    const item = await getDocument('items', itemId);
 
-    if (itemError || !item) {
+    if (!item) {
       return Response.json(
         { message: "Item não encontrado" },
         { status: 404 }
@@ -116,30 +93,28 @@ export async function POST(request) {
 
     // Verificar se o item requer avatar ativo
     if (item.requer_avatar_ativo) {
-      const { data: avatarAtivo, error: avatarError } = await supabase
-        .from('avatares')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('ativo', true)
-        .eq('vivo', true)
-        .single();
+      // Buscar avatar ativo no Firestore
+      const avatares = await getDocuments('avatares', {
+        where: [
+          ['user_id', '==', userId],
+          ['ativo', '==', true],
+          ['vivo', '==', true]
+        ]
+      });
 
-      if (avatarError || !avatarAtivo) {
+      if (!avatares || avatares.length === 0) {
         return Response.json(
           { message: "Você precisa ter um avatar ativo vivo para usar este item" },
           { status: 400 }
         );
       }
 
-      // PRIMEIRO: Verificar e validar item no inventário
-      const { data: inventoryItem, error: invError } = await supabase
-        .from('player_inventory')
-        .select('quantidade')
-        .eq('id', inventoryItemId)
-        .eq('user_id', userId)
-        .single();
+      const avatarAtivo = avatares[0];
 
-      if (invError || !inventoryItem) {
+      // PRIMEIRO: Verificar e validar item no inventário
+      const inventoryItem = await getDocument('player_inventory', inventoryItemId);
+
+      if (!inventoryItem || inventoryItem.user_id !== userId) {
         return Response.json(
           { message: "Item não encontrado no inventário" },
           { status: 404 }
@@ -192,66 +167,30 @@ export async function POST(request) {
       }
 
       // TERCEIRO: Consumir item do inventário
+      const { updateDocument, deleteDocument } = await import('@/lib/firebase/firestore');
+
       if (inventoryItem.quantidade > 1) {
         // Reduzir quantidade
-        const { error: updateInvError } = await supabase
-          .from('player_inventory')
-          .update({
-            quantidade: inventoryItem.quantidade - 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', inventoryItemId);
-
-        if (updateInvError) {
-          console.error("Erro ao consumir item:", updateInvError);
-          return Response.json(
-            { message: "Erro ao consumir item do inventário" },
-            { status: 500 }
-          );
-        }
+        await updateDocument('player_inventory', inventoryItemId, {
+          quantidade: inventoryItem.quantidade - 1,
+          updated_at: new Date().toISOString()
+        });
       } else {
         // Remover item do inventário
-        const { error: deleteInvError } = await supabase
-          .from('player_inventory')
-          .delete()
-          .eq('id', inventoryItemId);
-
-        if (deleteInvError) {
-          console.error("Erro ao remover item:", deleteInvError);
-          return Response.json(
-            { message: "Erro ao remover item do inventário" },
-            { status: 500 }
-          );
-        }
+        await deleteDocument('player_inventory', inventoryItemId);
       }
 
       // QUARTO: Aplicar efeito no avatar (só depois de consumir o item!)
       if (item.efeito === 'cura_hp') {
-        const { error: updateError } = await supabase
-          .from('avatares')
-          .update({ hp_atual: novoHP })
-          .eq('id', avatarAtivo.id);
-
-        if (updateError) {
-          console.error("ERRO CRÍTICO - Item foi consumido mas HP não foi atualizado:", updateError);
-          return Response.json(
-            { message: "Erro ao aplicar efeito. Contate o suporte." },
-            { status: 500 }
-          );
-        }
+        await updateDocument('avatares', avatarAtivo.id, {
+          hp_atual: novoHP,
+          updated_at: new Date().toISOString()
+        });
       } else if (item.efeito === 'cura_exaustao') {
-        const { error: updateError } = await supabase
-          .from('avatares')
-          .update({ exaustao: novaExaustao })
-          .eq('id', avatarAtivo.id);
-
-        if (updateError) {
-          console.error("ERRO CRÍTICO - Item foi consumido mas exaustão não foi atualizada:", updateError);
-          return Response.json(
-            { message: "Erro ao aplicar efeito. Contate o suporte." },
-            { status: 500 }
-          );
-        }
+        await updateDocument('avatares', avatarAtivo.id, {
+          exaustao: novaExaustao,
+          updated_at: new Date().toISOString()
+        });
       }
 
       return Response.json({
@@ -270,7 +209,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("Erro ao usar item:", error);
     return Response.json(
-      { message: "Erro ao processar requisição" },
+      { message: "Erro ao processar requisição: " + error.message },
       { status: 500 }
     );
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments, getDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +9,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
@@ -21,25 +16,29 @@ export async function GET(request) {
       return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
-    // Buscar histórico de temporadas
-    const { data: historico, error } = await supabase
-      .from('pvp_historico_temporadas')
-      .select(`
-        *,
-        temporada:pvp_temporadas!pvp_historico_temporadas_temporada_id_fkey(
-          temporada_id,
-          nome,
-          data_inicio,
-          data_fim
-        )
-      `)
-      .eq('user_id', userId)
-      .order('data_encerramento', { ascending: false });
+    // Buscar histórico de temporadas no Firestore
+    const historicoItems = await getDocuments('pvp_historico_temporadas', {
+      where: [['user_id', '==', userId]],
+      orderBy: [['data_encerramento', 'desc']]
+    });
 
-    if (error) {
-      console.error('[HISTORICO] Erro ao buscar:', error);
-      return NextResponse.json({ error: 'Erro ao buscar histórico' }, { status: 500 });
-    }
+    // Para cada item do histórico, buscar detalhes da temporada
+    // (Firestore não suporta JOIN, então fazemos queries separadas)
+    const historico = await Promise.all(
+      (historicoItems || []).map(async (item) => {
+        const temporada = await getDocument('pvp_temporadas', item.temporada_id);
+
+        return {
+          ...item,
+          temporada: temporada ? {
+            temporada_id: temporada.temporada_id,
+            nome: temporada.nome,
+            data_inicio: temporada.data_inicio,
+            data_fim: temporada.data_fim
+          } : null
+        };
+      })
+    );
 
     // Calcular estatísticas gerais
     const stats = {
@@ -61,6 +60,6 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('[HISTORICO] Erro interno:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }

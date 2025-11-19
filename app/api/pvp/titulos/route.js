@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments, getDocument, updateDocument } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +9,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
@@ -21,23 +16,27 @@ export async function GET(request) {
       return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
-    // Buscar títulos do jogador
-    const { data: titulos, error } = await supabase
-      .from('pvp_titulos')
-      .select(`
-        *,
-        temporada:pvp_temporadas!pvp_titulos_temporada_id_fkey(
-          temporada_id,
-          nome
-        )
-      `)
-      .eq('user_id', userId)
-      .order('data_conquista', { ascending: false });
+    // Buscar títulos do jogador no Firestore
+    const titulosItems = await getDocuments('pvp_titulos', {
+      where: [['user_id', '==', userId]],
+      orderBy: [['data_conquista', 'desc']]
+    });
 
-    if (error) {
-      console.error('[TITULOS] Erro ao buscar:', error);
-      return NextResponse.json({ error: 'Erro ao buscar títulos' }, { status: 500 });
-    }
+    // Para cada título, buscar detalhes da temporada
+    // (Firestore não suporta JOIN, então fazemos queries separadas)
+    const titulos = await Promise.all(
+      (titulosItems || []).map(async (titulo) => {
+        const temporada = await getDocument('pvp_temporadas', titulo.temporada_id);
+
+        return {
+          ...titulo,
+          temporada: temporada ? {
+            temporada_id: temporada.temporada_id,
+            nome: temporada.nome
+          } : null
+        };
+      })
+    );
 
     // Buscar título ativo
     const tituloAtivo = titulos?.find(t => t.ativo) || null;
@@ -50,7 +49,7 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('[TITULOS] Erro interno:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }
 
@@ -61,11 +60,6 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return NextResponse.json({ error: 'Serviço temporariamente indisponível' }, { status: 503 });
-    }
-
     const body = await request.json();
     const { userId, tituloId } = body;
 
@@ -75,15 +69,16 @@ export async function POST(request) {
 
     // Se tituloId for null, desativa todos os títulos
     if (!tituloId) {
-      const { error } = await supabase
-        .from('pvp_titulos')
-        .update({ ativo: false })
-        .eq('user_id', userId);
+      const titulos = await getDocuments('pvp_titulos', {
+        where: [['user_id', '==', userId]]
+      });
 
-      if (error) {
-        console.error('[TITULOS] Erro ao desativar todos:', error);
-        return NextResponse.json({ error: 'Erro ao desativar títulos' }, { status: 500 });
-      }
+      // Desativar todos os títulos
+      await Promise.all(
+        (titulos || []).map(titulo =>
+          updateDocument('pvp_titulos', titulo.id, { ativo: false })
+        )
+      );
 
       return NextResponse.json({
         success: true,
@@ -92,38 +87,25 @@ export async function POST(request) {
     }
 
     // Verificar se título pertence ao jogador
-    const { data: titulo, error: errorVerificar } = await supabase
-      .from('pvp_titulos')
-      .select('*')
-      .eq('id', tituloId)
-      .eq('user_id', userId)
-      .single();
+    const titulo = await getDocument('pvp_titulos', tituloId);
 
-    if (errorVerificar || !titulo) {
+    if (!titulo || titulo.user_id !== userId) {
       return NextResponse.json({ error: 'Título não encontrado' }, { status: 404 });
     }
 
     // Desativar todos os títulos do jogador primeiro
-    const { error: errorDesativar } = await supabase
-      .from('pvp_titulos')
-      .update({ ativo: false })
-      .eq('user_id', userId);
+    const titulos = await getDocuments('pvp_titulos', {
+      where: [['user_id', '==', userId]]
+    });
 
-    if (errorDesativar) {
-      console.error('[TITULOS] Erro ao desativar:', errorDesativar);
-      return NextResponse.json({ error: 'Erro ao desativar títulos' }, { status: 500 });
-    }
+    await Promise.all(
+      (titulos || []).map(t =>
+        updateDocument('pvp_titulos', t.id, { ativo: false })
+      )
+    );
 
     // Ativar o título selecionado
-    const { error: errorAtivar } = await supabase
-      .from('pvp_titulos')
-      .update({ ativo: true })
-      .eq('id', tituloId);
-
-    if (errorAtivar) {
-      console.error('[TITULOS] Erro ao ativar:', errorAtivar);
-      return NextResponse.json({ error: 'Erro ao ativar título' }, { status: 500 });
-    }
+    await updateDocument('pvp_titulos', tituloId, { ativo: true });
 
     return NextResponse.json({
       success: true,
@@ -132,6 +114,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('[TITULOS] Erro interno:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor: ' + error.message }, { status: 500 });
   }
 }

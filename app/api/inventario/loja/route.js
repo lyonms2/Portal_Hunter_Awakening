@@ -1,7 +1,7 @@
 // ==================== API: LISTAR ITENS DA LOJA ====================
 // Arquivo: /app/api/inventario/loja/route.js
 
-import { getSupabaseClientSafe } from "@/lib/supabase/serverClient";
+import { getDocuments } from '@/lib/firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,27 +10,10 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request) {
   try {
-    const supabase = getSupabaseClientSafe(true);
-    if (!supabase) {
-      return Response.json(
-        { message: "Serviço temporariamente indisponível" },
-        { status: 503 }
-      );
-    }
-
-    // Buscar todos os itens disponíveis
-    const { data: itens, error } = await supabase
-      .from('items')
-      .select('*')
-      .order('preco_compra', { ascending: true });
-
-    if (error) {
-      console.error("Erro ao buscar itens:", error);
-      return Response.json(
-        { message: "Erro ao buscar itens: " + error.message },
-        { status: 500 }
-      );
-    }
+    // Buscar todos os itens disponíveis no Firestore
+    const itens = await getDocuments('items', {
+      orderBy: [['preco_compra', 'asc']]
+    });
 
     return Response.json({
       itens: itens || [],
