@@ -394,7 +394,10 @@ export default function AvatarsPage() {
           COMMON_ACTIONS.mercado,
           COMMON_ACTIONS.fusao,
           ...(avataresCaidos > 0 ? [{ ...COMMON_ACTIONS.memorial, label: `MEMORIAL (${avataresCaidos})` }] : []),
-          COMMON_ACTIONS.invocar
+          COMMON_ACTIONS.invocar,
+          COMMON_ACTIONS.necromante,
+          COMMON_ACTIONS.purificador,
+          COMMON_ACTIONS.inventario
         ]}
       />
 

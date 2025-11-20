@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
 
 export default function OcultistaPage() {
   const router = useRouter();
@@ -121,17 +122,21 @@ export default function OcultistaPage() {
       {/* Vinheta */}
       <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.9)] pointer-events-none"></div>
 
+      {/* Navegação padronizada - apenas na introdução */}
+      {etapa === 'introducao' && (
+        <GameNav
+          backTo="/avatares"
+          backLabel="AVATARES"
+          title="O OCULTISTA"
+          subtitle="Invocador de Entidades Dimensionais"
+          actions={[
+            COMMON_ACTIONS.avatares,
+            COMMON_ACTIONS.mercado
+          ]}
+        />
+      )}
+
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8">
-        {/* Botão Voltar */}
-        {etapa === 'introducao' && (
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="absolute top-8 left-8 text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-2 font-mono text-sm group"
-          >
-            <span className="group-hover:-translate-x-1 transition-transform">←</span> 
-            <span>RETORNAR</span>
-          </button>
-        )}
 
         <div className="max-w-4xl w-full">
           {/* ETAPA 1: INTRODUÇÃO */}
