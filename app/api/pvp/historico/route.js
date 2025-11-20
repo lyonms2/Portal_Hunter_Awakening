@@ -19,7 +19,7 @@ export async function GET(request) {
     // Buscar histórico de temporadas no Firestore
     const historicoItems = await getDocuments('pvp_historico_temporadas', {
       where: [['user_id', '==', userId]],
-      orderBy: [['data_encerramento', 'desc']]
+      orderBy: ['data_encerramento', 'desc']
     });
 
     // Para cada item do histórico, buscar detalhes da temporada

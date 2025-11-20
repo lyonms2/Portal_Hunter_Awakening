@@ -13,8 +13,7 @@ export async function GET(request) {
       where: [
         ['em_venda', '==', true],
         ['vivo', '==', true]
-      ],
-      orderBy: ['created_at', 'desc']
+      ]
     };
 
     let avatares = await getDocuments('avatares', constraints);

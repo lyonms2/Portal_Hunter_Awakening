@@ -23,7 +23,7 @@ export async function GET(request) {
     // Buscar inventário do jogador no Firestore
     const inventarioItems = await getDocuments('player_inventory', {
       where: [['user_id', '==', userId]],
-      orderBy: [['created_at', 'desc']]
+      orderBy: ['created_at', 'desc']
     });
 
     if (!inventarioItems || inventarioItems.length === 0) {
@@ -84,6 +84,9 @@ export async function POST(request) {
     // Buscar informações do item no Firestore
     const item = await getDocument('items', itemId);
 
+    console.log('[INVENTARIO] Dados recebidos:', { userId, itemId, inventoryItemId });
+    console.log('[INVENTARIO] Item encontrado:', item);
+
     if (!item) {
       return Response.json(
         { message: "Item não encontrado" },
@@ -91,8 +94,12 @@ export async function POST(request) {
       );
     }
 
+    // Itens consumíveis requerem avatar ativo (suporta com e sem acento)
+    const requerAvatar = item.tipo === 'consumivel' || item.tipo === 'consumível';
+    console.log('[INVENTARIO] Tipo do item:', item.tipo, '| Requer avatar:', requerAvatar);
+
     // Verificar se o item requer avatar ativo
-    if (item.requer_avatar_ativo) {
+    if (requerAvatar) {
       // Buscar avatar ativo no Firestore
       const avatares = await getDocuments('avatares', {
         where: [
@@ -125,7 +132,10 @@ export async function POST(request) {
       let resultado = {};
       let novoHP, hpCurado, hpMaximo, novaExaustao, exaustaoReduzida;
 
-      if (item.efeito === 'cura_hp') {
+      // Suportar ambos os formatos: 'hp'/'cura_hp' e 'exaustao'/'cura_exaustao'
+      const efeito = item.efeito;
+
+      if (efeito === 'hp' || efeito === 'cura_hp') {
         // Calcular HP máximo
         hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
         const hpAtual = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
@@ -152,9 +162,11 @@ export async function POST(request) {
           hp_novo: novoHP,
           hp_maximo: hpMaximo
         };
-      } else if (item.efeito === 'cura_exaustao') {
+      } else if (efeito === 'exaustao' || efeito === 'cura_exaustao') {
         const exaustaoAtual = avatarAtivo.exaustao || 0;
-        novaExaustao = Math.max(0, exaustaoAtual - item.valor_efeito);
+        // valor_efeito negativo = reduz exaustão
+        const reducao = item.valor_efeito < 0 ? Math.abs(item.valor_efeito) : item.valor_efeito;
+        novaExaustao = Math.max(0, exaustaoAtual - reducao);
         exaustaoReduzida = exaustaoAtual - novaExaustao;
 
         resultado = {
@@ -164,6 +176,37 @@ export async function POST(request) {
           exaustao_anterior: exaustaoAtual,
           exaustao_nova: novaExaustao
         };
+      } else if (efeito === 'ambos') {
+        // Item que cura HP e exaustão
+        hpMaximo = avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5;
+        const hpAtual = avatarAtivo.hp_atual !== null && avatarAtivo.hp_atual !== undefined
+          ? avatarAtivo.hp_atual
+          : hpMaximo;
+
+        novoHP = Math.min(hpAtual + (item.valor_hp || item.valor_efeito || 0), hpMaximo);
+        hpCurado = novoHP - hpAtual;
+
+        const exaustaoAtual = avatarAtivo.exaustao || 0;
+        const reducao = item.valor_exaustao ? Math.abs(item.valor_exaustao) : 0;
+        novaExaustao = Math.max(0, exaustaoAtual - reducao);
+        exaustaoReduzida = exaustaoAtual - novaExaustao;
+
+        resultado = {
+          tipo: 'ambos',
+          avatar: avatarAtivo.nome,
+          hp_curado: hpCurado,
+          hp_anterior: hpAtual,
+          hp_novo: novoHP,
+          hp_maximo: hpMaximo,
+          exaustao_reduzida: exaustaoReduzida,
+          exaustao_anterior: exaustaoAtual,
+          exaustao_nova: novaExaustao
+        };
+      } else {
+        return Response.json(
+          { message: "Tipo de efeito não suportado: " + efeito },
+          { status: 400 }
+        );
       }
 
       // TERCEIRO: Consumir item do inventário
@@ -181,13 +224,19 @@ export async function POST(request) {
       }
 
       // QUARTO: Aplicar efeito no avatar (só depois de consumir o item!)
-      if (item.efeito === 'cura_hp') {
+      if (efeito === 'hp' || efeito === 'cura_hp') {
         await updateDocument('avatares', avatarAtivo.id, {
           hp_atual: novoHP,
           updated_at: new Date().toISOString()
         });
-      } else if (item.efeito === 'cura_exaustao') {
+      } else if (efeito === 'exaustao' || efeito === 'cura_exaustao') {
         await updateDocument('avatares', avatarAtivo.id, {
+          exaustao: novaExaustao,
+          updated_at: new Date().toISOString()
+        });
+      } else if (efeito === 'ambos') {
+        await updateDocument('avatares', avatarAtivo.id, {
+          hp_atual: novoHP,
           exaustao: novaExaustao,
           updated_at: new Date().toISOString()
         });

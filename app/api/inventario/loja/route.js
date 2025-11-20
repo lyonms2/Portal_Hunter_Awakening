@@ -12,7 +12,7 @@ export async function GET(request) {
   try {
     // Buscar todos os itens disponíveis no Firestore
     const itens = await getDocuments('items', {
-      orderBy: [['preco_compra', 'asc']]
+      orderBy: ['preco_compra', 'asc']
     });
 
     return Response.json({

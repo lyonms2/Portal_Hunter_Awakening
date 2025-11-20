@@ -19,7 +19,7 @@ export async function GET(request) {
     // Buscar títulos do jogador no Firestore
     const titulosItems = await getDocuments('pvp_titulos', {
       where: [['user_id', '==', userId]],
-      orderBy: [['data_conquista', 'desc']]
+      orderBy: ['data_conquista', 'desc']
     });
 
     // Para cada título, buscar detalhes da temporada
