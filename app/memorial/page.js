@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
 
 // Função para gerar epitáfio baseado na causa da morte
 const getEpitafio = (causaMorte) => {
@@ -107,16 +108,19 @@ export default function MemorialPage() {
         ))}
       </div>
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">
-        {/* Botão Voltar */}
-        <button
-          onClick={voltarParaAvatares}
-          className="absolute top-8 left-8 text-gray-600 hover:text-gray-500 transition-colors flex items-center gap-2 font-mono text-sm group"
-        >
-          <span className="group-hover:-translate-x-1 transition-transform">←</span> 
-          <span>SAIR DO MEMORIAL</span>
-        </button>
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/avatares"
+        backLabel="AVATARES"
+        title="MEMORIAL DOS CAÍDOS"
+        subtitle={avataresMarcados.length > 0 ? `${avataresMarcados.length} ${avataresMarcados.length === 1 ? 'herói caído' : 'heróis caídos'}` : ''}
+        actions={[
+          COMMON_ACTIONS.necromante,
+          COMMON_ACTIONS.purificador
+        ]}
+      />
 
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">
         <div className="max-w-7xl w-full">
           {/* Cabeçalho */}
           <div className="text-center mb-20">

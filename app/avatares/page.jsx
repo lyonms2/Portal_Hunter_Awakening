@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
 import AvatarDetalhes from "./components/AvatarDetalhes";
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
 
 export default function AvatarsPage() {
   const router = useRouter();
@@ -383,101 +384,56 @@ export default function AvatarsPage() {
       {/* Vinheta */}
       <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.9)] pointer-events-none"></div>
 
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/dashboard"
+        backLabel="DASHBOARD"
+        title="MINHA COLEÇÃO"
+        subtitle={`${avatares.length} ${avatares.length === 1 ? 'Avatar' : 'Avatares'} | ${avatares.filter(a => a.vivo).length} Vivos | ${avatares.filter(a => !a.vivo).length} Mortos`}
+        actions={[
+          COMMON_ACTIONS.mercado,
+          COMMON_ACTIONS.fusao,
+          ...(avataresCaidos > 0 ? [{ ...COMMON_ACTIONS.memorial, label: `MEMORIAL (${avataresCaidos})` }] : []),
+          COMMON_ACTIONS.invocar
+        ]}
+      />
+
       <div className="relative z-10 container mx-auto px-4 py-6 max-w-7xl">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div className="flex-1">
-            <h1 className="text-3xl font-black bg-gradient-to-r from-cyan-300 via-blue-300 to-purple-300 bg-clip-text text-transparent mb-1">
-              MINHA COLEÇÃO
-            </h1>
-            <p className="text-slate-400 font-mono text-xs mb-2">
-              {avatares.length} {avatares.length === 1 ? 'Avatar' : 'Avatares'} | {avatares.filter(a => a.vivo).length} Vivos | {avatares.filter(a => !a.vivo).length} Mortos
-            </p>
-
-            {/* Contador de Slots */}
-            <div className="mt-3">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`font-mono text-sm font-bold ${
-                  percentualOcupado >= 100 ? 'text-red-400' :
-                  percentualOcupado >= 80 ? 'text-orange-400' :
-                  'text-cyan-400'
-                }`}>
-                  📦 Slots: {slotsUsados}/{LIMITE_AVATARES}
-                </span>
-                {slotsDisponiveis > 0 && slotsDisponiveis <= 3 && (
-                  <span className="text-[10px] text-orange-400 font-bold animate-pulse">
-                    ⚠️ Quase cheio!
-                  </span>
-                )}
-                {slotsDisponiveis === 0 && (
-                  <span className="text-[10px] text-red-400 font-bold animate-pulse">
-                    🚫 LIMITE ATINGIDO
-                  </span>
-                )}
-              </div>
-              <div className="w-64 bg-slate-800 rounded-full h-2 overflow-hidden">
-                <div
-                  className={`h-full transition-all ${
-                    percentualOcupado >= 100 ? 'bg-red-500' :
-                    percentualOcupado >= 80 ? 'bg-orange-500' :
-                    percentualOcupado >= 60 ? 'bg-yellow-500' :
-                    'bg-cyan-500'
-                  }`}
-                  style={{ width: `${Math.min(percentualOcupado, 100)}%` }}
-                ></div>
-              </div>
-              <p className="text-[10px] text-slate-500 font-mono mt-1">
-                * Avatares no memorial não ocupam slots
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2 flex-wrap">
-            {/* Botão Mercado */}
-            <button
-              onClick={() => router.push("/mercado")}
-              className="px-4 py-2 bg-gradient-to-r from-amber-900/30 to-yellow-900/30 hover:from-amber-800/40 hover:to-yellow-800/40 border border-amber-500/30 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-amber-400"
-            >
-              <span>🏪</span>
-              <span>MERCADO</span>
-            </button>
-
-            {/* Botão Merge */}
-            <button
-              onClick={() => router.push("/merge")}
-              className="px-4 py-2 bg-gradient-to-r from-indigo-900/30 to-violet-900/30 hover:from-indigo-800/40 hover:to-violet-800/40 border border-indigo-500/30 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-indigo-400"
-            >
-              <span>🧬</span>
-              <span>FUSÃO</span>
-            </button>
-
-            {/* Botão Memorial */}
-            {avataresCaidos > 0 && (
-              <button
-                onClick={() => router.push("/memorial")}
-                className="group relative px-4 py-2 bg-gradient-to-b from-gray-900 to-black rounded-lg border border-gray-700/50 hover:border-gray-600 transition-all flex items-center gap-2 text-sm"
-              >
-                <span className="text-lg opacity-40 group-hover:opacity-60 transition-opacity">🕯️</span>
-                <span className="text-gray-400 group-hover:text-gray-300 font-semibold">MEMORIAL ({avataresCaidos})</span>
-              </button>
+        {/* Contador de Slots */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`font-mono text-sm font-bold ${
+              percentualOcupado >= 100 ? 'text-red-400' :
+              percentualOcupado >= 80 ? 'text-orange-400' :
+              'text-cyan-400'
+            }`}>
+              📦 Slots: {slotsUsados}/{LIMITE_AVATARES}
+            </span>
+            {slotsDisponiveis > 0 && slotsDisponiveis <= 3 && (
+              <span className="text-[10px] text-orange-400 font-bold animate-pulse">
+                ⚠️ Quase cheio!
+              </span>
             )}
-
-            <button
-              onClick={() => router.push("/ocultista")}
-              className="px-4 py-2 bg-purple-900/30 hover:bg-purple-800/30 border border-purple-500/30 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-purple-400"
-            >
-              <span>🔮</span>
-              <span>INVOCAR</span>
-            </button>
-
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="px-4 py-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700/50 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-cyan-400"
-            >
-              <span>←</span>
-              <span>VOLTAR</span>
-            </button>
+            {slotsDisponiveis === 0 && (
+              <span className="text-[10px] text-red-400 font-bold animate-pulse">
+                🚫 LIMITE ATINGIDO
+              </span>
+            )}
           </div>
+          <div className="w-64 bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div
+              className={`h-full transition-all ${
+                percentualOcupado >= 100 ? 'bg-red-500' :
+                percentualOcupado >= 80 ? 'bg-orange-500' :
+                percentualOcupado >= 60 ? 'bg-yellow-500' :
+                'bg-cyan-500'
+              }`}
+              style={{ width: `${Math.min(percentualOcupado, 100)}%` }}
+            ></div>
+          </div>
+          <p className="text-[10px] text-slate-500 font-mono mt-1">
+            * Avatares no memorial não ocupam slots
+          </p>
         </div>
 
         {/* Avatar Ativo (COMPACTO) */}
