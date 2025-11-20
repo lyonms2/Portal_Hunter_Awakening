@@ -10,6 +10,9 @@ export default function StoryModePage() {
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
 
+  // Reset tracking
+  const [resetsRemaining, setResetsRemaining] = useState(2);
+
   // Story progression state
   const [storyPhase, setStoryPhase] = useState('prologo');
   const [sceneIndex, setSceneIndex] = useState(0);
@@ -19,6 +22,7 @@ export default function StoryModePage() {
   const [selectedElement, setSelectedElement] = useState(null);
   const [avatarName, setAvatarName] = useState('');
   const [avatarStats, setAvatarStats] = useState(null);
+  const [avatarVisual, setAvatarVisual] = useState(null);
 
   // Combat/Action log
   const [actionLog, setActionLog] = useState([]);
@@ -96,6 +100,9 @@ export default function StoryModePage() {
         const response = await fetch(`/api/story/load?userId=${parsedUser.id}`);
         const data = await response.json();
 
+        // Set resets remaining
+        setResetsRemaining(data.resets_remaining ?? 2);
+
         if (data.progress) {
           // Restore progress from database
           setStoryPhase(data.progress.story_phase);
@@ -145,6 +152,7 @@ export default function StoryModePage() {
         selectedElement: updates.selectedElement ?? selectedElement,
         avatarName: updates.avatarName ?? avatarName,
         avatarStats: updates.avatarStats ?? avatarStats,
+        avatarVisual: updates.avatarVisual ?? avatarVisual,
         completed: updates.completed ?? (storyPhase === 'conclusao')
       };
 
@@ -170,8 +178,14 @@ export default function StoryModePage() {
   const handleReset = async () => {
     if (!user) return;
 
+    if (resetsRemaining <= 0) {
+      addToLog('Você já usou todos os seus 2 resets disponíveis.', 'error');
+      alert('Limite de resets atingido!\n\nVocê já usou seus 2 resets disponíveis para o Modo História.');
+      return;
+    }
+
     const confirmReset = confirm(
-      'Tem certeza que deseja resetar o Modo História?\n\nTodo o progresso será perdido e você começará do início.'
+      `Tem certeza que deseja resetar o Modo História?\n\nTodo o progresso será perdido e você começará do início.\n\nResets restantes: ${resetsRemaining}`
     );
 
     if (!confirmReset) return;
@@ -184,9 +198,20 @@ export default function StoryModePage() {
         body: JSON.stringify({ userId: user.id })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
+        if (data.error === 'Limite de resets atingido') {
+          setResetsRemaining(0);
+          addToLog(data.message, 'error');
+          alert(data.message);
+          return;
+        }
         throw new Error('Erro ao resetar progresso');
       }
+
+      // Update resets remaining
+      setResetsRemaining(data.resets_remaining);
 
       // Reset all state
       setStoryPhase('prologo');
@@ -195,9 +220,10 @@ export default function StoryModePage() {
       setSelectedElement(null);
       setAvatarName('');
       setAvatarStats(null);
+      setAvatarVisual(null);
       setActionLog([]);
 
-      addToLog('Modo História resetado. Começando do início.', 'important');
+      addToLog(`Modo História resetado. Resets restantes: ${data.resets_remaining}`, 'important');
       addToLog('Capítulo 1: O Despertar do Vínculo carregado.', 'info');
     } catch (error) {
       console.error('Erro ao resetar:', error);
@@ -289,6 +315,20 @@ export default function StoryModePage() {
       velocidade: baseStats.velocidade + (bonus.velocidade || 0)
     };
 
+    // Generate visual properties for the avatar based on element
+    const elementVisuals = {
+      fogo: { corPele: '#F5D0C5', corCabelo: '#FF6B35', tipoCabelo: 'spiky', corOlhos: '#FF4500', corRoupa: '#8B0000' },
+      agua: { corPele: '#E8F4F8', corCabelo: '#4682B4', tipoCabelo: 'wavy', corOlhos: '#00CED1', corRoupa: '#1E90FF' },
+      terra: { corPele: '#D2B48C', corCabelo: '#8B4513', tipoCabelo: 'short', corOlhos: '#556B2F', corRoupa: '#6B4423' },
+      vento: { corPele: '#F0FFF0', corCabelo: '#98FB98', tipoCabelo: 'long', corOlhos: '#00FA9A', corRoupa: '#2E8B57' },
+      eletricidade: { corPele: '#FFFACD', corCabelo: '#FFD700', tipoCabelo: 'spiky', corOlhos: '#FFA500', corRoupa: '#DAA520' },
+      sombra: { corPele: '#C4A1FF', corCabelo: '#4B0082', tipoCabelo: 'messy', corOlhos: '#8A2BE2', corRoupa: '#2F0A3D' },
+      luz: { corPele: '#FFF8DC', corCabelo: '#FAFAD2', tipoCabelo: 'long', corOlhos: '#FFD700', corRoupa: '#F5F5DC' }
+    };
+
+    const visual = elementVisuals[selectedElement.id] || elementVisuals.fogo;
+    setAvatarVisual(visual);
+
     setAvatarStats(finalStats);
     addToLog(`Avatar ${avatarName} criado com sucesso!`, 'success');
     addToLog(`Stats: HP ${finalStats.vida} | ATK ${finalStats.ataque} | DEF ${finalStats.defesa} | SPD ${finalStats.velocidade}`, 'stats');
@@ -299,6 +339,7 @@ export default function StoryModePage() {
     saveProgress({
       avatarName: avatarName,
       avatarStats: finalStats,
+      avatarVisual: visual,
       storyPhase: 'conclusao',
       completed: true
     });
@@ -381,12 +422,14 @@ export default function StoryModePage() {
 
             <button
               onClick={handleReset}
-              disabled={resetting}
-              className="text-red-400/70 hover:text-red-400 transition-colors flex items-center gap-2 font-mono text-xs group disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Resetar Modo História"
+              disabled={resetting || resetsRemaining <= 0}
+              className={`transition-colors flex items-center gap-2 font-mono text-xs group disabled:opacity-50 disabled:cursor-not-allowed ${
+                resetsRemaining <= 0 ? 'text-slate-600' : 'text-red-400/70 hover:text-red-400'
+              }`}
+              title={resetsRemaining <= 0 ? 'Sem resets disponíveis' : `Resetar Modo História (${resetsRemaining} restantes)`}
             >
               <span className="group-hover:rotate-180 transition-transform duration-500">🔄</span>
-              <span>{resetting ? 'RESETANDO...' : 'RESETAR'}</span>
+              <span>{resetting ? 'RESETANDO...' : `RESETAR (${resetsRemaining}/2)`}</span>
             </button>
           </div>
         </div>

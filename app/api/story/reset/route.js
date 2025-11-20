@@ -1,7 +1,9 @@
-import { deleteDocument, getDocuments } from "@/lib/firebase/firestore";
+import { deleteDocument, getDocument, getDocuments, setDocument } from "@/lib/firebase/firestore";
 import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
+
+const MAX_RESETS = 2;
 
 export async function POST(request) {
   try {
@@ -11,6 +13,24 @@ export async function POST(request) {
     if (!userId) {
       return NextResponse.json(
         { error: "userId é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    // Check reset count
+    const resetDocId = `${userId}_reset_count`;
+    let resetData = await getDocument('story_resets', resetDocId);
+
+    const currentResets = resetData?.count || 0;
+
+    if (currentResets >= MAX_RESETS) {
+      return NextResponse.json(
+        {
+          error: "Limite de resets atingido",
+          message: `Você já usou seus ${MAX_RESETS} resets disponíveis.`,
+          resets_used: currentResets,
+          max_resets: MAX_RESETS
+        },
         { status: 400 }
       );
     }
@@ -50,9 +70,19 @@ export async function POST(request) {
       console.error("Erro ao deletar conquistas:", error);
     }
 
+    // 4. Increment reset count
+    const newResetCount = currentResets + 1;
+    await setDocument('story_resets', resetDocId, {
+      user_id: userId,
+      count: newResetCount,
+      last_reset: new Date().toISOString()
+    });
+
     return NextResponse.json({
       success: true,
-      message: "Progresso resetado com sucesso"
+      message: "Progresso resetado com sucesso",
+      resets_used: newResetCount,
+      resets_remaining: MAX_RESETS - newResetCount
     });
 
   } catch (error) {

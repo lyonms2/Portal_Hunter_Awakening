@@ -15,6 +15,7 @@ export async function POST(request) {
       selectedElement,
       avatarName,
       avatarStats,
+      avatarVisual,
       completed
     } = body;
 
@@ -51,7 +52,13 @@ export async function POST(request) {
         defesa: avatarStats.defesa,
         velocidade: avatarStats.velocidade,
         nivel: avatarStats.nivel,
-        vinculo: avatarStats.vinculo
+        vinculo: avatarStats.vinculo,
+        // Visual properties for avatar image generation
+        corPele: avatarVisual?.corPele || '#F5D0C5',
+        corCabelo: avatarVisual?.corCabelo || '#8B4513',
+        tipoCabelo: avatarVisual?.tipoCabelo || 'short',
+        corOlhos: avatarVisual?.corOlhos || '#8B4513',
+        corRoupa: avatarVisual?.corRoupa || '#4A5568'
       };
 
       await setDocument('story_avatars', userId, avatarData);

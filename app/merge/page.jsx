@@ -319,7 +319,7 @@ export default function MergePage() {
                           <button
                             key={avatar.id}
                             onClick={() => setAvatarBase(avatar)}
-                            className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded transition-all"
+                            className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded transition-all flex flex-col items-center"
                           >
                             <AvatarSVG avatar={avatar} tamanho={60} />
                             <div className="text-xs font-bold text-white mt-1 truncate">{avatar.nome}</div>
@@ -406,7 +406,7 @@ export default function MergePage() {
                         <button
                           key={avatar.id}
                           onClick={() => setAvatarSacrificio(avatar)}
-                          className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-red-500/50 rounded transition-all"
+                          className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-red-500/50 rounded transition-all flex flex-col items-center"
                         >
                           <AvatarSVG avatar={avatar} tamanho={60} />
                           <div className="text-xs font-bold text-white mt-1 truncate">{avatar.nome}</div>
