@@ -1,4 +1,4 @@
-import { getDocRef, executeTransaction } from "@/lib/firebase/firestore";
+import { getDocRef, executeTransaction, getDocuments } from "@/lib/firebase/firestore";
 import { getDoc, updateDoc, increment } from 'firebase/firestore';
 
 export async function POST(request) {
@@ -8,6 +8,27 @@ export async function POST(request) {
     if (!compradorId || !avatarId) {
       return Response.json(
         { message: "Dados incompletos" },
+        { status: 400 }
+      );
+    }
+
+    // VERIFICAR LIMITE DE AVATARES ANTES DA TRANSAÇÃO
+    const LIMITE_AVATARES = 15;
+    const avatares = await getDocuments('avatares', {
+      where: [['user_id', '==', compradorId]]
+    });
+
+    // Contar apenas avatares que não estão no memorial
+    const avataresConta = (avatares || []).filter(av => !(av.marca_morte && !av.vivo)).length;
+
+    if (avataresConta >= LIMITE_AVATARES) {
+      return Response.json(
+        {
+          message: "Você atingiu o limite de 15 avatares! Sacrifique avatares inativos ou espere que morram em combate para liberar espaço.",
+          limite: LIMITE_AVATARES,
+          avatares_atuais: avataresConta,
+          slots_disponiveis: 0
+        },
         { status: 400 }
       );
     }
@@ -46,11 +67,7 @@ export async function POST(request) {
 
       const comprador = compradorDoc.data();
 
-      // 4. Verificar limite de avatares do comprador (usar getDocuments diretamente)
-      // Como estamos em transação, vamos confiar que o limite será validado
-      // ou implementar uma contagem de avatares no player_stats
-
-      // 5. Verificar saldo
+      // 4. Verificar saldo
       const saldoMoedas = comprador.moedas || 0;
       const saldoFragmentos = comprador.fragmentos || 0;
 
