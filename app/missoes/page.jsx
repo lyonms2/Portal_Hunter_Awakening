@@ -460,7 +460,7 @@ export default function StoryModePage() {
               title={resetsRemaining <= 0 ? 'Sem resets disponíveis' : `Resetar Modo História (${resetsRemaining} restantes)`}
             >
               <span className="group-hover:rotate-180 transition-transform duration-500">🔄</span>
-              <span>{resetting ? 'RESETANDO...' : `RESETAR (${resetsRemaining}/2)`}</span>
+              <span>{resetting ? 'RESETANDO...' : `RESETAR (${2 - resetsRemaining}/2)`}</span>
             </button>
           </div>
         </div>
