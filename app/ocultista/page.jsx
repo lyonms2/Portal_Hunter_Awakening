@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
 
 export default function OcultistaPage() {
   const router = useRouter();
@@ -121,17 +122,17 @@ export default function OcultistaPage() {
       {/* Vinheta */}
       <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.9)] pointer-events-none"></div>
 
+      {/* Navegação padronizada - apenas na introdução */}
+      {etapa === 'introducao' && (
+        <GameNav
+          backTo="/avatares"
+          backLabel="AVATARES"
+          title="O OCULTISTA"
+          subtitle="Invocador de Entidades Dimensionais"
+        />
+      )}
+
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8">
-        {/* Botão Voltar */}
-        {etapa === 'introducao' && (
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="absolute top-8 left-8 text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-2 font-mono text-sm group"
-          >
-            <span className="group-hover:-translate-x-1 transition-transform">←</span> 
-            <span>RETORNAR</span>
-          </button>
-        )}
 
         <div className="max-w-4xl w-full">
           {/* ETAPA 1: INTRODUÇÃO */}
@@ -216,13 +217,13 @@ export default function OcultistaPage() {
                   {/* Aviso de Slots */}
                   <div className="bg-slate-900/50 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-slate-400 text-sm font-mono">Slots Disponíveis:</span>
+                      <span className="text-slate-400 text-sm font-mono">Slots Ocupados:</span>
                       <span className={`font-bold text-lg ${
                         slotsDisponiveis === 0 ? 'text-red-400' :
                         slotsDisponiveis <= 3 ? 'text-orange-400' :
                         'text-cyan-400'
                       }`}>
-                        {slotsDisponiveis}/15
+                        {totalAvatares}/15
                       </span>
                     </div>
                     <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mb-2">
@@ -233,11 +234,11 @@ export default function OcultistaPage() {
                           slotsDisponiveis <= 7 ? 'bg-yellow-500' :
                           'bg-cyan-500'
                         }`}
-                        style={{ width: `${((15 - slotsDisponiveis) / 15) * 100}%` }}
+                        style={{ width: `${(totalAvatares / 15) * 100}%` }}
                       ></div>
                     </div>
                     <p className="text-[10px] text-slate-500 font-mono text-center">
-                      Você tem {totalAvatares} avatares. Avatares no memorial não ocupam slots.
+                      {slotsDisponiveis} {slotsDisponiveis === 1 ? 'slot disponível' : 'slots disponíveis'}. Avatares no memorial não ocupam slots.
                     </p>
                   </div>
 

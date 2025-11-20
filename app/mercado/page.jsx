@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
 
 export default function MercadoPage() {
   const router = useRouter();
@@ -203,37 +204,26 @@ export default function MercadoPage() {
       {/* Vinheta */}
       <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.9)] pointer-events-none"></div>
 
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/avatares"
+        backLabel="AVATARES"
+        title="MERCADO DE AVATARES"
+        subtitle='"Aqui, as almas são moeda e os contratos são eternos..."'
+      />
+
       <div className="relative z-10 container mx-auto px-4 py-6 max-w-7xl">
-        {/* Header */}
+        {/* Carteira do jogador */}
         <div className="mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-            <div>
-              <h1 className="text-4xl font-black bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-300 bg-clip-text text-transparent mb-2">
-                🏪 MERCADO DE AVATARES
-              </h1>
-              <p className="text-slate-400 font-mono text-sm italic">
-                "Aqui, as almas são moeda e os contratos são eternos..."
-              </p>
+          <div className="flex gap-3 items-center flex-wrap mb-4">
+            <div className="px-4 py-2 bg-slate-900/50 border border-amber-500/30 rounded-lg">
+              <span className="text-xs text-slate-500 font-mono">Suas Moedas</span>
+              <div className="text-xl font-bold text-amber-400">{stats?.moedas || 0} 💰</div>
             </div>
 
-            <div className="flex gap-3 items-center flex-wrap">
-              <div className="px-4 py-2 bg-slate-900/50 border border-amber-500/30 rounded-lg">
-                <span className="text-xs text-slate-500 font-mono">Suas Moedas</span>
-                <div className="text-xl font-bold text-amber-400">{stats?.moedas || 0} 💰</div>
-              </div>
-
-              <div className="px-4 py-2 bg-slate-900/50 border border-cyan-500/30 rounded-lg">
-                <span className="text-xs text-slate-500 font-mono">Seus Fragmentos</span>
-                <div className="text-xl font-bold text-cyan-400">{stats?.fragmentos || 0} 💎</div>
-              </div>
-
-              <button
-                onClick={() => router.push("/avatares")}
-                className="px-4 py-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700/50 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-cyan-400"
-              >
-                <span>←</span>
-                <span>VOLTAR</span>
-              </button>
+            <div className="px-4 py-2 bg-slate-900/50 border border-cyan-500/30 rounded-lg">
+              <span className="text-xs text-slate-500 font-mono">Seus Fragmentos</span>
+              <div className="text-xl font-bold text-cyan-400">{stats?.fragmentos || 0} 💎</div>
             </div>
           </div>
 

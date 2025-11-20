@@ -3,6 +3,34 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
+
+// Função para gerar epitáfio baseado na causa da morte
+const getEpitafio = (causaMorte) => {
+  switch (causaMorte) {
+    case 'sacrificio':
+      return {
+        texto: "Sacrificado pelo próprio mestre,<br/>sua essência alimenta o Vazio Dimensional.",
+        emoji: "🕯️"
+      };
+    case 'fusao':
+      return {
+        texto: "Sua essência foi absorvida em uma fusão,<br/>vive agora através de outro guerreiro.",
+        emoji: "🧬"
+      };
+    case 'combate':
+      return {
+        texto: "Tombou em combate honrado,<br/>um verdadeiro guerreiro até o fim.",
+        emoji: "⚔️"
+      };
+    default:
+      // Fallback para avatares antigos sem causa_morte
+      return {
+        texto: "Tombou em combate honrado,<br/>um verdadeiro guerreiro até o fim.",
+        emoji: "⚔️"
+      };
+  }
+};
 
 export default function MemorialPage() {
   const router = useRouter();
@@ -80,16 +108,15 @@ export default function MemorialPage() {
         ))}
       </div>
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">
-        {/* Botão Voltar */}
-        <button
-          onClick={voltarParaAvatares}
-          className="absolute top-8 left-8 text-gray-600 hover:text-gray-500 transition-colors flex items-center gap-2 font-mono text-sm group"
-        >
-          <span className="group-hover:-translate-x-1 transition-transform">←</span> 
-          <span>SAIR DO MEMORIAL</span>
-        </button>
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/avatares"
+        backLabel="AVATARES"
+        title="MEMORIAL DOS CAÍDOS"
+        subtitle={avataresMarcados.length > 0 ? `${avataresMarcados.length} ${avataresMarcados.length === 1 ? 'herói caído' : 'heróis caídos'}` : ''}
+      />
 
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">
         <div className="max-w-7xl w-full">
           {/* Cabeçalho */}
           <div className="text-center mb-20">
@@ -214,7 +241,8 @@ export default function MemorialPage() {
                       {/* Epitáfio */}
                       <div className="text-center">
                         <p className="text-gray-700 text-xs font-mono italic leading-relaxed">
-                          "Tombou em combate honrado,<br/>um verdadeiro guerreiro até o fim."
+                          <span className="mr-1">{getEpitafio(avatar.causa_morte).emoji}</span>
+                          "<span dangerouslySetInnerHTML={{ __html: getEpitafio(avatar.causa_morte).texto }} />"
                         </p>
                       </div>
                     </div>

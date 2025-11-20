@@ -172,6 +172,7 @@ export async function POST(request) {
       vivo: false,
       hp_atual: 0,
       marca_morte: true,
+      causa_morte: 'fusao', // Para epitáfio personalizado no memorial
       ativo: false,
       updated_at: new Date().toISOString()
     });

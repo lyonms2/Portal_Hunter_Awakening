@@ -58,15 +58,29 @@ export default function DashboardPage() {
   // Função para calcular dias desde o registro
   const calcularDiasRegistro = () => {
     if (!stats?.created_at) return 0;
-    
+
     try {
-      const dataRegistro = new Date(stats.created_at);
+      let dataRegistro;
+
+      // Firestore Timestamp tem método toDate()
+      if (stats.created_at.toDate) {
+        dataRegistro = stats.created_at.toDate();
+      }
+      // Firestore Timestamp pode vir como objeto com seconds
+      else if (stats.created_at.seconds) {
+        dataRegistro = new Date(stats.created_at.seconds * 1000);
+      }
+      // ISO string ou timestamp number
+      else {
+        dataRegistro = new Date(stats.created_at);
+      }
+
       if (isNaN(dataRegistro.getTime())) return 0;
-      
+
       const hoje = new Date();
       const diferencaMs = hoje - dataRegistro;
       const dias = Math.floor(diferencaMs / (1000 * 60 * 60 * 24));
-      
+
       return dias === 0 ? 1 : dias;
     } catch (error) {
       console.error('Erro ao calcular dias de registro:', error);
@@ -77,15 +91,29 @@ export default function DashboardPage() {
   // Função para formatar data de registro
   const formatarDataRegistro = () => {
     if (!stats?.created_at) return "Data não disponível";
-    
+
     try {
-      const data = new Date(stats.created_at);
+      let data;
+
+      // Firestore Timestamp tem método toDate()
+      if (stats.created_at.toDate) {
+        data = stats.created_at.toDate();
+      }
+      // Firestore Timestamp pode vir como objeto com seconds
+      else if (stats.created_at.seconds) {
+        data = new Date(stats.created_at.seconds * 1000);
+      }
+      // ISO string ou timestamp number
+      else {
+        data = new Date(stats.created_at);
+      }
+
       if (isNaN(data.getTime())) return "Data inválida";
-      
+
       const dia = String(data.getDate()).padStart(2, '0');
       const mes = String(data.getMonth() + 1).padStart(2, '0');
       const ano = data.getFullYear();
-      
+
       return `${dia}/${mes}/${ano}`;
     } catch (error) {
       console.error('Erro ao formatar data:', error);

@@ -29,12 +29,19 @@ export async function GET(request) {
       where: [['user_id', '==', userId]]
     });
 
+    // Buscar contagem de resets
+    const resetDocId = `${userId}_reset_count`;
+    const resetData = await getDocument('story_resets', resetDocId);
+    const resetsUsed = resetData?.count || 0;
+
     // Se não há progresso, retornar null
     if (!progressData) {
       return NextResponse.json({
         progress: null,
         avatar: null,
-        achievements: []
+        achievements: [],
+        resets_used: resetsUsed,
+        resets_remaining: 2 - resetsUsed
       });
     }
 
@@ -42,7 +49,9 @@ export async function GET(request) {
     const response = {
       progress: progressData,
       avatar: avatarData,
-      achievements: achievementsData || []
+      achievements: achievementsData || [],
+      resets_used: resetsUsed,
+      resets_remaining: 2 - resetsUsed
     };
 
     // Adicionar dados do avatar ao progresso para compatibilidade

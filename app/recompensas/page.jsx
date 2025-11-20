@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import GameNav from '../components/GameNav';
 
 export default function RecompensasPage() {
   const router = useRouter();
@@ -103,31 +104,16 @@ export default function RecompensasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => router.back()}
-            className="mb-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-          >
-            ← Voltar
-          </button>
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900">
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/arena/pvp-ia"
+        backLabel="ARENA PVP"
+        title="RECOMPENSAS DE TEMPORADA"
+        subtitle="Colete suas recompensas conquistadas"
+      />
 
-          <div className="bg-gradient-to-r from-yellow-600 via-yellow-500 to-yellow-600 rounded-lg p-6 shadow-2xl">
-            <div className="flex items-center gap-4">
-              <div className="text-6xl">🎁</div>
-              <div>
-                <h1 className="text-4xl font-bold text-white mb-2">
-                  Recompensas de Temporada
-                </h1>
-                <p className="text-yellow-100">
-                  Colete suas recompensas conquistadas em temporadas anteriores
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="max-w-6xl mx-auto p-6">
 
         {/* Lista de Recompensas */}
         {recompensas.length === 0 ? (

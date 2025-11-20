@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import GameNav from '../components/GameNav';
 
 export default function MergePage() {
   const router = useRouter();
@@ -221,26 +222,15 @@ export default function MergePage() {
       <div className="absolute inset-0 opacity-[0.03] bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] pointer-events-none"></div>
       <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.9)] pointer-events-none"></div>
 
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h1 className="text-5xl font-black bg-gradient-to-r from-indigo-300 via-violet-300 to-purple-300 bg-clip-text text-transparent mb-2 flex items-center gap-3">
-              <span className="text-6xl">🧬</span>
-              CÂMARA DE FUSÃO DIMENSIONAL
-            </h1>
-            <p className="text-slate-400 font-mono text-sm">
-              💰 {stats?.moedas || 0} Moedas • 💎 {stats?.fragmentos || 0} Fragmentos
-            </p>
-          </div>
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/avatares"
+        backLabel="AVATARES"
+        title="CÂMARA DE FUSÃO"
+        subtitle={`💰 ${stats?.moedas || 0} Moedas • 💎 ${stats?.fragmentos || 0} Fragmentos`}
+      />
 
-          <button
-            onClick={() => router.push("/avatares")}
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-all"
-          >
-            ← Voltar
-          </button>
-        </div>
+      <div className="relative z-10 container mx-auto px-4 py-8">
 
 
         {/* Lore Introduction */}
@@ -315,7 +305,7 @@ export default function MergePage() {
               ) : (
                 <div>
                   <div className="mb-4 p-6 bg-cyan-950/20 rounded-lg border border-cyan-900/30 text-center">
-                    <div className="text-4xl mb-2">👤</div>
+                    <div className="text-4xl mb-2">🧬</div>
                     <div className="text-sm text-cyan-400">Selecione o avatar que receberá os poderes</div>
                   </div>
 
@@ -329,7 +319,7 @@ export default function MergePage() {
                           <button
                             key={avatar.id}
                             onClick={() => setAvatarBase(avatar)}
-                            className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded transition-all"
+                            className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded transition-all flex flex-col items-center"
                           >
                             <AvatarSVG avatar={avatar} tamanho={60} />
                             <div className="text-xs font-bold text-white mt-1 truncate">{avatar.nome}</div>
@@ -416,7 +406,7 @@ export default function MergePage() {
                         <button
                           key={avatar.id}
                           onClick={() => setAvatarSacrificio(avatar)}
-                          className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-red-500/50 rounded transition-all"
+                          className="p-2 bg-slate-900/50 hover:bg-slate-800/50 border border-slate-700 hover:border-red-500/50 rounded transition-all flex flex-col items-center"
                         >
                           <AvatarSVG avatar={avatar} tamanho={60} />
                           <div className="text-xs font-bold text-white mt-1 truncate">{avatar.nome}</div>

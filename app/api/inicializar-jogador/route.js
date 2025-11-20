@@ -30,7 +30,7 @@ export async function POST(request) {
     const statsData = {
       user_id: userId,
       moedas: 500,
-      fragmentos: 0,
+      fragmentos: 10,
       divida: 0,
       ranking: 'F',
       missoes_completadas: 0,

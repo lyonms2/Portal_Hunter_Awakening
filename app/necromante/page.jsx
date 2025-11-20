@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
 
 export default function NecromantePage() {
   const router = useRouter();
@@ -143,17 +144,17 @@ export default function NecromantePage() {
       {/* Vinheta */}
       <div className="absolute inset-0 shadow-[inset_0_0_150px_rgba(0,0,0,0.95)] pointer-events-none"></div>
 
+      {/* Navegação padronizada - apenas na introdução */}
+      {etapa === 'introducao' && (
+        <GameNav
+          backTo="/avatares"
+          backLabel="AVATARES"
+          title="O NECROMANTE"
+          subtitle="Senhor da Ressurreição"
+        />
+      )}
+
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8">
-        {/* Botão Voltar */}
-        {etapa === 'introducao' && (
-          <button
-            onClick={voltarAoDashboard}
-            className="absolute top-8 left-8 text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-2 font-mono text-sm group"
-          >
-            <span className="group-hover:-translate-x-1 transition-transform">←</span> 
-            <span>RETORNAR</span>
-          </button>
-        )}
 
         <div className="max-w-5xl w-full">
           {/* ETAPA 1: INTRODUÇÃO */}

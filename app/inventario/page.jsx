@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BackgroundEffects from "@/components/BackgroundEffects";
+import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
 
 export default function InventarioPage() {
   const router = useRouter();
@@ -223,26 +224,24 @@ export default function InventarioPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-gray-100 relative overflow-hidden">
       <BackgroundEffects />
 
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-4xl font-black bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-300 bg-clip-text text-transparent mb-2">
-              📦 INVENTÁRIO DO CAÇADOR
-            </h1>
-            <p className="text-slate-400 font-mono text-sm">Gerencie seus itens e equipamentos</p>
-          </div>
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/avatares"
+        backLabel="AVATARES"
+        title="INVENTÁRIO DO CAÇADOR"
+        subtitle="Gerencie seus itens e equipamentos"
+      />
 
-          {/* Recursos do jogador */}
-          <div className="flex gap-3">
-            <div className="bg-slate-950/80 backdrop-blur-xl border border-amber-500/30 rounded-lg px-4 py-2">
-              <div className="text-xs text-slate-500 uppercase font-mono">Moedas</div>
-              <div className="text-xl font-bold text-amber-400">💰 {stats?.moedas || 0}</div>
-            </div>
-            <div className="bg-slate-950/80 backdrop-blur-xl border border-purple-500/30 rounded-lg px-4 py-2">
-              <div className="text-xs text-slate-500 uppercase font-mono">Fragmentos</div>
-              <div className="text-xl font-bold text-purple-400">💎 {stats?.fragmentos || 0}</div>
-            </div>
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        {/* Recursos do jogador */}
+        <div className="flex gap-3 mb-6">
+          <div className="bg-slate-950/80 backdrop-blur-xl border border-amber-500/30 rounded-lg px-4 py-2">
+            <div className="text-xs text-slate-500 uppercase font-mono">Moedas</div>
+            <div className="text-xl font-bold text-amber-400">💰 {stats?.moedas || 0}</div>
+          </div>
+          <div className="bg-slate-950/80 backdrop-blur-xl border border-purple-500/30 rounded-lg px-4 py-2">
+            <div className="text-xs text-slate-500 uppercase font-mono">Fragmentos</div>
+            <div className="text-xl font-bold text-purple-400">💎 {stats?.fragmentos || 0}</div>
           </div>
         </div>
 
@@ -264,6 +263,17 @@ export default function InventarioPage() {
                       ? avatarAtivo.hp_atual
                       : avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5
                     } / {avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-slate-500 uppercase font-mono mb-1">Exaustão</div>
+                  <div className={`text-lg font-bold ${
+                    (avatarAtivo.exaustao || 0) >= 60 ? 'text-red-400' :
+                    (avatarAtivo.exaustao || 0) >= 40 ? 'text-orange-400' :
+                    (avatarAtivo.exaustao || 0) >= 20 ? 'text-yellow-400' :
+                    'text-green-400'
+                  }`}>
+                    {avatarAtivo.exaustao || 0} / 100
                   </div>
                 </div>
               </div>
@@ -349,7 +359,13 @@ export default function InventarioPage() {
                             <div className="flex justify-between text-xs">
                               <span className="text-slate-500">Efeito:</span>
                               <span className="text-green-400 font-bold">
-                                {item.efeito === 'cura_hp' ? `+${item.valor_efeito} HP` : item.efeito}
+                                {item.efeito === 'cura_hp' || item.efeito === 'hp'
+                                  ? `+${item.valor_efeito} HP`
+                                  : item.efeito === 'exaustao' || item.efeito === 'cura_exaustao'
+                                    ? `${item.valor_efeito} Exaustão`
+                                    : item.efeito === 'ambos'
+                                      ? `+${item.valor_hp || item.valor_efeito} HP / ${item.valor_exaustao} Exaustão`
+                                      : item.efeito}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs">
@@ -437,7 +453,13 @@ export default function InventarioPage() {
                           <div className="flex justify-between text-xs">
                             <span className="text-slate-500">Efeito:</span>
                             <span className="text-green-400 font-bold">
-                              {item.efeito === 'cura_hp' ? `+${item.valor_efeito} HP` : item.efeito}
+                              {item.efeito === 'cura_hp' || item.efeito === 'hp'
+                                ? `+${item.valor_efeito} HP`
+                                : item.efeito === 'exaustao' || item.efeito === 'cura_exaustao'
+                                  ? `${item.valor_efeito} Exaustão`
+                                  : item.efeito === 'ambos'
+                                    ? `+${item.valor_hp || item.valor_efeito} HP / ${item.valor_exaustao} Exaustão`
+                                    : item.efeito}
                             </span>
                           </div>
                           <div className="flex justify-between text-xs">
@@ -528,6 +550,14 @@ export default function InventarioPage() {
                             ? avatarAtivo.hp_atual
                             : avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5
                           } / {avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5}
+                        </div>
+                        <div className={`text-sm mt-1 ${
+                          (avatarAtivo.exaustao || 0) >= 60 ? 'text-red-400' :
+                          (avatarAtivo.exaustao || 0) >= 40 ? 'text-orange-400' :
+                          (avatarAtivo.exaustao || 0) >= 20 ? 'text-yellow-400' :
+                          'text-green-400'
+                        }`}>
+                          Exaustão: {avatarAtivo.exaustao || 0} / 100
                         </div>
                       </div>
                     </div>

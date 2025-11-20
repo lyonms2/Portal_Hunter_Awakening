@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import GameNav from '../components/GameNav';
 
 export default function TitulosPage() {
   const router = useRouter();
@@ -124,30 +125,14 @@ export default function TitulosPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => router.back()}
-            className="mb-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-          >
-            ← Voltar
-          </button>
+      <GameNav
+        backTo="/arena/pvp-ia"
+        backLabel="ARENA PVP"
+        title="MEUS TÍTULOS"
+        subtitle="Títulos conquistados em temporadas de PVP"
+      />
 
-          <div className="bg-gradient-to-r from-yellow-600 via-orange-500 to-yellow-600 rounded-lg p-6 shadow-2xl">
-            <div className="flex items-center gap-4">
-              <div className="text-6xl">🏆</div>
-              <div>
-                <h1 className="text-4xl font-bold text-white mb-2">
-                  Meus Títulos
-                </h1>
-                <p className="text-yellow-100">
-                  Títulos conquistados em temporadas de PVP
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="max-w-6xl mx-auto mt-6">
 
         {/* Título Ativo */}
         {tituloAtivo && (

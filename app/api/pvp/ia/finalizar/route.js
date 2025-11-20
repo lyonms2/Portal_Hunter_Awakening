@@ -102,6 +102,11 @@ export async function POST(request) {
       if (avatarMorreu) {
         updates.vivo = false;
         // NÃO adicionar marca_morte - avatar pode ser ressuscitado pelo Necromante
+
+        // Se já tinha marca_morte, esta é a morte final - registrar causa para o memorial
+        if (avatar.marca_morte) {
+          updates.causa_morte = 'combate';
+        }
       }
 
       console.log('[ATUALIZANDO AVATAR]', updates);

@@ -46,6 +46,7 @@ export async function POST(request) {
       vivo: false,
       hp_atual: 0,
       marca_morte: true, // Marca da morte - vai pro memorial
+      causa_morte: 'sacrificio', // Para epitáfio personalizado no memorial
       ativo: false,
       updated_at: new Date().toISOString()
     });
