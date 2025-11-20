@@ -5,6 +5,7 @@ import { ELEMENTOS, aplicarBonusElemental } from '../../avatares/sistemas/elemen
 import { gerarStatsBalanceados } from '../../avatares/sistemas/statsSystem';
 import { selecionarHabilidadesIniciais } from '../../avatares/sistemas/abilitiesSystem';
 import { gerarNomeCompleto, gerarDescricaoNarrativa } from '../../avatares/sistemas/loreSystem';
+import { getHunterRank, aplicarBonusInvocacao, calcularXpFeito, verificarPromocao } from '@/lib/hunter/hunterRankSystem';
 
 // ==================== FUNÇÕES DE GERAÇÃO ====================
 
@@ -15,28 +16,41 @@ function escolherAleatorio(array) {
 /**
  * Determina raridade baseado em probabilidades balanceadas
  * Primeira invocação sempre é Comum
+ * Aplica bônus do rank do caçador
  */
-function determinarRaridade(primeiraInvocacao = false) {
+function determinarRaridade(primeiraInvocacao = false, hunterRank = null) {
   if (primeiraInvocacao) {
     return 'Comum';
   }
 
-  const rand = Math.random() * 100;
-  
-  // 70% Comum, 28% Raro, 2% Lendário
-  if (rand < 70) return 'Comum';
-  if (rand < 98) return 'Raro';
-  return 'Lendário';
+  // Chances base: 70% Comum, 28% Raro, 2% Lendário
+  let chancesBase = {
+    comum: 0.70,
+    raro: 0.28,
+    lendario: 0.02
+  };
+
+  // Aplicar bônus do rank do caçador
+  if (hunterRank) {
+    chancesBase = aplicarBonusInvocacao(chancesBase, hunterRank);
+  }
+
+  const rand = Math.random();
+
+  // Verificar do mais raro para o mais comum
+  if (rand < chancesBase.lendario) return 'Lendário';
+  if (rand < chancesBase.lendario + chancesBase.raro) return 'Raro';
+  return 'Comum';
 }
 
 /**
  * Gera um avatar completo usando todos os sistemas
  */
-function gerarAvatarCompleto(primeiraInvocacao = false) {
+function gerarAvatarCompleto(primeiraInvocacao = false, hunterRank = null) {
   console.log("=== GERANDO AVATAR COM NOVOS SISTEMAS ===");
-  
-  // 1. DETERMINAR RARIDADE
-  const raridade = determinarRaridade(primeiraInvocacao);
+
+  // 1. DETERMINAR RARIDADE (com bônus do rank)
+  const raridade = determinarRaridade(primeiraInvocacao, hunterRank);
   console.log(`Raridade: ${raridade}`);
   
   // 2. ESCOLHER ELEMENTO ALEATÓRIO
@@ -204,8 +218,12 @@ export async function POST(request) {
 
     console.log("Gerando avatar com sistemas integrados...");
 
+    // Obter rank do caçador para aplicar bônus
+    const hunterRank = getHunterRank(stats.hunterRankXp || 0);
+    console.log(`Hunter Rank: ${hunterRank.nome} (${stats.hunterRankXp || 0} XP)`);
+
     // GERAR AVATAR COM TODOS OS SISTEMAS
-    const avatarGerado = gerarAvatarCompleto(ehPrimeiraInvocacao);
+    const avatarGerado = gerarAvatarCompleto(ehPrimeiraInvocacao, hunterRank);
     avatarGerado.user_id = userId;
     // ❌ REMOVIDO: avatarGerado.data_invocacao (coluna não existe no banco)
 
@@ -241,10 +259,19 @@ export async function POST(request) {
     const novosMoedas = stats.moedas - custoMoedas;
     const novosFragmentos = stats.fragmentos - custoFragmentos;
 
+    // Calcular XP de rank ganho por invocar avatar
+    const xpGanho = calcularXpFeito('AVATAR_INVOCADO');
+    const xpAnterior = stats.hunterRankXp || 0;
+    const novoHunterRankXp = xpAnterior + xpGanho;
+
+    // Verificar promoção de rank
+    const promocao = verificarPromocao(xpAnterior, novoHunterRankXp);
+
     try {
       await updateDocument('player_stats', userId, {
         moedas: novosMoedas,
         fragmentos: novosFragmentos,
+        hunterRankXp: novoHunterRankXp,
         primeira_invocacao: false
       });
     } catch (updateError) {
@@ -301,6 +328,12 @@ export async function POST(request) {
         moedas: novosMoedas,
         fragmentos: novosFragmentos
       },
+      hunterRank: {
+        xpGanho,
+        xpTotal: novoHunterRankXp,
+        rank: getHunterRank(novoHunterRankXp),
+        promocao: promocao.promovido ? promocao : null
+      },
       sistemas_aplicados: {
         elemental: true,
         stats: true,
@@ -308,7 +341,8 @@ export async function POST(request) {
         lore: true,
         progression: true,
         bond: true,
-        exhaustion: true
+        exhaustion: true,
+        hunterRank: true
       }
     });
 
