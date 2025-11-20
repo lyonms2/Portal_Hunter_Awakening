@@ -737,6 +737,23 @@ export default function AvatarsPage() {
           getCorBorda={getCorBorda}
           getCorElemento={getCorElemento}
           getEmojiElemento={getEmojiElemento}
+          userId={user?.id}
+          onRename={(avatarId, novoNome) => {
+            // Atualizar o nome no estado local
+            setAvatares(prev => prev.map(av =>
+              av.id === avatarId ? { ...av, nome: novoNome } : av
+            ));
+            // Atualizar o avatar selecionado também
+            setAvatarSelecionado(prev =>
+              prev && prev.id === avatarId ? { ...prev, nome: novoNome } : prev
+            );
+            // Mostrar confirmação
+            setModalConfirmacao({
+              tipo: 'sucesso',
+              mensagem: `Avatar renomeado para "${novoNome}"!`
+            });
+            setTimeout(() => setModalConfirmacao(null), 3000);
+          }}
         />
       )}
 

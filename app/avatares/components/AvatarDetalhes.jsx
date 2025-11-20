@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import AvatarSVG from '../../components/AvatarSVG';
 import { aplicarPenalidadesExaustao, getNivelExaustao } from '../sistemas/exhaustionSystem';
 
@@ -66,9 +67,72 @@ export default function AvatarDetalhes({
   getCorRaridade,
   getCorBorda,
   getCorElemento,
-  getEmojiElemento
+  getEmojiElemento,
+  userId,
+  onRename
 }) {
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [novoNome, setNovoNome] = useState(avatar?.nome || '');
+  const [salvandoNome, setSalvandoNome] = useState(false);
+  const [erroNome, setErroNome] = useState('');
+
   if (!avatar) return null;
+
+  const salvarNome = async () => {
+    const nomeValidado = novoNome.trim();
+
+    // Validações locais
+    if (nomeValidado.length < 3) {
+      setErroNome('O nome deve ter no mínimo 3 caracteres');
+      return;
+    }
+    if (nomeValidado.length > 30) {
+      setErroNome('O nome deve ter no máximo 30 caracteres');
+      return;
+    }
+    if (nomeValidado === avatar.nome) {
+      setEditandoNome(false);
+      setErroNome('');
+      return;
+    }
+
+    setSalvandoNome(true);
+    setErroNome('');
+
+    try {
+      const response = await fetch('/api/renomear-avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          avatarId: avatar.id,
+          novoNome: nomeValidado
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setEditandoNome(false);
+        if (onRename) {
+          onRename(avatar.id, nomeValidado);
+        }
+      } else {
+        setErroNome(data.error || 'Erro ao renomear avatar');
+      }
+    } catch (error) {
+      console.error('Erro ao renomear:', error);
+      setErroNome('Erro de conexão');
+    } finally {
+      setSalvandoNome(false);
+    }
+  };
+
+  const cancelarEdicao = () => {
+    setEditandoNome(false);
+    setNovoNome(avatar.nome);
+    setErroNome('');
+  };
 
   // Calcular stats com penalidades de exaustão
   const statsBase = {
@@ -125,10 +189,59 @@ export default function AvatarDetalhes({
     
                     {/* Nome e Elemento */}
                     <div className="text-center">
-                      <h3 className="text-2xl font-black mb-2 bg-gradient-to-r from-cyan-300 to-purple-300 bg-clip-text text-transparent">
-                        {avatar.nome}
-                      </h3>
-                      
+                      {editandoNome ? (
+                        <div className="mb-2">
+                          <div className="flex items-center justify-center gap-2">
+                            <input
+                              type="text"
+                              value={novoNome}
+                              onChange={(e) => setNovoNome(e.target.value)}
+                              maxLength={30}
+                              className="px-3 py-2 bg-slate-800 border border-cyan-500/50 rounded text-white text-center font-bold focus:border-cyan-400 focus:outline-none w-48"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') salvarNome();
+                                if (e.key === 'Escape') cancelarEdicao();
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-center gap-2 mt-2">
+                            <button
+                              onClick={salvarNome}
+                              disabled={salvandoNome}
+                              className="px-3 py-1 bg-green-900/50 hover:bg-green-800/50 border border-green-500/50 rounded text-xs font-bold text-green-400 transition-all disabled:opacity-50"
+                            >
+                              {salvandoNome ? '...' : '✓ Salvar'}
+                            </button>
+                            <button
+                              onClick={cancelarEdicao}
+                              disabled={salvandoNome}
+                              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs font-bold text-slate-400 transition-all disabled:opacity-50"
+                            >
+                              ✕ Cancelar
+                            </button>
+                          </div>
+                          {erroNome && (
+                            <p className="text-xs text-red-400 mt-2">{erroNome}</p>
+                          )}
+                          <p className="text-[10px] text-slate-500 mt-1">{novoNome.length}/30 caracteres</p>
+                        </div>
+                      ) : (
+                        <div className="mb-2 group/nome">
+                          <h3
+                            className="text-2xl font-black bg-gradient-to-r from-cyan-300 to-purple-300 bg-clip-text text-transparent inline-flex items-center gap-2 cursor-pointer hover:from-cyan-200 hover:to-purple-200 transition-all"
+                            onClick={() => {
+                              setNovoNome(avatar.nome);
+                              setEditandoNome(true);
+                            }}
+                            title="Clique para renomear"
+                          >
+                            {avatar.nome}
+                            <span className="text-sm opacity-0 group-hover/nome:opacity-100 transition-opacity">✏️</span>
+                          </h3>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-center gap-2 flex-wrap">
                         <span className={`inline-block px-3 py-1 bg-slate-800 rounded-full text-sm font-mono ${getCorElemento(avatar.elemento)}`}>
                           {getEmojiElemento(avatar.elemento)} {avatar.elemento}
