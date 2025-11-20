@@ -305,7 +305,7 @@ export default function MergePage() {
               ) : (
                 <div>
                   <div className="mb-4 p-6 bg-cyan-950/20 rounded-lg border border-cyan-900/30 text-center">
-                    <div className="text-4xl mb-2">👤</div>
+                    <div className="text-4xl mb-2">🧬</div>
                     <div className="text-sm text-cyan-400">Selecione o avatar que receberá os poderes</div>
                   </div>
 

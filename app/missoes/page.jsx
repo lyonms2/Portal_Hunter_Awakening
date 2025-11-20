@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import AvatarSVG from '../components/AvatarSVG';
 
 export default function StoryModePage() {
   const router = useRouter();
@@ -26,6 +27,11 @@ export default function StoryModePage() {
 
   // Combat/Action log
   const [actionLog, setActionLog] = useState([]);
+
+  // Typing animation state
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const typingSpeed = 15; // ms per character
 
   // Elements available
   const elements = [
@@ -133,6 +139,40 @@ export default function StoryModePage() {
 
     init();
   }, [router]);
+
+  // Typing animation effect
+  useEffect(() => {
+    const scene = getCurrentScene();
+    if (!scene?.text) {
+      setDisplayedText('');
+      return;
+    }
+
+    setIsTyping(true);
+    setDisplayedText('');
+    let currentIndex = 0;
+
+    const interval = setInterval(() => {
+      if (currentIndex < scene.text.length) {
+        setDisplayedText(scene.text.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        setIsTyping(false);
+        clearInterval(interval);
+      }
+    }, typingSpeed);
+
+    return () => clearInterval(interval);
+  }, [storyPhase, sceneIndex]);
+
+  const getCurrentScene = () => {
+    if (storyPhase === 'prologo') {
+      return storyContent.prologo.scenes[sceneIndex];
+    } else if (storyPhase === 'cena1') {
+      return storyContent.cena1.scenes[sceneIndex];
+    }
+    return null;
+  };
 
   const addToLog = (message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString('pt-BR');
@@ -357,15 +397,6 @@ export default function StoryModePage() {
     );
   }
 
-  const getCurrentScene = () => {
-    if (storyPhase === 'prologo') {
-      return storyContent.prologo.scenes[sceneIndex];
-    } else if (storyPhase === 'cena1') {
-      return storyContent.cena1.scenes[sceneIndex];
-    }
-    return null;
-  };
-
   const getCurrentTitle = () => {
     if (storyPhase === 'prologo') return storyContent.prologo.title;
     if (storyPhase === 'cena1') return storyContent.cena1.title;
@@ -435,20 +466,29 @@ export default function StoryModePage() {
         </div>
 
         {/* Avatar Stats Display - Top */}
-        {avatarStats && (
+        {avatarStats && avatarVisual && (
           <div className="max-w-5xl mx-auto mb-6">
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-purple-500/20 rounded-lg blur opacity-50"></div>
               <div className="relative bg-slate-950/80 backdrop-blur-xl border border-cyan-900/30 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${selectedElement.cor} flex items-center justify-center text-3xl`}>
-                      {selectedElement.emoji}
-                    </div>
+                    <AvatarSVG
+                      avatar={{
+                        nome: avatarName,
+                        elemento: selectedElement.nome,
+                        corPele: avatarVisual.corPele,
+                        corCabelo: avatarVisual.corCabelo,
+                        tipoCabelo: avatarVisual.tipoCabelo,
+                        corOlhos: avatarVisual.corOlhos,
+                        corRoupa: avatarVisual.corRoupa
+                      }}
+                      tamanho={64}
+                    />
                     <div>
                       <div className="text-xs text-slate-400">Avatar Vinculado</div>
                       <div className="text-xl font-bold text-cyan-400">{avatarName}</div>
-                      <div className="text-sm text-slate-400">Elemento: {selectedElement.nome}</div>
+                      <div className="text-sm text-slate-400">Elemento: {selectedElement.nome} {selectedElement.emoji}</div>
                     </div>
                   </div>
                   <div className="flex gap-6 font-mono text-sm">
@@ -503,7 +543,8 @@ export default function StoryModePage() {
                   {currentScene && (
                     <>
                       <div className="text-slate-300 leading-relaxed whitespace-pre-wrap">
-                        {currentScene.text}
+                        {displayedText}
+                        {isTyping && <span className="inline-block w-2 h-4 bg-cyan-400 ml-1 animate-pulse" />}
                       </div>
                     </>
                   )}
