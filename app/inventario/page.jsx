@@ -265,6 +265,17 @@ export default function InventarioPage() {
                     } / {avatarAtivo.resistencia * 10 + avatarAtivo.nivel * 5}
                   </div>
                 </div>
+                <div className="text-right">
+                  <div className="text-xs text-slate-500 uppercase font-mono mb-1">Exaustão</div>
+                  <div className={`text-lg font-bold ${
+                    (avatarAtivo.exaustao || 0) >= 60 ? 'text-red-400' :
+                    (avatarAtivo.exaustao || 0) >= 40 ? 'text-orange-400' :
+                    (avatarAtivo.exaustao || 0) >= 20 ? 'text-yellow-400' :
+                    'text-green-400'
+                  }`}>
+                    {avatarAtivo.exaustao || 0} / 100
+                  </div>
+                </div>
               </div>
             </div>
           </div>
