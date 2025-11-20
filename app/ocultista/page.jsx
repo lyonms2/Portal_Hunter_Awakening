@@ -129,10 +129,6 @@ export default function OcultistaPage() {
           backLabel="AVATARES"
           title="O OCULTISTA"
           subtitle="Invocador de Entidades Dimensionais"
-          actions={[
-            COMMON_ACTIONS.avatares,
-            COMMON_ACTIONS.mercado
-          ]}
         />
       )}
 

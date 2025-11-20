@@ -210,10 +210,6 @@ export default function MercadoPage() {
         backLabel="AVATARES"
         title="MERCADO DE AVATARES"
         subtitle='"Aqui, as almas são moeda e os contratos são eternos..."'
-        actions={[
-          COMMON_ACTIONS.fusao,
-          COMMON_ACTIONS.invocar
-        ]}
       />
 
       <div className="relative z-10 container mx-auto px-4 py-6 max-w-7xl">

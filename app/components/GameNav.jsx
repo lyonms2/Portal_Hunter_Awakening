@@ -10,13 +10,15 @@ import { useRouter } from "next/navigation";
  * @param {Array} actions - Array de ações adicionais [{href, label, icon, color}]
  * @param {string} title - Título da página (opcional)
  * @param {string} subtitle - Subtítulo/descrição (opcional)
+ * @param {boolean} compact - Usar botões menores (para muitas ações)
  */
 export default function GameNav({
   backTo = "/dashboard",
   backLabel = "VOLTAR",
   actions = [],
   title,
-  subtitle
+  subtitle,
+  compact = false
 }) {
   const router = useRouter();
 
@@ -67,14 +69,14 @@ export default function GameNav({
 
             {/* Lado direito - Ações */}
             {actions.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-1.5 flex-wrap">
                 {actions.map((action, index) => (
                   <button
                     key={index}
                     onClick={() => router.push(action.href)}
-                    className={`px-4 py-2 bg-gradient-to-r ${getActionStyle(action.color)} border rounded-lg transition-all flex items-center gap-2 text-sm font-semibold`}
+                    className={`${compact ? 'px-2 py-1.5 text-xs gap-1' : 'px-3 py-1.5 text-xs gap-1.5'} bg-gradient-to-r ${getActionStyle(action.color)} border rounded-lg transition-all flex items-center font-semibold`}
                   >
-                    {action.icon && <span>{action.icon}</span>}
+                    {action.icon && <span className={compact ? 'text-sm' : ''}>{action.icon}</span>}
                     <span>{action.label}</span>
                   </button>
                 ))}

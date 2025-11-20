@@ -152,11 +152,6 @@ export default function PurificadorPage() {
           backLabel="AVATARES"
           title="O PURIFICADOR"
           subtitle="Purificador de Almas Marcadas"
-          actions={[
-            COMMON_ACTIONS.avatares,
-            COMMON_ACTIONS.memorial,
-            COMMON_ACTIONS.necromante
-          ]}
         />
       )}
 

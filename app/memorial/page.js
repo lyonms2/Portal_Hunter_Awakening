@@ -114,10 +114,6 @@ export default function MemorialPage() {
         backLabel="AVATARES"
         title="MEMORIAL DOS CAÍDOS"
         subtitle={avataresMarcados.length > 0 ? `${avataresMarcados.length} ${avataresMarcados.length === 1 ? 'herói caído' : 'heróis caídos'}` : ''}
-        actions={[
-          COMMON_ACTIONS.necromante,
-          COMMON_ACTIONS.purificador
-        ]}
       />
 
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">

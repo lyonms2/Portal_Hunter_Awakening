@@ -151,11 +151,6 @@ export default function NecromantePage() {
           backLabel="AVATARES"
           title="O NECROMANTE"
           subtitle="Senhor da Ressurreição"
-          actions={[
-            COMMON_ACTIONS.avatares,
-            COMMON_ACTIONS.memorial,
-            COMMON_ACTIONS.purificador
-          ]}
         />
       )}
 

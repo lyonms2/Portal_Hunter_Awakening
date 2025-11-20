@@ -230,11 +230,6 @@ export default function InventarioPage() {
         backLabel="AVATARES"
         title="INVENTÁRIO DO CAÇADOR"
         subtitle="Gerencie seus itens e equipamentos"
-        actions={[
-          COMMON_ACTIONS.avatares,
-          COMMON_ACTIONS.missoes,
-          COMMON_ACTIONS.arena
-        ]}
       />
 
       <div className="relative z-10 container mx-auto px-4 py-8">

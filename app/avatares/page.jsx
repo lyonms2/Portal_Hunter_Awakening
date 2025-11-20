@@ -389,15 +389,16 @@ export default function AvatarsPage() {
         backTo="/dashboard"
         backLabel="DASHBOARD"
         title="MINHA COLEÇÃO"
-        subtitle={`${avatares.length} ${avatares.length === 1 ? 'Avatar' : 'Avatares'} | ${avatares.filter(a => a.vivo).length} Vivos | ${avatares.filter(a => !a.vivo).length} Mortos`}
+        subtitle={`${avatares.length} Avatares | ${avatares.filter(a => a.vivo).length} Vivos`}
+        compact={true}
         actions={[
           COMMON_ACTIONS.mercado,
+          COMMON_ACTIONS.inventario,
           COMMON_ACTIONS.fusao,
-          ...(avataresCaidos > 0 ? [{ ...COMMON_ACTIONS.memorial, label: `MEMORIAL (${avataresCaidos})` }] : []),
           COMMON_ACTIONS.invocar,
           COMMON_ACTIONS.necromante,
           COMMON_ACTIONS.purificador,
-          COMMON_ACTIONS.inventario
+          ...(avataresCaidos > 0 ? [{ ...COMMON_ACTIONS.memorial, label: `MEMORIAL (${avataresCaidos})` }] : [])
         ]}
       />
 
