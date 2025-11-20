@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import GameNav from '../components/GameNav';
 
 export default function HistoricoPvPPage() {
   const router = useRouter();
@@ -94,30 +95,14 @@ export default function HistoricoPvPPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => router.back()}
-            className="mb-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-          >
-            ← Voltar
-          </button>
+      <GameNav
+        backTo="/arena/pvp-ia"
+        backLabel="ARENA PVP"
+        title="HISTÓRICO DE TEMPORADAS"
+        subtitle="Seu desempenho em temporadas anteriores"
+      />
 
-          <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 rounded-lg p-6 shadow-2xl">
-            <div className="flex items-center gap-4">
-              <div className="text-6xl">📜</div>
-              <div>
-                <h1 className="text-4xl font-bold text-white mb-2">
-                  Histórico de Temporadas
-                </h1>
-                <p className="text-purple-100">
-                  Seu desempenho em temporadas anteriores
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="max-w-6xl mx-auto mt-6">
 
         {/* Estatísticas Gerais */}
         {stats && historico.length > 0 && (

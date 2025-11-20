@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import GameNav from '../components/GameNav';
 
 export default function ArenaLobby() {
   const router = useRouter();
@@ -88,26 +89,15 @@ export default function ArenaLobby() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-gray-100">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-5xl font-black bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 bg-clip-text text-transparent mb-3 flex items-center gap-4">
-              <span className="text-6xl">🏟️</span>
-              ARENA DE COMBATE
-            </h1>
-            <p className="text-slate-400 font-mono text-lg">
-              Escolha seu modo de jogo e prove seu valor em combate
-            </p>
-          </div>
+      {/* Navegação padronizada */}
+      <GameNav
+        backTo="/dashboard"
+        backLabel="DASHBOARD"
+        title="ARENA DE COMBATE"
+        subtitle="Escolha seu modo de jogo e prove seu valor"
+      />
 
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-all hover:scale-105"
-          >
-            ← Voltar ao Dashboard
-          </button>
-        </div>
+      <div className="container mx-auto px-4 py-8">
 
         {/* Modos de Jogo */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
