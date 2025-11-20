@@ -216,13 +216,13 @@ export default function OcultistaPage() {
                   {/* Aviso de Slots */}
                   <div className="bg-slate-900/50 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-slate-400 text-sm font-mono">Slots Disponíveis:</span>
+                      <span className="text-slate-400 text-sm font-mono">Slots Ocupados:</span>
                       <span className={`font-bold text-lg ${
                         slotsDisponiveis === 0 ? 'text-red-400' :
                         slotsDisponiveis <= 3 ? 'text-orange-400' :
                         'text-cyan-400'
                       }`}>
-                        {slotsDisponiveis}/15
+                        {totalAvatares}/15
                       </span>
                     </div>
                     <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mb-2">
@@ -233,11 +233,11 @@ export default function OcultistaPage() {
                           slotsDisponiveis <= 7 ? 'bg-yellow-500' :
                           'bg-cyan-500'
                         }`}
-                        style={{ width: `${((15 - slotsDisponiveis) / 15) * 100}%` }}
+                        style={{ width: `${(totalAvatares / 15) * 100}%` }}
                       ></div>
                     </div>
                     <p className="text-[10px] text-slate-500 font-mono text-center">
-                      Você tem {totalAvatares} avatares. Avatares no memorial não ocupam slots.
+                      {slotsDisponiveis} {slotsDisponiveis === 1 ? 'slot disponível' : 'slots disponíveis'}. Avatares no memorial não ocupam slots.
                     </p>
                   </div>
 
