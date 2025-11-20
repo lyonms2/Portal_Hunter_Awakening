@@ -4,6 +4,33 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarSVG from '../components/AvatarSVG';
 
+// Função para gerar epitáfio baseado na causa da morte
+const getEpitafio = (causaMorte) => {
+  switch (causaMorte) {
+    case 'sacrificio':
+      return {
+        texto: "Sacrificado pelo próprio mestre,<br/>sua essência alimenta o Vazio Dimensional.",
+        emoji: "🕯️"
+      };
+    case 'fusao':
+      return {
+        texto: "Sua essência foi absorvida em uma fusão,<br/>vive agora através de outro guerreiro.",
+        emoji: "🧬"
+      };
+    case 'combate':
+      return {
+        texto: "Tombou em combate honrado,<br/>um verdadeiro guerreiro até o fim.",
+        emoji: "⚔️"
+      };
+    default:
+      // Fallback para avatares antigos sem causa_morte
+      return {
+        texto: "Tombou em combate honrado,<br/>um verdadeiro guerreiro até o fim.",
+        emoji: "⚔️"
+      };
+  }
+};
+
 export default function MemorialPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -214,7 +241,8 @@ export default function MemorialPage() {
                       {/* Epitáfio */}
                       <div className="text-center">
                         <p className="text-gray-700 text-xs font-mono italic leading-relaxed">
-                          "Tombou em combate honrado,<br/>um verdadeiro guerreiro até o fim."
+                          <span className="mr-1">{getEpitafio(avatar.causa_morte).emoji}</span>
+                          "<span dangerouslySetInnerHTML={{ __html: getEpitafio(avatar.causa_morte).texto }} />"
                         </p>
                       </div>
                     </div>
