@@ -348,7 +348,13 @@ export default function InventarioPage() {
                             <div className="flex justify-between text-xs">
                               <span className="text-slate-500">Efeito:</span>
                               <span className="text-green-400 font-bold">
-                                {item.efeito === 'cura_hp' ? `+${item.valor_efeito} HP` : item.efeito}
+                                {item.efeito === 'cura_hp' || item.efeito === 'hp'
+                                  ? `+${item.valor_efeito} HP`
+                                  : item.efeito === 'exaustao' || item.efeito === 'cura_exaustao'
+                                    ? `${item.valor_efeito} Exaustão`
+                                    : item.efeito === 'ambos'
+                                      ? `+${item.valor_hp || item.valor_efeito} HP / ${item.valor_exaustao} Exaustão`
+                                      : item.efeito}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs">
@@ -436,7 +442,13 @@ export default function InventarioPage() {
                           <div className="flex justify-between text-xs">
                             <span className="text-slate-500">Efeito:</span>
                             <span className="text-green-400 font-bold">
-                              {item.efeito === 'cura_hp' ? `+${item.valor_efeito} HP` : item.efeito}
+                              {item.efeito === 'cura_hp' || item.efeito === 'hp'
+                                ? `+${item.valor_efeito} HP`
+                                : item.efeito === 'exaustao' || item.efeito === 'cura_exaustao'
+                                  ? `${item.valor_efeito} Exaustão`
+                                  : item.efeito === 'ambos'
+                                    ? `+${item.valor_hp || item.valor_efeito} HP / ${item.valor_exaustao} Exaustão`
+                                    : item.efeito}
                             </span>
                           </div>
                           <div className="flex justify-between text-xs">
