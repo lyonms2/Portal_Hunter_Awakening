@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { inicializarBatalhaD20, processarTurnoD20, calcularHP, calcularDefesa } from "@/lib/combat/d20CombatSystem";
+import { inicializarBatalhaD20, processarTurnoD20, calcularHP, calcularDefesa, verificarPodeLutar, calcularPenalidadeExaustao } from "@/lib/combat/d20CombatSystem";
 import { calcularRecompensasTreino } from "@/lib/arena/recompensasCalc";
 import { calcularRecompensasPvP, calcularPontosVitoria, calcularPerda } from "@/lib/pvp/rankingSystem";
 import { BattleSyncManager, enviarAcaoPvP, buscarEstadoSala, marcarComoPronto, notificarDesconexao } from "@/lib/pvp/battleSync";
@@ -1091,6 +1091,11 @@ function BatalhaContent() {
                   <span>🎲 Crítico: nat 20 (2x dano)</span>
                   <span>🛡️ Defesa: {calcularDefesa(estado.jogador)}</span>
                 </div>
+                {estado.penalidade_exaustao > 0 && (
+                  <div className="mt-2 text-orange-400 text-center">
+                    ⚠️ Exaustão: -{Math.round(estado.penalidade_exaustao * 100)}% stats
+                  </div>
+                )}
               </div>
             </div>
           </div>
