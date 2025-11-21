@@ -1098,7 +1098,6 @@ function BatalhaContent() {
                 )}
               </div>
             </div>
-          </div>
         </div>
 
         {/* Log de Combate - Embaixo */}
