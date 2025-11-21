@@ -2,8 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { processarAcaoJogador, verificarVitoria, iniciarTurno } from "@/lib/arena/batalhaEngine";
-import { processarTurnoIA, getMensagemIA } from "@/lib/arena/iaEngine";
+import { inicializarBatalhaD20, processarTurnoD20, calcularHP, calcularDefesa } from "@/lib/combat/d20CombatSystem";
 import { calcularRecompensasTreino } from "@/lib/arena/recompensasCalc";
 import { calcularRecompensasPvP, calcularPontosVitoria, calcularPerda } from "@/lib/pvp/rankingSystem";
 import { BattleSyncManager, enviarAcaoPvP, buscarEstadoSala, marcarComoPronto, notificarDesconexao } from "@/lib/pvp/battleSync";
@@ -81,31 +80,22 @@ function BatalhaContent() {
           setMatchId(dados.matchId);
         }
 
-        // Construir estado de batalha a partir dos dados PvP - GARANTIR habilidades
-        const batalha = {
-          jogador: {
+        // Construir estado de batalha a partir dos dados PvP usando D20
+        const hpJogador = calcularHP(dados.avatarJogador);
+        const hpInimigo = calcularHP(dados.avatarOponente);
+
+        const batalha = inicializarBatalhaD20(
+          {
             ...dados.avatarJogador,
             habilidades: Array.isArray(dados.avatarJogador.habilidades) ? dados.avatarJogador.habilidades : [],
-            hp_atual: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
-            hp_maximo: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
-            energia_atual: 100,
-            buffs: [],
-            debuffs: []
           },
-          inimigo: {
+          {
             ...dados.avatarOponente,
             nome: dados.nomeOponente || dados.avatarOponente.nome,
             habilidades: Array.isArray(dados.avatarOponente.habilidades) ? dados.avatarOponente.habilidades : [],
-            hp_atual: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
-            hp_maximo: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
-            energia_atual: 100,
-            buffs: [],
-            debuffs: []
           },
-          dificuldade: 'pvp',
-          rodada: 1,
-          turno_atual: 'jogador'
-        };
+          'normal' // PvP usa dificuldade normal
+        );
 
         setEstado(batalha);
 
@@ -163,9 +153,9 @@ function BatalhaContent() {
     const interval = setInterval(() => {
       setTempoRestante((prev) => {
         if (prev <= 1) {
-          // Tempo esgotado - executar ação automática (esperar)
-          adicionarLog('⏱️ Tempo esgotado! Passando a vez...');
-          executarAcao('esperar');
+          // Tempo esgotado - executar ação automática (defender)
+          adicionarLog('⏱️ Tempo esgotado! Defendendo automaticamente...');
+          executarAcao('defender');
           return 30;
         }
         return prev - 1;
@@ -342,43 +332,27 @@ function BatalhaContent() {
     setTempoRestante(30); // Reset timer
 
     // Animação da ação
-    setAnimacaoAcao({ tipo, alvo: 'inimigo' });
+    setAnimacaoAcao({ tipo, alvo: tipo === 'defender' || tipo === 'esquivar' ? 'jogador' : 'inimigo' });
     setTimeout(() => setAnimacaoAcao(null), 800);
 
     try {
-      const novoEstado = { ...estado };
+      // === PROCESSAR TURNO D20 ===
+      const resultado = processarTurnoD20(estado, tipo);
 
-      // === TURNO DO JOGADOR ===
-      const resultado = processarAcaoJogador(novoEstado, { tipo, habilidadeIndex });
+      // Exibir logs detalhados do D20
+      resultado.logs.forEach(logMsg => {
+        adicionarLog(logMsg);
+      });
 
-      adicionarLog(`🎯 ${resultado.mensagem}`);
-
-      if (resultado.energiaGasta > 0) {
-        adicionarLog(`⚡ -${resultado.energiaGasta} energia`);
-      }
-
-      if (resultado.energiaRecuperada > 0) {
-        adicionarLog(`⚡ +${resultado.energiaRecuperada} energia recuperada`);
-      }
-
-      if (resultado.dano > 0) {
-        adicionarLog(`💥 ${resultado.dano} de dano causado`);
-      }
-
-      if (resultado.cura > 0) {
-        adicionarLog(`💚 +${resultado.cura} HP recuperado`);
-      }
-
-      if (resultado.buffs && resultado.buffs.length > 0) {
-        resultado.buffs.forEach(buff => {
-          if (buff.tipo === 'defesa') {
-            adicionarLog(`🛡️ Defesa aumentada em ${buff.valor}% por 1 turno!`);
-          }
+      // Animação de dano no inimigo (ataque do jogador)
+      if (resultado.ataqueJogador && resultado.ataqueJogador.acertou && resultado.ataqueJogador.danoFinal > 0) {
+        setAnimacaoDano({
+          tipo: 'inimigo',
+          valor: resultado.ataqueJogador.danoFinal,
+          critico: resultado.ataqueJogador.critico || false
         });
+        setTimeout(() => setAnimacaoDano(null), 1500);
       }
-
-      // Verificar vitória
-      const vitoria = verificarVitoria(novoEstado);
 
       // === MODO PVP AO VIVO ===
       if (pvpAoVivo && matchId) {
@@ -387,24 +361,24 @@ function BatalhaContent() {
         // Enviar ação para servidor
         await enviarAcaoPvP(matchId, userData.id, {
           tipo,
-          dano: resultado.dano || 0,
-          cura: resultado.cura || 0,
-          critico: resultado.critico || false,
-          energiaGasta: resultado.energiaGasta || 0,
-          hp_jogador_atual: novoEstado.jogador.hp_atual,
-          hp_inimigo_atual: novoEstado.inimigo.hp_atual,
-          resultado: vitoria.fim ? 'vitoria' : null
+          dano: resultado.ataqueJogador?.danoFinal || 0,
+          cura: 0,
+          critico: resultado.ataqueJogador?.critico || false,
+          energiaGasta: 0,
+          hp_jogador_atual: resultado.novoEstado.jogador.hp_atual,
+          hp_inimigo_atual: resultado.novoEstado.inimigo.hp_atual,
+          resultado: resultado.fimBatalha ? (resultado.vencedor === 'jogador' ? 'vitoria' : 'derrota') : null
         });
 
         // Atualizar estado local
-        setEstado(novoEstado);
+        setEstado(resultado.novoEstado);
         setIsYourTurn(false); // Agora é turno do oponente
         setAguardandoOponente(true);
         adicionarLog('⏳ Aguardando oponente...');
 
-        if (vitoria.fim) {
+        if (resultado.fimBatalha) {
           await new Promise(resolve => setTimeout(resolve, 1000));
-          finalizarBatalha(novoEstado, vitoria.vencedor);
+          finalizarBatalha(resultado.novoEstado, resultado.vencedor);
         }
 
         setProcessando(false);
@@ -412,85 +386,32 @@ function BatalhaContent() {
       }
 
       // === MODO TREINO (IA LOCAL) ===
-      if (vitoria.fim) {
-        finalizarBatalha(novoEstado, vitoria.vencedor);
+
+      // Aguardar um pouco para mostrar os logs
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Animação de dano no jogador (ataque do inimigo)
+      if (resultado.ataqueInimigo && resultado.ataqueInimigo.acertou && resultado.ataqueInimigo.danoFinal > 0) {
+        setTurnoIA(true);
+        setAnimacaoDano({
+          tipo: 'jogador',
+          valor: resultado.ataqueInimigo.danoFinal,
+          critico: resultado.ataqueInimigo.critico || false
+        });
+        setTimeout(() => setAnimacaoDano(null), 1500);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        setTurnoIA(false);
+      }
+
+      // Verificar fim da batalha
+      if (resultado.fimBatalha) {
+        finalizarBatalha(resultado.novoEstado, resultado.vencedor);
         setProcessando(false);
         return;
       }
 
       // Atualizar estado
-      setEstado(novoEstado);
-
-      // Aguardar 1 segundo antes do turno da IA
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // === TURNO DA IA ===
-      setTurnoIA(true);
-      adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      adicionarLog('🤖 Turno do oponente...');
-      
-      // Mensagem de flavor
-      const mensagemIA = getMensagemIA({ tipo: 'habilidade' }, novoEstado);
-      adicionarLog(mensagemIA);
-
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Executar ação da IA
-      const resultadoIA = processarTurnoIA(novoEstado);
-      adicionarLog(`💥 ${resultadoIA.mensagem}`);
-
-      // Animação de dano da IA no jogador
-      if (resultadoIA.dano > 0) {
-        setAnimacaoDano({
-          tipo: 'jogador',
-          valor: resultadoIA.dano,
-          critico: resultadoIA.critico || false
-        });
-        setTimeout(() => setAnimacaoDano(null), 1500);
-      }
-
-      // Verificar vitória novamente
-      const vitoriaIA = verificarVitoria(novoEstado);
-      
-      if (vitoriaIA.fim) {
-        finalizarBatalha(novoEstado, vitoriaIA.vencedor);
-        return;
-      }
-
-      // === PRÓXIMA RODADA ===
-      novoEstado.rodada++;
-      novoEstado.turno_atual = 'jogador';
-
-      // Processar efeitos contínuos (dano/cura por turno, reduzir duração de buffs/debuffs)
-      const turnoJogador = iniciarTurno(novoEstado.jogador, novoEstado);
-      const turnoInimigo = iniciarTurno(novoEstado.inimigo, novoEstado);
-
-      // Registrar efeitos processados
-      if (turnoJogador.efeitosProcessados && turnoJogador.efeitosProcessados.length > 0) {
-        turnoJogador.efeitosProcessados.forEach(efeito => {
-          if (efeito.tipo === 'dano_continuo') {
-            adicionarLog(`🔥 ${novoEstado.jogador.nome} sofreu ${efeito.dano} de dano de ${efeito.nome}`);
-          } else if (efeito.tipo === 'cura_continua') {
-            adicionarLog(`💚 ${novoEstado.jogador.nome} recuperou ${efeito.cura} HP de ${efeito.nome}`);
-          }
-        });
-      }
-
-      if (turnoInimigo.efeitosProcessados && turnoInimigo.efeitosProcessados.length > 0) {
-        turnoInimigo.efeitosProcessados.forEach(efeito => {
-          if (efeito.tipo === 'dano_continuo') {
-            adicionarLog(`🔥 ${novoEstado.inimigo.nome} sofreu ${efeito.dano} de dano de ${efeito.nome}`);
-          } else if (efeito.tipo === 'cura_continua') {
-            adicionarLog(`💚 ${novoEstado.inimigo.nome} recuperou ${efeito.cura} HP de ${efeito.nome}`);
-          }
-        });
-      }
-
-      adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      adicionarLog(`⏰ Rodada ${novoEstado.rodada}`);
-
-      setEstado(novoEstado);
-      setTurnoIA(false);
+      setEstado(resultado.novoEstado);
 
     } catch (error) {
       console.error('Erro ao executar ação:', error);
@@ -1114,96 +1035,63 @@ function BatalhaContent() {
             </div>
           </div>
 
-            {/* Ações */}
+            {/* Ações D20 */}
             <div className="bg-slate-900/80 rounded-lg p-6 border-2 border-slate-700">
-              <h3 className="text-cyan-400 font-bold mb-4">⚡ SUAS AÇÕES</h3>
+              <h3 className="text-cyan-400 font-bold mb-4">🎲 AÇÕES D20</h3>
 
-              {/* Ataque Básico */}
-              <div className="mb-4">
+              {/* Ataques */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 <button
-                  onClick={() => !turnoIA && !processando && executarAcao('ataque_basico')}
+                  onClick={() => !turnoIA && !processando && executarAcao('ataque_fisico')}
                   disabled={turnoIA || processando}
-                  className="w-full p-4 rounded-lg border-2 transition-all text-left bg-gradient-to-r from-red-900/40 to-orange-900/40 border-red-500 hover:from-red-900/60 hover:to-orange-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-4 rounded-lg border-2 transition-all text-left bg-gradient-to-r from-red-900/40 to-orange-900/40 border-red-500 hover:from-red-900/60 hover:to-orange-900/60 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-red-300 text-lg mb-1">⚔️ Ataque Básico</div>
-                      <div className="text-xs text-slate-300">Ataque físico rápido • Sem custo de energia</div>
-                    </div>
-                    <div className="text-3xl">⚔️</div>
-                  </div>
-                  <div className="mt-2 text-xs text-green-400">✅ Sempre disponível • Pode causar crítico</div>
+                  <div className="font-bold text-red-300 text-lg mb-1">⚔️ Ataque Físico</div>
+                  <div className="text-xs text-slate-300">1d20 + Força</div>
+                  <div className="mt-2 text-xs text-orange-400">🎯 Força: {estado.jogador.forca}</div>
+                </button>
+
+                <button
+                  onClick={() => !turnoIA && !processando && executarAcao('ataque_magico')}
+                  disabled={turnoIA || processando}
+                  className="p-4 rounded-lg border-2 transition-all text-left bg-gradient-to-r from-purple-900/40 to-indigo-900/40 border-purple-500 hover:from-purple-900/60 hover:to-indigo-900/60 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
+                >
+                  <div className="font-bold text-purple-300 text-lg mb-1">✨ Ataque Mágico</div>
+                  <div className="text-xs text-slate-300">1d20 + Foco</div>
+                  <div className="mt-2 text-xs text-purple-400">🔮 Foco: {estado.jogador.foco}</div>
                 </button>
               </div>
 
-              {/* Habilidades */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {estado.jogador.habilidades && estado.jogador.habilidades.length > 0 ? estado.jogador.habilidades.map((hab, index) => {
-                  const custoEnergia = hab.custo_energia || hab.custoEnergia || 20;
-                  const podeUsar = estado.jogador.energia_atual >= custoEnergia && !turnoIA && !processando;
-                  const energiaInsuficiente = estado.jogador.energia_atual < custoEnergia;
+              {/* Ações Defensivas */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => !turnoIA && !processando && executarAcao('esquivar')}
+                  disabled={turnoIA || processando}
+                  className="p-4 rounded-lg border-2 transition-all text-left bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-green-500 hover:from-green-900/60 hover:to-emerald-900/60 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
+                >
+                  <div className="font-bold text-green-300 text-lg mb-1">💨 Esquivar</div>
+                  <div className="text-xs text-slate-300">Tenta evitar o ataque</div>
+                  <div className="mt-2 text-xs text-green-400">🏃 Agilidade: {estado.jogador.agilidade}</div>
+                </button>
 
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => podeUsar && executarAcao('habilidade', index)}
-                      disabled={!podeUsar}
-                      className={`p-3 rounded-lg border-2 transition-all text-left relative overflow-hidden ${
-                        podeUsar
-                          ? 'border-purple-500 bg-gradient-to-br from-purple-900/40 to-purple-800/30 hover:from-purple-800/50 hover:to-purple-700/40 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20 cursor-pointer'
-                          : energiaInsuficiente
-                          ? 'border-slate-700 bg-slate-800/30 opacity-40 cursor-not-allowed'
-                          : 'border-slate-600 bg-slate-800/20 opacity-50 cursor-wait'
-                      }`}
-                    >
-                      {podeUsar && (
-                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 animate-pulse"></div>
-                      )}
-                      <div className="relative z-10">
-                        <div className="font-bold text-purple-300 text-sm mb-1 flex items-center justify-between">
-                          <span>{hab.nome}</span>
-                          {hab.tipo && (
-                            <span className="text-[10px] px-1 py-0.5 rounded bg-purple-500/20 text-purple-200">
-                              {hab.tipo}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-400 mb-2 line-clamp-2">{hab.descricao}</div>
-                        <div className={`text-xs flex items-center justify-between ${
-                          energiaInsuficiente ? 'text-red-400' : 'text-blue-400'
-                        }`}>
-                          <span>⚡ {custoEnergia} energia</span>
-                          {energiaInsuficiente && (
-                            <span className="text-[10px] text-red-400">❌ Sem energia</span>
-                          )}
-                        </div>
-                      </div>
-                  </button>
-                );
-              }) : (
-                <div className="text-center text-slate-400 py-4 text-xs">
-                  Sem habilidades
+                <button
+                  onClick={() => !turnoIA && !processando && executarAcao('defender')}
+                  disabled={turnoIA || processando}
+                  className="p-4 rounded-lg border-2 transition-all text-left bg-gradient-to-r from-blue-900/40 to-cyan-900/40 border-blue-500 hover:from-blue-900/60 hover:to-cyan-900/60 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
+                >
+                  <div className="font-bold text-blue-300 text-lg mb-1">🛡️ Defender</div>
+                  <div className="text-xs text-slate-300">Reduz dano recebido</div>
+                  <div className="mt-2 text-xs text-blue-400">🛡️ Resistência: {estado.jogador.resistencia}</div>
+                </button>
+              </div>
+
+              {/* Info D20 */}
+              <div className="mt-4 pt-4 border-t border-slate-700 text-xs text-slate-500">
+                <div className="flex justify-between">
+                  <span>🎲 Crítico: nat 20 (2x dano)</span>
+                  <span>🛡️ Defesa: {calcularDefesa(estado.jogador)}</span>
                 </div>
-              )}
-            </div>
-
-            {/* Ações Especiais */}
-            <div className="space-y-2">
-              <button
-                onClick={() => !turnoIA && !processando && executarAcao('defender')}
-                disabled={turnoIA || processando}
-                className="w-full px-4 py-3 bg-gradient-to-br from-blue-900/60 to-blue-800/40 hover:from-blue-800/70 hover:to-blue-700/50 rounded border border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-semibold hover:scale-105"
-              >
-                🛡️ Defender <span className="text-xs text-blue-300">(+15 energia)</span>
-              </button>
-
-              <button
-                onClick={() => !turnoIA && !processando && executarAcao('esperar')}
-                disabled={turnoIA || processando}
-                className="w-full px-4 py-3 bg-gradient-to-br from-green-900/60 to-green-800/40 hover:from-green-800/70 hover:to-green-700/50 rounded border border-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-semibold hover:scale-105"
-              >
-                ⏸️ Esperar <span className="text-xs text-green-300">(+30 energia)</span>
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1256,8 +1144,26 @@ function BatalhaContent() {
               } else if (texto.includes('🎯')) {
                 bgColor = 'bg-purple-900/20';
                 textColor = 'text-purple-200';
-                borderColor = 'border-purple-500/20';
-                icon = '🎯';
+              } else if (texto.includes('🎲') || texto.includes('1d20')) {
+                bgColor = 'bg-indigo-900/20';
+                textColor = 'text-indigo-200';
+                borderColor = 'border-indigo-500/20';
+                icon = '🎲';
+              } else if (texto.includes('CRÍTICO') || texto.includes('nat 20')) {
+                bgColor = 'bg-amber-900/30';
+                textColor = 'text-amber-200';
+                borderColor = 'border-amber-500/30';
+                icon = '💀';
+              } else if (texto.includes('ESQUIVOU') || texto.includes('esquiva')) {
+                bgColor = 'bg-emerald-900/20';
+                textColor = 'text-emerald-200';
+                borderColor = 'border-emerald-500/20';
+                icon = '💨';
+              } else if (texto.includes('Rodada')) {
+                bgColor = 'bg-cyan-900/20';
+                textColor = 'text-cyan-200';
+                borderColor = 'border-cyan-500/20';
+                icon = '⏰';
               } else if (texto.includes('━━━')) {
                 bgColor = 'bg-slate-700/30';
                 borderColor = 'border-slate-600/30';
