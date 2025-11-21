@@ -206,7 +206,7 @@ export const HABILIDADES_POR_ELEMENTO = {
       tipo: TIPO_HABILIDADE.OFENSIVA,
       raridade: RARIDADE_HABILIDADE.AVANCADA,
       elemento: ELEMENTOS.AGUA,
-      dano_base: 70,
+      dano_base: 80,
       multiplicador_stat: 1.6,
       stat_primario: 'foco',
       efeitos_status: ['atordoado', 'lentidao'],
