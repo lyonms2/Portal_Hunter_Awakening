@@ -62,91 +62,122 @@ function BatalhaContent() {
   const [aguardandoOponente, setAguardandoOponente] = useState(false);
   const [oponenteDesconectou, setOponenteDesconectou] = useState(false);
 
+  // Ref para controle de registro de batalha (anti-abandono)
+  const batalhaRegistradaRef = useRef(false);
+
   useEffect(() => {
     // Carregar estado da batalha
-    let batalhaJSON;
+    const carregarBatalha = async () => {
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
 
-    if (modoPvP) {
-      // Modo PvP - carregar de sessionStorage
-      batalhaJSON = sessionStorage.getItem('batalha_pvp_dados');
-      if (batalhaJSON) {
-        const dados = JSON.parse(batalhaJSON);
-        setDadosPvP(dados);
+      // Primeiro verificar se há batalha ativa no banco (F5 ou voltou)
+      if (userData.id) {
+        try {
+          const response = await fetch(`/api/batalha/ativa?userId=${userData.id}`);
+          const data = await response.json();
 
-        // Detectar PvP ao vivo
-        const isPvpRealTime = dados.pvpAoVivo === true;
-        setPvpAoVivo(isPvpRealTime);
+          if (data.temBatalhaAtiva && data.batalha?.dados?.estadoBatalha) {
+            // Restaurar batalha do banco
+            const estadoSalvo = data.batalha.dados.estadoBatalha;
+            setEstado(estadoSalvo);
 
-        if (isPvpRealTime && dados.matchId) {
-          setMatchId(dados.matchId);
-        }
+            // Marcar como já registrada para evitar re-registro
+            batalhaRegistradaRef.current = true;
 
-        // Construir estado de batalha a partir dos dados PvP - GARANTIR habilidades
-        const batalha = {
-          jogador: {
-            ...dados.avatarJogador,
-            habilidades: Array.isArray(dados.avatarJogador.habilidades) ? dados.avatarJogador.habilidades : [],
-            hp_atual: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
-            hp_maximo: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
-            energia_atual: 100,
-            buffs: [],
-            debuffs: []
-          },
-          inimigo: {
-            ...dados.avatarOponente,
-            nome: dados.nomeOponente || dados.avatarOponente.nome,
-            habilidades: Array.isArray(dados.avatarOponente.habilidades) ? dados.avatarOponente.habilidades : [],
-            hp_atual: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
-            hp_maximo: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
-            energia_atual: 100,
-            buffs: [],
-            debuffs: []
-          },
-          dificuldade: 'pvp',
-          rodada: 1,
-          turno_atual: 'jogador'
-        };
+            adicionarLog('⚠️ Batalha restaurada!');
+            adicionarLog('Você não pode sair durante uma batalha.');
+            adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-        setEstado(batalha);
-
-        adicionarLog('⚔️ BATALHA PvP INICIADA!');
-        adicionarLog(`Você: ${batalha.jogador.nome} (${batalha.jogador.elemento})`);
-        adicionarLog(`VS`);
-        adicionarLog(`${dados.nomeOponente}: ${batalha.inimigo.nome} (${batalha.inimigo.elemento})`);
-        if (dados.tierJogador) {
-          adicionarLog(`Tier: ${dados.tierJogador.nome} ${dados.tierJogador.icone}`);
-        }
-        adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-        // Inicializar PvP ao vivo se aplicável
-        if (isPvpRealTime && dados.matchId) {
-          inicializarPvPAoVivo(dados);
+            setTimerAtivo(true);
+            setTempoRestante(30);
+            return;
+          }
+        } catch (error) {
+          console.error('Erro ao verificar batalha ativa:', error);
         }
       }
-    } else {
-      // Modo Treino - carregar de localStorage
-      batalhaJSON = localStorage.getItem('batalha_atual');
-      if (batalhaJSON) {
-        const batalha = JSON.parse(batalhaJSON);
-        setEstado(batalha);
 
-        adicionarLog('🎮 Batalha iniciada!');
-        adicionarLog(`Você: ${batalha.jogador.nome} (${batalha.jogador.elemento})`);
-        adicionarLog(`VS`);
-        adicionarLog(`Oponente: ${batalha.inimigo.nome} (${batalha.inimigo.elemento})`);
-        adicionarLog(`Dificuldade: ${batalha.dificuldade.toUpperCase()}`);
-        adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      // Se não há batalha salva, carregar normalmente
+      let batalhaJSON;
+
+      if (modoPvP) {
+        batalhaJSON = sessionStorage.getItem('batalha_pvp_dados');
+        if (batalhaJSON) {
+          const dados = JSON.parse(batalhaJSON);
+          setDadosPvP(dados);
+
+          const isPvpRealTime = dados.pvpAoVivo === true;
+          setPvpAoVivo(isPvpRealTime);
+
+          if (isPvpRealTime && dados.matchId) {
+            setMatchId(dados.matchId);
+          }
+
+          const batalha = {
+            jogador: {
+              ...dados.avatarJogador,
+              habilidades: Array.isArray(dados.avatarJogador.habilidades) ? dados.avatarJogador.habilidades : [],
+              hp_atual: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
+              hp_maximo: dados.avatarJogador.hp || (dados.avatarJogador.resistencia * 10),
+              energia_atual: 100,
+              buffs: [],
+              debuffs: []
+            },
+            inimigo: {
+              ...dados.avatarOponente,
+              nome: dados.nomeOponente || dados.avatarOponente.nome,
+              habilidades: Array.isArray(dados.avatarOponente.habilidades) ? dados.avatarOponente.habilidades : [],
+              hp_atual: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
+              hp_maximo: dados.avatarOponente.hp || (dados.avatarOponente.resistencia * 10),
+              energia_atual: 100,
+              buffs: [],
+              debuffs: []
+            },
+            dificuldade: 'pvp',
+            rodada: 1,
+            turno_atual: 'jogador'
+          };
+
+          setEstado(batalha);
+
+          adicionarLog('⚔️ BATALHA PvP INICIADA!');
+          adicionarLog(`Você: ${batalha.jogador.nome} (${batalha.jogador.elemento})`);
+          adicionarLog(`VS`);
+          adicionarLog(`${dados.nomeOponente}: ${batalha.inimigo.nome} (${batalha.inimigo.elemento})`);
+          if (dados.tierJogador) {
+            adicionarLog(`Tier: ${dados.tierJogador.nome} ${dados.tierJogador.icone}`);
+          }
+          adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          if (isPvpRealTime && dados.matchId) {
+            inicializarPvPAoVivo(dados);
+          }
+        }
+      } else {
+        batalhaJSON = localStorage.getItem('batalha_atual');
+        if (batalhaJSON) {
+          const batalha = JSON.parse(batalhaJSON);
+          setEstado(batalha);
+
+          adicionarLog('🎮 Batalha iniciada!');
+          adicionarLog(`Você: ${batalha.jogador.nome} (${batalha.jogador.elemento})`);
+          adicionarLog(`VS`);
+          adicionarLog(`Oponente: ${batalha.inimigo.nome} (${batalha.inimigo.elemento})`);
+          adicionarLog(`Dificuldade: ${batalha.dificuldade.toUpperCase()}`);
+          adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        }
       }
-    }
 
-    if (!batalhaJSON) {
-      router.push('/arena');
-      return;
-    }
+      if (!batalhaJSON) {
+        router.push('/arena');
+        return;
+      }
 
-    // Iniciar timer no primeiro turno
-    setTimerAtivo(true);
-    setTempoRestante(30);
+      setTimerAtivo(true);
+      setTempoRestante(30);
+    };
+
+    carregarBatalha();
   }, [router, modoPvP]);
 
   // Timer para turnos (especialmente útil para PvP)
@@ -200,8 +231,11 @@ function BatalhaContent() {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
     if (!userData.id) return;
 
-    // Registrar batalha como ativa
+    // Registrar batalha como ativa (apenas uma vez)
     const registrarBatalha = async () => {
+      if (batalhaRegistradaRef.current) return;
+      batalhaRegistradaRef.current = true;
+
       try {
         await fetch('/api/batalha/ativa', {
           method: 'POST',
@@ -211,7 +245,10 @@ function BatalhaContent() {
             avatarId: estado.jogador?.id,
             acao: 'iniciar',
             tipo: modoPvP ? 'pvp' : 'treino',
-            dados: { dificuldade: estado.dificuldade },
+            dados: {
+              dificuldade: estado.dificuldade,
+              estadoBatalha: estado
+            },
             penalidade: {
               hp_perdido: modoPvP ? 30 : 15,
               exaustao: modoPvP ? 15 : 8,
@@ -244,6 +281,36 @@ function BatalhaContent() {
 
   const adicionarLog = (mensagem) => {
     setLog(prev => [...prev, { texto: mensagem, timestamp: Date.now() }]);
+  };
+
+  // Atualizar estado da batalha no banco (anti-abandono)
+  const atualizarEstadoBatalha = async (novoEstado) => {
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!userData.id) return;
+
+    try {
+      await fetch('/api/batalha/ativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userData.id,
+          avatarId: novoEstado.jogador?.id,
+          acao: 'iniciar', // Re-registrar com novo estado
+          tipo: modoPvP ? 'pvp' : 'treino',
+          dados: {
+            dificuldade: novoEstado.dificuldade,
+            estadoBatalha: novoEstado
+          },
+          penalidade: {
+            hp_perdido: modoPvP ? 30 : 15,
+            exaustao: modoPvP ? 15 : 8,
+            derrota: true
+          }
+        })
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar estado da batalha:', error);
+    }
   };
 
   // === FUNÇÕES PvP AO VIVO ===
@@ -540,6 +607,9 @@ function BatalhaContent() {
 
       setEstado(novoEstado);
       setTurnoIA(false);
+
+      // Salvar estado atualizado no banco (anti-abandono)
+      atualizarEstadoBatalha(novoEstado);
 
     } catch (error) {
       console.error('Erro ao executar ação:', error);
