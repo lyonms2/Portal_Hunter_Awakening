@@ -197,20 +197,36 @@ export default function ArenaSobrevivenciaPage() {
   };
 
   const iniciarOndaAtual = (onda) => {
-    // Simular batalha com dificuldade crescente
+    // Simular batalha com dificuldade crescente usando mecânicas do jogo
     const multiplicador = calcularMultiplicadorOnda(onda);
-    const danoBase = 15 * multiplicador;
-    const gastoEnergiaBase = 20 + (onda * 2);
+    const isBossWave = onda % 5 === 0;
 
-    const tempoCombate = 2500;
+    // Calcular dano baseado no sistema de batalha real
+    // Inimigo tem stats baseados na onda
+    const nivelInimigo = Math.floor(onda * 1.5) + 5;
+    const forcaInimigo = 10 + (onda * 2);
+
+    // Dano = (dano_base + força × multiplicador) × multiplicador_onda
+    // Simula várias trocas de golpes por onda
+    const golpesPorOnda = isBossWave ? 5 : 3;
+    const danoBasePorGolpe = 20 + forcaInimigo * 1.2;
+    const danoTotal = danoBasePorGolpe * golpesPorOnda * multiplicador;
+
+    // Defesa do jogador reduz dano (resistência × 0.3)
+    const reducaoDefesa = statsAvatarAtual ? statsAvatarAtual.resistencia * 0.3 : 0;
+    const danoFinal = Math.max(1, danoTotal - reducaoDefesa);
+
+    // Energia: gasta para atacar mas recupera com ataque básico (+10 por golpe)
+    // Saldo: gasta 15-40 por habilidade, recupera 10 por ataque básico
+    const energiaGasta = (15 * golpesPorOnda) - (10 * Math.floor(golpesPorOnda / 2));
+    const energiaFinal = Math.max(0, Math.min(energiaGasta, 50));
+
+    const tempoCombate = isBossWave ? 3500 : 2500;
 
     setTimeout(() => {
-      // Calcular dano recebido na onda (progressivo e balanceado)
-      const danoAleatorio = danoBase + Math.random() * (danoBase * 0.5);
-      const dano = Math.floor(danoAleatorio);
-
-      // Calcular gasto de energia
-      const energiaGasta = Math.min(gastoEnergiaBase + Math.random() * 10, 80);
+      // Aplicar variação de ±20%
+      const variacao = 0.8 + Math.random() * 0.4;
+      const dano = Math.floor(danoFinal * variacao);
 
       // Atualizar exaustão acumulada
       const exaustaoOnda = calcularExaustaoOnda(onda);
@@ -225,7 +241,8 @@ export default function ArenaSobrevivenciaPage() {
         if (!prev) return prev;
 
         novoHP = Math.max(0, prev.hp_atual - dano);
-        const novaEnergia = Math.max(0, prev.energia_atual - energiaGasta);
+        // Energia: gasta na onda mas recupera um pouco (simulando ataque básico)
+        const novaEnergia = Math.max(0, Math.min(100, prev.energia_atual - energiaFinal + 5));
         morreu = novoHP <= 0;
 
         return {
@@ -300,7 +317,12 @@ export default function ArenaSobrevivenciaPage() {
         };
       }
 
-      return { ...prev, xp_atual: novoXP };
+      // Recuperação entre ondas: +15 energia (como recarregar parcial)
+      return {
+        ...prev,
+        xp_atual: novoXP,
+        energia_atual: Math.min(prev.energia_atual + 15, 100)
+      };
     });
 
     const exaustao = calcularExaustaoOnda(onda);

@@ -96,7 +96,7 @@ export default function HistoricoPvPPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 p-6">
       <GameNav
-        backTo="/arena/pvp-ia"
+        backTo="/arena/pvp"
         backLabel="ARENA PVP"
         title="HISTÓRICO DE TEMPORADAS"
         subtitle="Seu desempenho em temporadas anteriores"

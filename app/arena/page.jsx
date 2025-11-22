@@ -55,7 +55,7 @@ export default function ArenaLobby() {
       corBg: 'bg-red-900/10',
       corHover: 'hover:border-red-400',
       disponivel: true,
-      rota: '/arena/pvp-ia'
+      rota: '/arena/pvp'
     },
     {
       id: 'sobrevivencia',
