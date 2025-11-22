@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDocument, getDocuments, updateDocument, createDocument } from '@/lib/firebase/firestore';
+import { getHunterRank, calcularXpFeito, verificarPromocao, aplicarBonusMoedas, aplicarBonusFragmentos } from '@/lib/hunter/hunterRankSystem';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +22,32 @@ export const dynamic = 'force-dynamic';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinal } = body;
+    const { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinal, oponenteFamaSuperior } = body;
 
     console.log('[PVP IA FINALIZAR]', { userId, avatarId, vitoria, famaGanha, vinculoGanho, exaustaoGanha, avatarMorreu, hpFinal });
+
+    // Buscar stats do jogador para atualizar hunterRankXp
+    const playerStats = await getDocument('player_stats', userId);
+    const hunterRankXpAtual = playerStats?.hunterRankXp || 0;
+
+    // Calcular XP de rank ganho
+    let xpRankGanho = vitoria
+      ? calcularXpFeito('VITORIA_PVP', { rankSuperior: oponenteFamaSuperior })
+      : calcularXpFeito('DERROTA_PVP');
+
+    const novoHunterRankXp = hunterRankXpAtual + xpRankGanho;
+    const promocaoRank = verificarPromocao(hunterRankXpAtual, novoHunterRankXp);
+    const hunterRank = getHunterRank(novoHunterRankXp);
+
+    console.log('[HUNTER RANK]', { xpRankGanho, hunterRankXpAtual, novoHunterRankXp, rank: hunterRank.nome });
+
+    // Atualizar hunterRankXp do jogador
+    if (playerStats) {
+      await updateDocument('player_stats', userId, {
+        hunterRankXp: novoHunterRankXp,
+        updated_at: new Date().toISOString()
+      });
+    }
 
     // Buscar temporada ativa no Firestore
     const temporadas = await getDocuments('pvp_temporadas', {
@@ -122,7 +146,13 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       message: 'Resultado da batalha salvo com sucesso',
-      ranking: rankingAtualizado || null
+      ranking: rankingAtualizado || null,
+      hunterRank: {
+        xpGanho: xpRankGanho,
+        xpTotal: novoHunterRankXp,
+        rank: hunterRank,
+        promocao: promocaoRank.promovido ? promocaoRank : null
+      }
     });
 
   } catch (error) {

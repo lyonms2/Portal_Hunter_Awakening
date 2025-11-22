@@ -1,4 +1,5 @@
 import { getDocument, updateDocument } from '@/lib/firebase/firestore';
+import { getHunterRank, aplicarDescontoMerge, calcularXpFeito, verificarPromocao } from '@/lib/hunter/hunterRankSystem';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,15 +91,7 @@ export async function POST(request) {
     const roll = Math.random() * 100;
     const mergeSuccessful = roll <= chanceSucesso;
 
-    // 4. Calcular custo
-    const nivelTotal = avatarBase.nivel + avatarSacrificio.nivel;
-    const multiplicador = avatarBase.raridade === 'Lendário' ? 2 :
-                          avatarBase.raridade === 'Raro' ? 1.5 : 1;
-
-    const custoMoedas = Math.floor(nivelTotal * 100 * multiplicador);
-    const custoFragmentos = Math.floor(nivelTotal * 10 * multiplicador);
-
-    // 5. Buscar stats do player no Firestore
+    // 4. Buscar stats do player no Firestore (para verificar saldo e aplicar desconto)
     const playerStats = await getDocument('player_stats', userId);
 
     if (!playerStats) {
@@ -108,7 +101,24 @@ export async function POST(request) {
       );
     }
 
-    // 6. Verificar se tem saldo
+    // 4.1 Obter rank do cacador para aplicar desconto
+    const hunterRank = getHunterRank(playerStats.hunterRankXp || 0);
+
+    // 4.2 Calcular custo base
+    const nivelTotal = avatarBase.nivel + avatarSacrificio.nivel;
+    const multiplicador = avatarBase.raridade === 'Lendário' ? 2 :
+                          avatarBase.raridade === 'Raro' ? 1.5 : 1;
+
+    const custoMoedasBase = Math.floor(nivelTotal * 100 * multiplicador);
+    const custoFragmentosBase = Math.floor(nivelTotal * 10 * multiplicador);
+
+    // 4.3 Aplicar desconto do rank do cacador
+    const custoMoedas = aplicarDescontoMerge(custoMoedasBase, hunterRank);
+    const custoFragmentos = aplicarDescontoMerge(custoFragmentosBase, hunterRank);
+
+    const descontoAplicado = custoMoedasBase - custoMoedas;
+
+    // 5. Verificar se tem saldo
     if (playerStats.moedas < custoMoedas) {
       return Response.json(
         { message: `Moedas insuficientes. Você tem ${playerStats.moedas}, precisa de ${custoMoedas}` },
@@ -177,10 +187,17 @@ export async function POST(request) {
       updated_at: new Date().toISOString()
     });
 
-    // 13. Deduzir custos do player no Firestore
+    // 13. Calcular XP de rank ganho por merge
+    const xpRankGanho = calcularXpFeito('MERGE_REALIZADO');
+    const xpAnterior = playerStats.hunterRankXp || 0;
+    const novoHunterRankXp = xpAnterior + xpRankGanho;
+    const promocaoRank = verificarPromocao(xpAnterior, novoHunterRankXp);
+
+    // 14. Deduzir custos e atualizar XP do player no Firestore
     await updateDocument('player_stats', userId, {
       moedas: playerStats.moedas - custoMoedas,
       fragmentos: playerStats.fragmentos - custoFragmentos,
+      hunterRankXp: novoHunterRankXp,
       updated_at: new Date().toISOString()
     });
 
@@ -212,8 +229,15 @@ export async function POST(request) {
         elementoNovo: mergeSuccessful ? novoElemento : avatarBase.elemento,
         custos: {
           moedas: custoMoedas,
-          fragmentos: custoFragmentos
+          fragmentos: custoFragmentos,
+          desconto: descontoAplicado
         }
+      },
+      hunterRank: {
+        xpGanho: xpRankGanho,
+        xpTotal: novoHunterRankXp,
+        rank: hunterRank,
+        promocao: promocaoRank.promovido ? promocaoRank : null
       }
     });
 
