@@ -325,13 +325,13 @@ export const HABILIDADES_POR_ELEMENTO = {
   [ELEMENTOS.VENTO]: {
     LAMINAS_DE_AR: criarHabilidade({
       nome: 'Lâminas de Ar',
-      descricao: 'Múltiplos cortes rápidos de vento afiado',
+      descricao: 'Múltiplos cortes rápidos de vento afiado (3 golpes)',
       tipo: TIPO_HABILIDADE.OFENSIVA,
       elemento: ELEMENTOS.VENTO,
       dano_base: 20,
       multiplicador_stat: 0.8,
       stat_primario: 'agilidade',
-      num_alvos: 3, // Ataca 3 vezes
+      num_golpes: 3,
       custo_energia: 20,
       cooldown: 0,
       evolui_para: 'CICLONE',
@@ -356,17 +356,15 @@ export const HABILIDADES_POR_ELEMENTO = {
     
     CICLONE: criarHabilidade({
       nome: 'Ciclone',
-      descricao: 'Tornado que causa dano em área e desorienta inimigos',
+      descricao: 'Tornado que desorienta e pode incapacitar por 1 turno',
       tipo: TIPO_HABILIDADE.CONTROLE,
       raridade: RARIDADE_HABILIDADE.AVANCADA,
       elemento: ELEMENTOS.VENTO,
       dano_base: 60,
       multiplicador_stat: 1.4,
       stat_primario: 'agilidade',
-      efeitos_status: ['desorientado'],
-      alvo: 'inimigos_area',
-      area: true,
-      duracao_efeito: 2,
+      efeitos_status: ['desorientado', 'atordoado'],
+      duracao_efeito: 1,
       custo_energia: 40,
       cooldown: 3,
       nivel_minimo: 10,
@@ -376,14 +374,14 @@ export const HABILIDADES_POR_ELEMENTO = {
     
     RAJADA_CORTANTE: criarHabilidade({
       nome: 'Rajada Cortante',
-      descricao: 'Vendaval ultra concentrado que ignora evasão',
+      descricao: 'Vendaval concentrado que ignora evasão (100% acerto)',
       tipo: TIPO_HABILIDADE.OFENSIVA,
       raridade: RARIDADE_HABILIDADE.AVANCADA,
       elemento: ELEMENTOS.VENTO,
-      dano_base: 85,
-      multiplicador_stat: 1.9,
+      dano_base: 65,
+      multiplicador_stat: 1.6,
       stat_primario: 'agilidade',
-      chance_acerto: 100, // Não pode ser esquivado
+      chance_acerto: 100,
       custo_energia: 45,
       cooldown: 2,
       nivel_minimo: 15
@@ -391,17 +389,15 @@ export const HABILIDADES_POR_ELEMENTO = {
     
     TEMPESTADE_DIVINA: criarHabilidade({
       nome: 'Tempestade Divina',
-      descricao: 'Furacão catastrófico que devasta o campo de batalha',
+      descricao: 'Furacão catastrófico com 5 golpes e aumenta precisão',
       tipo: TIPO_HABILIDADE.OFENSIVA,
       raridade: RARIDADE_HABILIDADE.ULTIMATE,
       elemento: ELEMENTOS.VENTO,
-      dano_base: 150,
-      multiplicador_stat: 2.3,
+      dano_base: 40,
+      multiplicador_stat: 1.8,
       stat_primario: 'agilidade',
-      efeitos_status: ['vendaval_cortante'],
-      alvo: 'inimigos_area',
-      area: true,
-      num_alvos: 5,
+      efeitos_status: ['vendaval_cortante', 'precisao_aumentada'],
+      num_golpes: 5,
       duracao_efeito: 3,
       custo_energia: 80,
       cooldown: 5,
