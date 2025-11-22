@@ -25,33 +25,33 @@ export const ELEMENTOS = {
  */
 export const VANTAGENS_ELEMENTAIS = {
   [ELEMENTOS.FOGO]: {
-    forte_contra: [ELEMENTOS.VENTO, ELEMENTOS.TERRA],
+    forte_contra: [ELEMENTOS.VENTO],
     fraco_contra: [ELEMENTOS.AGUA],
-    neutro: [ELEMENTOS.ELETRICIDADE],
+    neutro: [ELEMENTOS.TERRA, ELEMENTOS.ELETRICIDADE],
     oposto: null
   },
   [ELEMENTOS.AGUA]: {
-    forte_contra: [ELEMENTOS.FOGO, ELEMENTOS.TERRA],
-    fraco_contra: [ELEMENTOS.ELETRICIDADE, ELEMENTOS.VENTO],
-    neutro: [],
+    forte_contra: [ELEMENTOS.FOGO],
+    fraco_contra: [ELEMENTOS.ELETRICIDADE],
+    neutro: [ELEMENTOS.TERRA, ELEMENTOS.VENTO],
     oposto: null
   },
   [ELEMENTOS.TERRA]: {
-    forte_contra: [ELEMENTOS.ELETRICIDADE, ELEMENTOS.VENTO],
-    fraco_contra: [ELEMENTOS.FOGO, ELEMENTOS.AGUA],
-    neutro: [],
+    forte_contra: [ELEMENTOS.ELETRICIDADE],
+    fraco_contra: [ELEMENTOS.VENTO],
+    neutro: [ELEMENTOS.FOGO, ELEMENTOS.AGUA],
     oposto: null
   },
   [ELEMENTOS.VENTO]: {
-    forte_contra: [ELEMENTOS.AGUA],
-    fraco_contra: [ELEMENTOS.FOGO, ELEMENTOS.TERRA],
-    neutro: [ELEMENTOS.ELETRICIDADE],
+    forte_contra: [ELEMENTOS.TERRA],
+    fraco_contra: [ELEMENTOS.FOGO],
+    neutro: [ELEMENTOS.AGUA, ELEMENTOS.ELETRICIDADE],
     oposto: null
   },
   [ELEMENTOS.ELETRICIDADE]: {
-    forte_contra: [ELEMENTOS.AGUA, ELEMENTOS.VENTO],
+    forte_contra: [ELEMENTOS.AGUA],
     fraco_contra: [ELEMENTOS.TERRA],
-    neutro: [ELEMENTOS.FOGO],
+    neutro: [ELEMENTOS.FOGO, ELEMENTOS.VENTO],
     oposto: null
   },
   [ELEMENTOS.SOMBRA]: {
