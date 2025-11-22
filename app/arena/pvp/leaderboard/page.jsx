@@ -81,7 +81,7 @@ export default function LeaderboardPage() {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/arena/pvp-ia')}
+            onClick={() => router.push('/arena/pvp')}
             className="text-cyan-400 hover:text-cyan-300 mb-4 flex items-center gap-2"
           >
             ← Voltar para Arena PVP
