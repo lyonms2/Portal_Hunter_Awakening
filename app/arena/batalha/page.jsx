@@ -193,6 +193,55 @@ function BatalhaContent() {
     };
   }, [syncManager, pvpAoVivo, matchId, resultado]);
 
+  // Sistema Anti-Abandono: Registrar batalha ativa
+  useEffect(() => {
+    if (!estado) return;
+
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!userData.id) return;
+
+    // Registrar batalha como ativa
+    const registrarBatalha = async () => {
+      try {
+        await fetch('/api/batalha/ativa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: userData.id,
+            avatarId: estado.jogador?.id,
+            acao: 'iniciar',
+            tipo: modoPvP ? 'pvp' : 'treino',
+            dados: { dificuldade: estado.dificuldade },
+            penalidade: {
+              hp_perdido: modoPvP ? 30 : 15,
+              exaustao: modoPvP ? 15 : 8,
+              derrota: true
+            }
+          })
+        });
+      } catch (error) {
+        console.error('Erro ao registrar batalha:', error);
+      }
+    };
+
+    registrarBatalha();
+
+    // Aviso antes de sair
+    const handleBeforeUnload = (e) => {
+      if (!resultado) {
+        e.preventDefault();
+        e.returnValue = 'Você está em uma batalha! Sair agora contará como derrota e aplicará penalidades.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [estado, modoPvP, resultado]);
+
   const adicionarLog = (mensagem) => {
     setLog(prev => [...prev, { texto: mensagem, timestamp: Date.now() }]);
   };
@@ -502,6 +551,19 @@ function BatalhaContent() {
 
   const finalizarBatalha = (estadoFinal, vencedor) => {
     setTurnoIA(false);
+
+    // Finalizar registro de batalha ativa (não aplicar penalidade)
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userData.id) {
+      fetch('/api/batalha/ativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userData.id,
+          acao: 'finalizar'
+        })
+      }).catch(err => console.error('Erro ao finalizar batalha:', err));
+    }
 
     adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
