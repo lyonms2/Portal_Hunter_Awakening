@@ -597,15 +597,14 @@ export const HABILIDADES_POR_ELEMENTO = {
     
     BENCAO: criarHabilidade({
       nome: 'Benção',
-      descricao: 'Aumenta todos os stats de aliados',
+      descricao: 'Aumenta todos os stats em 20%',
       tipo: TIPO_HABILIDADE.SUPORTE,
       elemento: ELEMENTOS.LUZ,
       dano_base: 0,
       multiplicador_stat: 1.3,
       stat_primario: 'foco',
       efeitos_status: ['bencao'],
-      alvo: 'aliados',
-      area: true,
+      alvo: 'self',
       duracao_efeito: 3,
       custo_energia: 35,
       cooldown: 3,
@@ -614,16 +613,15 @@ export const HABILIDADES_POR_ELEMENTO = {
     
     PURIFICACAO: criarHabilidade({
       nome: 'Purificação',
-      descricao: 'Remove todos os efeitos negativos de aliados',
+      descricao: 'Remove debuffs e cura',
       tipo: TIPO_HABILIDADE.SUPORTE,
       raridade: RARIDADE_HABILIDADE.AVANCADA,
       elemento: ELEMENTOS.LUZ,
-      dano_base: -40, // Cura
+      dano_base: -50,
       multiplicador_stat: 1.5,
       stat_primario: 'foco',
       efeitos_status: ['limpar_debuffs'],
-      alvo: 'aliados',
-      area: true,
+      alvo: 'self',
       custo_energia: 40,
       cooldown: 3,
       nivel_minimo: 10
@@ -648,16 +646,14 @@ export const HABILIDADES_POR_ELEMENTO = {
     
     ASCENSAO_CELESTIAL: criarHabilidade({
       nome: 'Ascensão Celestial',
-      descricao: 'Luz divina purifica aliados e aniquila inimigos',
-      tipo: TIPO_HABILIDADE.SUPORTE,
+      descricao: 'Cura você e causa dano massivo no inimigo',
+      tipo: TIPO_HABILIDADE.OFENSIVA,
       raridade: RARIDADE_HABILIDADE.ULTIMATE,
       elemento: ELEMENTOS.LUZ,
-      dano_base: 170,
+      dano_base: 200,
       multiplicador_stat: 2.4,
       stat_primario: 'foco',
-      efeitos_status: ['cura_massiva_aliados', 'dano_massivo_inimigos'],
-      alvo: 'todos',
-      area: true,
+      efeitos_status: ['auto_cura', 'dano_massivo_inimigos'],
       duracao_efeito: 3,
       custo_energia: 85,
       cooldown: 5,
