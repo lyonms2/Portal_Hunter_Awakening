@@ -81,9 +81,6 @@ function BatalhaContent() {
         const isPvpRealTime = dados.pvpAoVivo === true;
         setPvpAoVivo(isPvpRealTime);
 
-          const isPvpRealTime = dados.pvpAoVivo === true;
-          setPvpAoVivo(isPvpRealTime);
-
         const batalha = inicializarBatalhaD20(
           {
             ...dados.avatarJogador,
