@@ -95,19 +95,16 @@ export default function PvPPage() {
         foco: avatarAtivo.foco
       }, avatarAtivo.exaustao || 0);
 
-      const response = await fetch('/api/pvp/matchmaking/entrar', {
+      // Usar sistema de fila existente
+      const response = await fetch('/api/pvp/queue/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
           avatarId: avatarAtivo.id,
-          avatar: {
-            ...avatarAtivo,
-            ...statsComPenalidades,
-            habilidades: avatarAtivo.habilidades || []
-          },
+          nivel: avatarAtivo.nivel || 1,
           poderTotal,
-          nomeJogador: user.nome || user.email?.split('@')[0] || 'Caçador'
+          fama: 0 // Será buscado do ranking
         })
       });
 
@@ -117,18 +114,51 @@ export default function PvPPage() {
 
       const data = await response.json();
 
+      // Se já encontrou match imediatamente
+      if (data.matched && data.matchId) {
+        clearInterval(intervalRef.current);
+
+        setPartidaEncontrada({
+          matchId: data.matchId,
+          oponente: { nome: 'Oponente' }
+        });
+
+        // Preparar dados da batalha
+        const dadosPartida = {
+          tipo: 'pvp',
+          pvpAoVivo: true,
+          matchId: data.matchId,
+          avatarJogador: {
+            ...avatarAtivo,
+            ...statsComPenalidades,
+            habilidades: avatarAtivo.habilidades || []
+          },
+          morteReal: true
+        };
+
+        sessionStorage.setItem('batalha_pvp_dados', JSON.stringify(dadosPartida));
+
+        setTimeout(() => {
+          router.push('/arena/batalha?modo=pvp');
+        }, 3000);
+        return;
+      }
+
       // Iniciar polling para verificar match
       pollingRef.current = setInterval(async () => {
         try {
-          const checkResponse = await fetch(`/api/pvp/matchmaking/verificar?userId=${user.id}`);
+          const checkResponse = await fetch(`/api/pvp/queue/check?userId=${user.id}`);
           const checkData = await checkResponse.json();
 
-          if (checkData.matched) {
+          if (checkData.matched && checkData.matchId) {
             // Partida encontrada!
             clearInterval(intervalRef.current);
             clearInterval(pollingRef.current);
 
-            setPartidaEncontrada(checkData);
+            setPartidaEncontrada({
+              matchId: checkData.matchId,
+              oponente: { nome: 'Oponente encontrado' }
+            });
 
             // Preparar dados da batalha
             const dadosPartida = {
@@ -140,8 +170,6 @@ export default function PvPPage() {
                 ...statsComPenalidades,
                 habilidades: avatarAtivo.habilidades || []
               },
-              avatarOponente: checkData.oponente.avatar,
-              nomeOponente: checkData.oponente.nome,
               morteReal: true
             };
 
@@ -176,7 +204,7 @@ export default function PvPPage() {
 
     // Sair da fila
     try {
-      await fetch('/api/pvp/matchmaking/sair', {
+      await fetch('/api/pvp/queue/leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id })

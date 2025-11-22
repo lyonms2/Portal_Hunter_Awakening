@@ -6,7 +6,7 @@ import { processarAcaoJogador, verificarVitoria, iniciarTurno } from "@/lib/aren
 import { processarTurnoIA, getMensagemIA } from "@/lib/arena/iaEngine";
 import { calcularRecompensasTreino } from "@/lib/arena/recompensasCalc";
 import { calcularRecompensasPvP, calcularPontosVitoria, calcularPerda } from "@/lib/pvp/rankingSystem";
-import { BattleSyncManager, enviarAcaoPvP, buscarEstadoSala, marcarComoPronto, notificarDesconexao } from "@/lib/pvp/battleSync";
+import { BattleSyncManagerFirestore as BattleSyncManager, enviarAcaoPvP, buscarEstadoSala, marcarComoPronto, notificarDesconexao } from "@/lib/pvp/battleSyncFirestore";
 import AvatarSVG from "@/app/components/AvatarSVG";
 
 // CSS personalizado para animações
@@ -228,7 +228,7 @@ function BatalhaContent() {
         handleOpponentAction
       );
 
-      sync.startPolling(2000); // Poll a cada 2 segundos
+      sync.startRealtimeListener(); // Sincronização em tempo real
       setSyncManager(sync);
 
       adicionarLog(`⏳ Aguardando ambos jogadores estarem prontos...`);
