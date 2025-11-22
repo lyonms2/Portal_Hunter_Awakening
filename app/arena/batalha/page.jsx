@@ -1063,8 +1063,8 @@ function BatalhaContent() {
                   )}
                 </div>
 
-                <div className="w-20 h-20 flex-shrink-0 relative">
-                  <AvatarSVG avatar={estado.inimigo} tamanho={80} isEnemy={true} />
+                <div className="w-[84px] h-[84px] flex-shrink-0 relative">
+                  <AvatarSVG avatar={estado.inimigo} tamanho={84} isEnemy={true} />
 
                   {/* Animação de dano no inimigo */}
                   {animacaoDano && animacaoDano.tipo === 'inimigo' && (
@@ -1116,8 +1116,8 @@ function BatalhaContent() {
             {/* Jogador */}
             <div className="bg-gradient-to-br from-slate-900/90 via-cyan-950/30 to-slate-900/90 rounded-lg p-3 border-2 border-cyan-500/50">
               <div className="flex items-center justify-between mb-1">
-                <div className="w-20 h-20 flex-shrink-0 relative">
-                  <AvatarSVG avatar={estado.jogador} tamanho={80} isEnemy={false} />
+                <div className="w-[84px] h-[84px] flex-shrink-0 relative">
+                  <AvatarSVG avatar={estado.jogador} tamanho={84} isEnemy={false} />
 
                   {/* Animação de dano no jogador */}
                   {animacaoDano && animacaoDano.tipo === 'jogador' && (
@@ -1337,7 +1337,7 @@ function BatalhaContent() {
             </h3>
           </div>
 
-          <div className="max-h-32 overflow-y-auto p-2 space-y-1">
+          <div className="max-h-36 overflow-y-auto p-2 space-y-1">
             {log.slice().reverse().map((entry, i) => {
               const texto = entry.texto;
 
