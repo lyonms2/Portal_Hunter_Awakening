@@ -33,6 +33,7 @@ export async function POST(request) {
       fragmentos: 10,
       divida: 0,
       ranking: 'F',
+      hunterRankXp: 0, // XP para sistema de ranking de cacador F-SS
       missoes_completadas: 0,
       primeira_invocacao: true
     };

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BackgroundEffects from "@/components/BackgroundEffects";
+import HunterRankBadge from "@/app/components/HunterRankBadge";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -373,13 +374,8 @@ export default function DashboardPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <div className="text-xs text-slate-500 uppercase font-mono mb-1">Ranking</div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg font-bold text-purple-400">{stats?.ranking || 'F'}</span>
-                            <span className="px-2 py-0.5 bg-purple-500/20 border border-purple-500/30 rounded text-xs text-purple-400 font-mono">
-                              CLASSE
-                            </span>
-                          </div>
+                          <div className="text-xs text-slate-500 uppercase font-mono mb-1">Rank de Cacador</div>
+                          <HunterRankBadge xpTotal={stats?.hunterRankXp || 0} compact={true} />
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 uppercase font-mono mb-1">Dias Ativos</div>

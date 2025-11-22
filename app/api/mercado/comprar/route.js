@@ -1,5 +1,6 @@
-import { getDocRef, executeTransaction, getDocuments } from "@/lib/firebase/firestore";
+import { getDocRef, executeTransaction, getDocuments, getDocument } from "@/lib/firebase/firestore";
 import { getDoc, updateDoc, increment } from 'firebase/firestore';
+import { getHunterRank, aplicarDescontoMercado } from '@/lib/hunter/hunterRankSystem';
 
 export async function POST(request) {
   try {
@@ -33,6 +34,10 @@ export async function POST(request) {
       );
     }
 
+    // Buscar stats do comprador para obter o rank
+    const compradorStats = await getDocument('player_stats', compradorId);
+    const hunterRank = getHunterRank(compradorStats?.hunterRankXp || 0);
+
     // Executar compra em transação atômica
     const result = await executeTransaction(async (transaction) => {
       // 1. Buscar avatar
@@ -54,8 +59,13 @@ export async function POST(request) {
         throw new Error("Você não pode comprar seu próprio avatar");
       }
 
-      const precoMoedas = avatar.preco_venda || 0;
-      const precoFragmentos = avatar.preco_fragmentos || 0;
+      const precoMoedasOriginal = avatar.preco_venda || 0;
+      const precoFragmentosOriginal = avatar.preco_fragmentos || 0;
+
+      // Aplicar desconto do rank do cacador
+      const precoMoedas = aplicarDescontoMercado(precoMoedasOriginal, hunterRank);
+      const precoFragmentos = aplicarDescontoMercado(precoFragmentosOriginal, hunterRank);
+      const descontoMoedas = precoMoedasOriginal - precoMoedas;
 
       // 3. Buscar dados do comprador
       const compradorRef = getDocRef('player_stats', compradorId);
@@ -79,8 +89,8 @@ export async function POST(request) {
         throw new Error(`Fragmentos insuficientes. Necessário: ${precoFragmentos}, Disponível: ${saldoFragmentos}`);
       }
 
-      // 6. Calcular taxa (10% em moedas)
-      const taxaMoedas = Math.floor(precoMoedas * 0.1);
+      // 6. Calcular taxa (10% em moedas) - baseado no preco original
+      const taxaMoedas = Math.floor(precoMoedasOriginal * 0.1);
 
       // 7. Buscar dados do vendedor
       const vendedorRef = getDocRef('player_stats', avatar.user_id);
@@ -96,11 +106,11 @@ export async function POST(request) {
         fragmentos: increment(-precoFragmentos)
       });
 
-      // 9. Atualizar vendedor (creditar - taxa)
-      const valorLiquidoMoedas = precoMoedas - taxaMoedas;
+      // 9. Atualizar vendedor (creditar - taxa) - recebe valor original menos taxa
+      const valorLiquidoMoedas = precoMoedasOriginal - taxaMoedas;
       transaction.update(vendedorRef, {
         moedas: increment(valorLiquidoMoedas),
-        fragmentos: increment(precoFragmentos)
+        fragmentos: increment(precoFragmentosOriginal)
       });
 
       // 10. Transferir avatar
@@ -122,6 +132,8 @@ export async function POST(request) {
         },
         preco_moedas: precoMoedas,
         preco_fragmentos: precoFragmentos,
+        preco_original: precoMoedasOriginal,
+        desconto_moedas: descontoMoedas,
         taxa_moedas: taxaMoedas,
         saldo_moedas_restante: saldoMoedas - precoMoedas,
         saldo_fragmentos_restante: saldoFragmentos - precoFragmentos
