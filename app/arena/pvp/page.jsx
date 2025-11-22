@@ -379,44 +379,82 @@ export default function PvPPage() {
           {/* Coluna Esquerda - Avatar e Stats */}
           <div className="lg:col-span-2 space-y-6">
             {/* Seu Avatar */}
-            <div className="bg-slate-900 border border-cyan-500 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-cyan-400">Seu Avatar</h2>
-                <button
-                  onClick={() => router.push('/avatares')}
-                  className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded font-bold text-sm"
-                >
-                  🔄 Trocar
-                </button>
-              </div>
-
-              <div className="flex items-center gap-6">
-                <div className="p-4 bg-gradient-to-b from-cyan-900/20 to-transparent rounded-lg">
-                  <AvatarSVG avatar={avatarAtivo} tamanho={120} />
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-purple-500/30 rounded-lg blur opacity-75"></div>
+              <div className="relative bg-gradient-to-br from-slate-900 to-slate-950 rounded-xl border-2 border-purple-500 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-black text-purple-400 flex items-center gap-2">
+                    <span className="text-2xl">👤</span> SEU AVATAR ATIVO
+                  </h2>
+                  <button
+                    onClick={() => router.push('/avatares')}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors text-sm"
+                  >
+                    Trocar Avatar
+                  </button>
                 </div>
 
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white mb-1">{avatarAtivo.nome}</h3>
-                  <div className="flex gap-3 text-sm mb-3 flex-wrap">
-                    <span className={`font-semibold ${getElementoColor(avatarAtivo.elemento)}`}>
-                      {avatarAtivo.elemento}
-                    </span>
-                    <span className={getRaridadeColor(avatarAtivo.raridade)}>
-                      {avatarAtivo.raridade}
-                    </span>
-                    <span className="text-yellow-400">Nv. {avatarAtivo.nivel}</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>⚔️ Poder: <span className="text-cyan-400 font-bold">{poderTotal}</span></div>
-                    <div>❤️ HP: <span className="text-green-400 font-bold">{calcularHPMaximoCompleto(avatarAtivo)}</span></div>
-                  </div>
-
-                  {avatarAtivo.exaustao >= 40 && (
-                    <div className="mt-3 text-orange-400 text-sm">
-                      ⚠️ Exaustão: {avatarAtivo.exaustao}%
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  {/* Avatar SVG */}
+                  <div className="flex-shrink-0">
+                    <div className="relative">
+                      <AvatarSVG avatar={avatarAtivo} tamanho={140} />
+                      <div className={`absolute -top-2 -right-2 px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        avatarAtivo.raridade === 'Lendário' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' :
+                        avatarAtivo.raridade === 'Épico' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white' :
+                        avatarAtivo.raridade === 'Raro' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' :
+                        'bg-slate-700 text-slate-300'
+                      }`}>
+                        {avatarAtivo.raridade}
+                      </div>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Info do Avatar */}
+                  <div className="flex-1 w-full">
+                    <div className="text-center md:text-left mb-3">
+                      <div className="font-black text-2xl text-white mb-1">{avatarAtivo.nome}</div>
+                      <div className="flex items-center justify-center md:justify-start gap-3 text-sm">
+                        <span className="text-purple-400 font-bold">Nv.{avatarAtivo.nivel}</span>
+                        <span className="text-slate-500">•</span>
+                        <span className={getElementoColor(avatarAtivo.elemento)}>{avatarAtivo.elemento}</span>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="bg-slate-950/50 rounded-lg p-3 mb-3">
+                      <div className="grid grid-cols-4 gap-3 text-center">
+                        <div>
+                          <div className="text-red-400 font-bold text-lg">{avatarAtivo.forca}</div>
+                          <div className="text-slate-500 text-xs font-semibold">FOR</div>
+                        </div>
+                        <div>
+                          <div className="text-green-400 font-bold text-lg">{avatarAtivo.agilidade}</div>
+                          <div className="text-slate-500 text-xs font-semibold">AGI</div>
+                        </div>
+                        <div>
+                          <div className="text-blue-400 font-bold text-lg">{avatarAtivo.resistencia}</div>
+                          <div className="text-slate-500 text-xs font-semibold">RES</div>
+                        </div>
+                        <div>
+                          <div className="text-purple-400 font-bold text-lg">{avatarAtivo.foco}</div>
+                          <div className="text-slate-500 text-xs font-semibold">FOC</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Info adicional */}
+                    <div className="flex justify-between text-sm">
+                      <div>⚔️ Poder: <span className="text-cyan-400 font-bold">{poderTotal}</span></div>
+                      <div>❤️ HP: <span className="text-green-400 font-bold">{calcularHPMaximoCompleto(avatarAtivo)}</span></div>
+                    </div>
+
+                    {avatarAtivo.exaustao >= 40 && (
+                      <div className="mt-2 text-orange-400 text-sm text-center md:text-left">
+                        ⚠️ Exaustão: {avatarAtivo.exaustao}%
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

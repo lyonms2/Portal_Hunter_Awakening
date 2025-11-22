@@ -66,6 +66,9 @@ function BatalhaContent() {
   const [aguardandoOponente, setAguardandoOponente] = useState(false);
   const [oponenteDesconectou, setOponenteDesconectou] = useState(false);
 
+  // Ref para controle de registro de batalha (anti-abandono)
+  const batalhaRegistradaRef = useRef(false);
+
   useEffect(() => {
     let batalhaJSON;
 
@@ -78,9 +81,8 @@ function BatalhaContent() {
         const isPvpRealTime = dados.pvpAoVivo === true;
         setPvpAoVivo(isPvpRealTime);
 
-        if (isPvpRealTime && dados.matchId) {
-          setMatchId(dados.matchId);
-        }
+          const isPvpRealTime = dados.pvpAoVivo === true;
+          setPvpAoVivo(isPvpRealTime);
 
         const batalha = inicializarBatalhaD20(
           {
@@ -123,12 +125,10 @@ function BatalhaContent() {
         adicionarLog(`Dificuldade: ${batalha.dificuldade.toUpperCase()}`);
         adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
-    }
 
-    if (!batalhaJSON) {
-      router.push('/arena');
-      return;
-    }
+      setTimerAtivo(true);
+      setTempoRestante(30);
+    };
 
     setTimerAtivo(true);
     setTempoRestante(30);
@@ -173,6 +173,61 @@ function BatalhaContent() {
       }
     };
   }, [syncManager, pvpAoVivo, matchId, resultado]);
+
+  // Sistema Anti-Abandono: Registrar batalha ativa
+  useEffect(() => {
+    if (!estado) return;
+
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!userData.id) return;
+
+    // Registrar batalha como ativa (apenas uma vez)
+    const registrarBatalha = async () => {
+      if (batalhaRegistradaRef.current) return;
+      batalhaRegistradaRef.current = true;
+
+      try {
+        await fetch('/api/batalha/ativa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: userData.id,
+            avatarId: estado.jogador?.id,
+            acao: 'iniciar',
+            tipo: modoPvP ? 'pvp' : 'treino',
+            dados: {
+              dificuldade: estado.dificuldade,
+              estadoBatalha: estado
+            },
+            penalidade: {
+              hp_perdido: modoPvP ? 30 : 15,
+              exaustao: modoPvP ? 15 : 8,
+              derrota: true
+            }
+          })
+        });
+      } catch (error) {
+        console.error('Erro ao registrar batalha:', error);
+      }
+    };
+
+    registrarBatalha();
+
+    // Aviso antes de sair
+    const handleBeforeUnload = (e) => {
+      if (!resultado) {
+        e.preventDefault();
+        e.returnValue = 'Você está em uma batalha! Sair agora contará como derrota e aplicará penalidades.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [estado, modoPvP, resultado]);
 
   const adicionarLog = (mensagem) => {
     setLog(prev => [...prev, { texto: mensagem, timestamp: Date.now() }]);
@@ -380,6 +435,9 @@ function BatalhaContent() {
 
       setEstado(resultado.novoEstado);
 
+      // Salvar estado atualizado no banco (anti-abandono)
+      atualizarEstadoBatalha(novoEstado);
+
     } catch (error) {
       console.error('Erro ao executar acao:', error);
       adicionarLog('❌ Erro ao processar acao!');
@@ -390,6 +448,19 @@ function BatalhaContent() {
 
   const finalizarBatalha = (estadoFinal, vencedor) => {
     setTurnoIA(false);
+
+    // Finalizar registro de batalha ativa (não aplicar penalidade)
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userData.id) {
+      fetch('/api/batalha/ativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userData.id,
+          acao: 'finalizar'
+        })
+      }).catch(err => console.error('Erro ao finalizar batalha:', err));
+    }
 
     adicionarLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 

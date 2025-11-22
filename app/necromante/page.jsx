@@ -276,7 +276,7 @@ export default function NecromantePage() {
 
                             <div className="p-4">
                               {/* Avatar */}
-                              <div className="mb-4 opacity-40 grayscale-[80%] hover:grayscale-[50%] transition-all">
+                              <div className="mb-4 opacity-40 grayscale-[80%] hover:grayscale-[50%] transition-all flex justify-center">
                                 <AvatarSVG avatar={avatar} tamanho={150} />
                               </div>
 

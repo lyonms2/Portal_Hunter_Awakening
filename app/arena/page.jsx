@@ -7,6 +7,7 @@ import GameNav from '../components/GameNav';
 export default function ArenaLobby() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [penalidadeAplicada, setPenalidadeAplicada] = useState(null);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -14,7 +15,38 @@ export default function ArenaLobby() {
       router.push("/login");
       return;
     }
-    setUser(JSON.parse(userData));
+    const parsedUser = JSON.parse(userData);
+    setUser(parsedUser);
+
+    // Verificar e aplicar penalidade de batalha abandonada
+    const verificarBatalhaAbandonada = async () => {
+      try {
+        const response = await fetch(`/api/batalha/ativa?userId=${parsedUser.id}`);
+        const data = await response.json();
+
+        if (data.temBatalhaAtiva || data.batalhaExpirada) {
+          // Aplicar penalidade
+          const penResponse = await fetch('/api/batalha/ativa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: parsedUser.id,
+              acao: 'aplicar_penalidade'
+            })
+          });
+
+          const penData = await penResponse.json();
+
+          if (penData.penalidadeAplicada) {
+            setPenalidadeAplicada(penData.penalidadeAplicada);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar batalha abandonada:', error);
+      }
+    };
+
+    verificarBatalhaAbandonada();
   }, [router]);
 
   const modos = [
@@ -96,6 +128,29 @@ export default function ArenaLobby() {
         title="ARENA DE COMBATE"
         subtitle="Escolha seu modo de jogo e prove seu valor"
       />
+
+      {/* Aviso de penalidade por abandono */}
+      {penalidadeAplicada && (
+        <div className="max-w-4xl mx-auto px-6 mt-4">
+          <div className="bg-red-950/50 border border-red-500 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <div className="font-bold text-red-400">Batalha Abandonada!</div>
+                <div className="text-sm text-red-300">
+                  Você abandonou uma batalha. Penalidade aplicada: -{penalidadeAplicada.hp_perdido} HP, +{penalidadeAplicada.exaustao}% Exaustão
+                </div>
+              </div>
+              <button
+                onClick={() => setPenalidadeAplicada(null)}
+                className="ml-auto text-red-400 hover:text-red-300"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="container mx-auto px-4 py-8">
 
