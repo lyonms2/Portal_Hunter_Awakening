@@ -954,7 +954,7 @@ function BatalhaContent() {
       )}
 
       {/* Interface de Batalha */}
-      <div className="container mx-auto px-3 py-2 max-w-7xl">
+      <div className="container mx-auto px-2 py-1 max-w-6xl">
         {/* Header Compacto */}
         <div className="flex justify-between items-center mb-2 bg-slate-900/50 rounded px-3 py-1.5 border border-slate-700/50">
           <div className="text-xs text-slate-400 font-mono">
@@ -1034,7 +1034,7 @@ function BatalhaContent() {
           {/* Arena de Combate */}
           <div className="lg:col-span-2 space-y-2">
             {/* Inimigo */}
-            <div className="bg-gradient-to-br from-slate-900/90 via-red-950/30 to-slate-900/90 rounded-lg p-3 border-2 border-red-500/50">
+            <div className="bg-gradient-to-br from-slate-900/90 via-red-950/30 to-slate-900/90 rounded-lg p-2 border-2 border-red-500/50">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -1063,8 +1063,8 @@ function BatalhaContent() {
                   )}
                 </div>
 
-                <div className="w-[84px] h-[84px] flex-shrink-0 relative">
-                  <AvatarSVG avatar={estado.inimigo} tamanho={84} isEnemy={true} />
+                <div className="w-[76px] h-[76px] flex-shrink-0 relative">
+                  <AvatarSVG avatar={estado.inimigo} tamanho={76} isEnemy={true} />
 
                   {/* Animação de dano no inimigo */}
                   {animacaoDano && animacaoDano.tipo === 'inimigo' && (
@@ -1114,10 +1114,10 @@ function BatalhaContent() {
             </div>
 
             {/* Jogador */}
-            <div className="bg-gradient-to-br from-slate-900/90 via-cyan-950/30 to-slate-900/90 rounded-lg p-3 border-2 border-cyan-500/50">
+            <div className="bg-gradient-to-br from-slate-900/90 via-cyan-950/30 to-slate-900/90 rounded-lg p-2 border-2 border-cyan-500/50">
               <div className="flex items-center justify-between mb-1">
-                <div className="w-[84px] h-[84px] flex-shrink-0 relative">
-                  <AvatarSVG avatar={estado.jogador} tamanho={84} isEnemy={false} />
+                <div className="w-[76px] h-[76px] flex-shrink-0 relative">
+                  <AvatarSVG avatar={estado.jogador} tamanho={76} isEnemy={false} />
 
                   {/* Animação de dano no jogador */}
                   {animacaoDano && animacaoDano.tipo === 'jogador' && (
@@ -1247,7 +1247,7 @@ function BatalhaContent() {
           </div>
 
             {/* Ações */}
-            <div className="bg-slate-900/80 rounded-lg p-3 border-2 border-slate-700">
+            <div className="bg-slate-900/80 rounded-lg p-2 border-2 border-slate-700">
               <h3 className="text-cyan-400 font-bold mb-2 text-sm">⚡ AÇÕES</h3>
 
               {/* Ataque Básico */}
@@ -1337,7 +1337,7 @@ function BatalhaContent() {
             </h3>
           </div>
 
-          <div className="max-h-36 overflow-y-auto p-2 space-y-1">
+          <div className="max-h-28 overflow-y-auto p-2 space-y-1">
             {log.slice().reverse().map((entry, i) => {
               const texto = entry.texto;
 
