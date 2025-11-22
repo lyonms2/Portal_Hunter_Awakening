@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BackgroundEffects from "@/components/BackgroundEffects";
 import GameNav, { COMMON_ACTIONS } from '../components/GameNav';
+import AvatarSVG from '../components/AvatarSVG';
 
 export default function InventarioPage() {
   const router = useRouter();
@@ -251,7 +252,9 @@ export default function InventarioPage() {
             <div className="absolute -inset-0.5 bg-gradient-to-r from-green-500/20 to-cyan-500/20 rounded-lg blur"></div>
             <div className="relative bg-slate-950/80 backdrop-blur-xl border border-green-500/30 rounded-lg p-4">
               <div className="flex items-center gap-4">
-                <div className="text-3xl">⚔️</div>
+                <div className="flex-shrink-0">
+                  <AvatarSVG avatar={avatarAtivo} tamanho={48} />
+                </div>
                 <div className="flex-1">
                   <div className="text-xs text-slate-500 uppercase font-mono mb-1">Avatar Ativo</div>
                   <div className="text-lg font-bold text-green-400">{avatarAtivo.nome}</div>
