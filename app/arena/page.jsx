@@ -88,26 +88,6 @@ export default function ArenaLobby() {
       corHover: 'hover:border-red-400',
       disponivel: true,
       rota: '/arena/pvp'
-    },
-    {
-      id: 'sobrevivencia',
-      nome: 'Sobrevivência',
-      emoji: '💀',
-      descricao: 'Quantas ondas você consegue sobreviver?',
-      detalhes: 'Sistema de ondas progressivas com dificuldade crescente. Teste suas habilidades no modo mais difícil da arena.',
-      recursos: [
-        'Ondas infinitas e progressivas',
-        'Dificuldade crescente balanceada',
-        'Recompensas acumulativas',
-        'Sistema de recordes pessoais'
-      ],
-      cor: 'from-purple-600 to-purple-900',
-      corBorda: 'border-purple-500',
-      corBg: 'bg-purple-900/10',
-      corHover: 'hover:border-purple-400',
-      disponivel: true, // INTERFACE DISPONÍVEL
-      rota: '/arena/sobrevivencia',
-      beta: true // Badge BETA
     }
   ];
 
